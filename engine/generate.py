@@ -64,3 +64,14 @@ def generate_paged(model, tokenizer, prompt: str, max_tokens: int = 128,
     lives, not what the model computes.
     """
     raise NotImplementedError("M1.5")
+
+
+def generate_speculative(model, tokenizer, prompt: str, max_tokens: int = 128,
+                         on_token: OnToken = None, n_draft: int = 8) -> str:
+    """M1.8 (Lecture 12). Draft, verify, accept.
+
+    Output must be IDENTICAL to generate_cached under greedy decoding --
+    speculation is exact, not approximate. Report acceptance rate alongside
+    tok/s or you cannot tell a real win from a lucky one.
+    """
+    raise NotImplementedError("M1.8")

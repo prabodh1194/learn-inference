@@ -166,24 +166,49 @@ def long_prefill(n: int = 8, prompt_words: int = 3000, max_tokens: int = 32,
 
 
 def code_completion(n: int = 16, max_tokens: int = 128, seed: int = 0) -> Workload:
-    """Output heavily echoes input -- n-gram speculation's best case."""
+    """Output heavily echoes input -- n-gram speculation's best case.
+
+    The prompt deliberately contains REPEATED structure (near-identical method
+    bodies, recurring call patterns). That repetition is the whole point: a
+    prompt-lookup speculator drafts by finding a recent n-gram and proposing
+    what followed it. A prompt with no internal repetition gives it nothing to
+    find, and the workload would show a ~0% acceptance rate -- proving nothing.
+    """
     rng = random.Random(seed)
     template = (
-        "def process_batch(requests, scheduler, cache):\n"
-        "    scheduled = scheduler.schedule(requests)\n"
-        "    for req in scheduled:\n"
-        "        block = cache.allocate(req)\n"
-        "        req.status = 'running'\n"
+        "class BlockManager:\n"
+        "    def allocate_block(self, seq):\n"
+        "        if not self.free_blocks:\n"
+        "            raise OutOfMemoryError('no free blocks')\n"
+        "        block = self.free_blocks.popleft()\n"
+        "        self.ref_counts[block] = 1\n"
+        "        return block\n"
         "\n"
-        "# Rewrite the function above with error handling, keeping style identical:\n"
+        "    def allocate_prefix(self, seq):\n"
+        "        if not self.free_blocks:\n"
+        "            raise OutOfMemoryError('no free blocks')\n"
+        "        block = self.free_blocks.popleft()\n"
+        "        self.ref_counts[block] = 1\n"
+        "        return block\n"
+        "\n"
+        "    def allocate_shared(self, seq):\n"
+        "        if not self.free_blocks:\n"
+        "            raise OutOfMemoryError('no free blocks')\n"
+        "        block = self.free_blocks.popleft()\n"
+        "        self.ref_counts[block] = 1\n"
+        "        return block\n"
+        "\n"
+        "# Add allocate_swapped following exactly the same pattern:\n"
+        "    def allocate_swapped(self, seq):\n"
     )
     return Workload(
         name="code_completion",
         milestone="M1.8",
-        note="Repetitive, predictable syntax. n-gram/prompt-lookup speculation "
+        note="Repetitive, predictable syntax -- the completion is nearly a copy "
+             "of blocks already in the prompt. n-gram/prompt-lookup speculation "
              "should show a high acceptance rate here.",
         requests=[
-            Request(prompt=template + f"# variant {rng.randrange(1000)}\n",
+            Request(prompt=template + f"        # variant {rng.randrange(1000)}\n",
                     max_tokens=max_tokens)
             for _ in range(n)
         ],
