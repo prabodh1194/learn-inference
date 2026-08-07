@@ -8,6 +8,19 @@ The premise: you don't learn what a KV cache is by reading about it. You write
 `generate()` without one, watch per-token latency climb, then add it and watch
 the curve go flat.
 
+## → Start here: [the book](book/README.md)
+
+Lectures with runnable demos, stubs to fill in, and tests that prove you got it
+right. [Lecture 00](book/00-intro.md) is the entry point.
+
+Runs today, no GPU and no download:
+
+```bash
+uv sync --group dev
+uv run python book/code/two_phases.py    # why decode is the hard part
+uv run pytest -m "not cuda" -q
+```
+
 **Model throughout:** `Qwen3-0.6B` — small enough to iterate on a laptop, real
 enough to be non-trivial (GQA, RoPE, RMSNorm, SwiGLU). Same model start to finish
 so every benchmark is comparable.
