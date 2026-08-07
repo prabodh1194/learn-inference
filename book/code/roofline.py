@@ -71,6 +71,19 @@ class ModelDims:
         )
 
 
+def model_params(d: "ModelDims") -> int:
+    """Rough parameter count: attention projections + MLP, per layer.
+
+    Approximate on purpose -- the ratios this book cares about are insensitive
+    to a constant factor. For exact counts, load the model (Lecture 03).
+    """
+    return 12 * d.n_layers * d.hidden**2
+
+
+def model_params_bytes(d: "ModelDims") -> int:
+    return model_params(d) * d.bytes_per_value
+
+
 # --------------------------------------------------------------------------
 # attention intensity -- book Figs 2.16-2.18
 # --------------------------------------------------------------------------

@@ -11,21 +11,7 @@ re-reads the entire model on every one of them.
 
 from __future__ import annotations
 
-from book.code.roofline import ModelDims
-
-
-def flops_matmul(m: int, k: int, n: int) -> int:
-    """(m,k) @ (k,n) -- one multiply and one add per output element per k."""
-    return 2 * m * k * n
-
-
-def model_params(d: ModelDims) -> int:
-    """Rough parameter count: attention projections + MLP, per layer.
-
-    Approximate on purpose. What matters is the ratio between phases, and that
-    is insensitive to a constant factor.
-    """
-    return 12 * d.n_layers * d.hidden**2
+from book.code.roofline import ModelDims, model_params
 
 
 def phase_work(d: ModelDims, prompt_tokens: int, output_tokens: int) -> dict:
