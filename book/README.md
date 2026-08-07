@@ -104,5 +104,7 @@ This book indexes two excellent sources rather than duplicating them:
 
 ## Status
 
-Part I is written. Later parts are in progress — the TOC above is the plan, and
-links to unwritten lectures won't resolve yet.
+**Parts I and II are written** (Lectures 00–14) — foundations through a working
+engine, ending with reading vLLM. That's the core of the book.
+
+Parts III–V are in progress; their links above won't resolve yet.
