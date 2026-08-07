@@ -104,7 +104,11 @@ This book indexes two excellent sources rather than duplicating them:
 
 ## Status
 
-**Parts I and II are written** (Lectures 00–14) — foundations through a working
-engine, ending with reading vLLM. That's the core of the book.
+**All 30 lectures are written**, front matter through appendices.
 
-Parts III–V are in progress; their links above won't resolve yet.
+The **code** is a different matter, and deliberately so: `engine/`, `kernels/`,
+`jaxlm/`, and `serve/` are stubs for *you* to fill in. The demos in `book/code/`
+run today; the tests in `tests/` fail until you build each lecture. That failure
+list is the course.
+
+Run `uv run python scripts/progress.py` to see where you are.
