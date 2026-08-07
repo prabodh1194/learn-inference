@@ -37,6 +37,9 @@ DEVICES = [
     Device("H100 SXM", 989e12, 3.35e12),
     Device("A100 80GB", 312e12, 2.039e12),
     Device("RTX 4090", 165e12, 1.008e12),
+    # The rental target (Vast.ai, ~$0.20-0.25/hr). Ampere sm_86, 24GB.
+    # fp16-with-fp32-accumulate on consumer Ampere runs at half rate: ~71 TFLOPS.
+    Device("RTX 3090", 71e12, 936e9),
     # M1: ~2.6 TFLOPS fp16 GPU, ~68 GB/s unified memory.
     # TODO verify on your machine -- these are nominal figures.
     Device("Apple M1", 2.6e12, 68.25e9),

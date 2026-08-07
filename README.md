@@ -123,13 +123,17 @@ uv sync --extra serve
 
 | Phase | Where |
 |---|---|
-| 0, M1.1–M1.4 | laptop — correctness and scheduling logic are CPU/MPS-fine |
+| 0, M1.1–M1.4 | laptop (M1 / MPS) — correctness and scheduling logic don't need CUDA |
 | M1.5 onward | rented NVIDIA — paged attention and CUDA graphs need real CUDA |
 | Phase 2 | rented, every session — Nsight requires NVIDIA |
 | M3.3 | rented multi-GPU (2–4×) |
 | Phase 4 | rented, longer blocks — load testing needs sustained runtime |
 
-Read and write code locally, batch the GPU work, always stop the pod.
+**Default rental: RTX 3090 on Vast.ai (~$0.20–0.25/hr).** 24GB, Ampere sm_86 —
+bf16, Triton, and Nsight all work. No FP8, which only affects M2.5 (INT8 is a
+fine substitute). Cheaper and faster than the comparable AWS spot options.
+
+Read and write code locally, batch the GPU work, **always stop the pod**.
 
 ## Reference
 
