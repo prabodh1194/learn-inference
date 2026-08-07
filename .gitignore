@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Models & weights — never commit
+models/
+*.safetensors
+*.pt
+*.bin
+*.gguf
+
+# Bench artifacts: keep results/*.json, ignore plots
+bench/results/*.png
+bench/results/*.svg
+!bench/results/*.json
+
+# Profiling
+*.nsys-rep
+*.ncu-rep
+*.qdrep
+prof/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
