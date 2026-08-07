@@ -80,6 +80,16 @@ the answer feels efficient and teaches you much less.
 
 ---
 
+## Field notes
+
+[**field-notes.md**](field-notes.md) collects what practitioners report — real
+magnitudes from real deployments, and the places where an optimization
+disappointed someone. Books give you the mechanism; these give you the scale.
+
+Use them to sanity-check your own results, and add your own entries as you go.
+
+---
+
 ## Companion texts
 
 This book indexes two excellent sources rather than duplicating them:

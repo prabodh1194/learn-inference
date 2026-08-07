@@ -115,6 +115,10 @@ Nothing to build yet. Do this instead — it takes five minutes and it matters:
 
 ## Go deeper
 
+- **[Field notes](field-notes.md)** — a 2×3090 setup measuring **~1500 tok/s
+  prefill against ~100 tok/s decode**. This lecture's asymmetry, as a production
+  number. Same source: 100 tok/s for one user, **585 tok/s across 8** — the
+  batching table, confirmed.
 - **Kiely §2.4.2** (p.63–66) — "LLM Inference Bottlenecks." The same split, with
   the memory-movement table this book's Lecture 02 reproduces.
 - **Kiely §1.4** (p.35–37) — TTFT and TPS as product metrics, not just numbers.
