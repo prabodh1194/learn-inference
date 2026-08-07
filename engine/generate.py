@@ -49,5 +49,18 @@ def generate_batched(model, tokenizer, prompts: list[str], max_tokens: int = 128
 
     Report padding_waste_fraction alongside throughput -- the waste is what
     motivates continuous batching (M1.4).
+
+    padding_side='left' is mandatory: with right-padding, logits[:, -1] reads a
+    PAD position for short sequences and predicts from nothing.
     """
     raise NotImplementedError("M1.3")
+
+
+def generate_paged(model, tokenizer, prompt: str, max_tokens: int = 128,
+                   on_token: OnToken = None) -> str:
+    """M1.5 (Lecture 09). Same generation, KV cache stored in blocks.
+
+    Output must be identical to generate_cached -- this changes WHERE the cache
+    lives, not what the model computes.
+    """
+    raise NotImplementedError("M1.5")
