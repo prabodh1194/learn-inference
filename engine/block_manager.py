@@ -30,5 +30,30 @@ class BlockManager:
         raise NotImplementedError("M1.5")
 
     def match_prefix(self, token_ids: list[int]) -> tuple[list[int], int]:
-        """M1.6. Return (cached_block_ids, n_tokens_hit)."""
+        """M1.6 (Lecture 10). Return (cached_block_ids, n_tokens_hit).
+
+        Walk the sequence block by block, hashing (parent_hash, tokens). Stop
+        at the first miss -- once the chain breaks, no later block can match.
+
+        The parent hash is not optional: K/V at position 16 depend on tokens
+        0-15, so identical tokens with different histories are different
+        blocks. Omitting it gives silently wrong output on cache hits.
+        """
+        raise NotImplementedError("M1.6")
+
+    def cache_blocks(self, sequence) -> None:
+        """M1.6. Publish a sequence's FULL blocks into the hash index.
+
+        Called after prefill, when the contents are final. Partial blocks are
+        still being written and must not be published.
+        """
+        raise NotImplementedError("M1.6")
+
+    def evict(self) -> int | None:
+        """M1.6. Reclaim the least-recently-used refcount-0 block.
+
+        A refcount-0 block is not garbage -- it is cached, and may serve a
+        future request. Reclaim only under memory pressure. Returns None when
+        nothing is evictable, which means genuine exhaustion (preempt).
+        """
         raise NotImplementedError("M1.6")
