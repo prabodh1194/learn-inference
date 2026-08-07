@@ -1,13 +1,13 @@
-"""M0.4 -- arithmetic intensity by hand, then plot the roofline.
+"""Lecture 02 -- arithmetic intensity, by hand.
 
-Runnable now: the arithmetic needs no GPU and no model weights. Run it before
-you implement anything else -- predicting the bottleneck on paper, then
-confirming it by measurement, is the entire point of Phase 0.
+Runnable right now: pure arithmetic, no GPU and no model weights. Run it before
+you implement anything else. Predicting a bottleneck on paper and then
+confirming it by measurement is the habit the whole course is built on.
 
-    uv run python notes/00-baseline/m04_roofline.py
+    uv run python book/code/roofline.py
 
-Reproduces Inference Engineering §2.4 (Figs 2.14-2.18) and extends it to
-Qwen3-0.6B's real dimensions.
+Reproduces Kiely, *Inference Engineering* §2.4 (Figs 2.14-2.18, p.61-66) and
+extends it to Qwen3-0.6B's real dimensions.
 """
 
 from __future__ import annotations
