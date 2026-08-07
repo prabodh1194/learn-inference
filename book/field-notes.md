@@ -83,6 +83,57 @@ A useful prior: **configuration and workload shape dominate build flags.** Befor
 reaching for exotic builds, tune engine arguments and check you're measuring the
 right workload. The boring lever is usually the bigger one.
 
+## Measure quality with a *task*, not just perplexity — **L19**
+
+A systematic comparison of Qwen3-27B across BF16 → Q8 → Q6 → Q5 → Q4 → IQ3
+([source](https://old.reddit.com/r/LocalLLaMA/comments/1t53dhp/quality_comparison_between_qwen_36_27b/))
+didn't use perplexity. It used a task with a **verifiable right answer**: given a
+chess PGN, track the board state and render it as SVG.
+
+Two things worth stealing:
+
+**A task exposes what perplexity hides.** Degradation showed up as *wrong piece
+placement* and *wrong board orientation* — structured-reasoning failures that a
+small perplexity delta wouldn't reveal.
+
+**Deliberately out-of-distribution inputs.** The author used nonsense chess moves
+"no player above 300 elo would ever play," specifically so memorization couldn't
+substitute for reasoning. If your eval is in the training set, you're measuring
+recall.
+
+When Lecture 19 says "measure the quality axis," this is the bar: a task you can
+grade, on inputs the model can't have memorized.
+
+## Conventional wisdom about parallelism is worth re-measuring — **L22**
+
+An operator with **2× GH200 and no NVLink** (PCIe only — 125 GB/s instead of
+900 GB/s) followed the standard guidance that low interconnect bandwidth means
+you should use pipeline parallelism instead of tensor parallelism
+([source](https://old.reddit.com/r/LocalLLaMA/comments/1qa1guo/i_bought_a_9k_gh200_desktop_to_save_127_on_claude/)).
+
+**Pipeline parallel lost. TP2 won**, on the exact hardware profile where the
+guides say it shouldn't.
+
+They also found `--max-num-seqs 16` was the single knob that "controls whether it
+feels like a sports car or a fax machine" — a scheduler concurrency limit
+(Lecture 08's `max_batch_size`) mattering more than the parallelism strategy.
+
+The lesson isn't "TP always wins." It's that **rules of thumb about interconnect
+and parallelism are workload- and model-dependent**, and a weekend of
+benchmarking beats a blog post. Measure your own scaling curve in Lecture 22.
+
+## KV cache quantization is its own frontier — **L19, L05**
+
+Several recent projects compress the **KV cache** rather than the weights,
+reporting 3–5× compression. Worth knowing because it attacks a different
+bottleneck than weight quantization: from Lecture 05, the cache can exceed the
+model's size at long context, and from Lecture 09, cache capacity directly caps
+your batch size.
+
+Note the recurring caveat in these reports: compression that holds up on general
+text can degrade **reasoning** specifically. Another argument for task-based
+evaluation over aggregate metrics.
+
 ---
 
 ## How to use this
