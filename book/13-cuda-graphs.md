@@ -2,7 +2,7 @@
 
 **Build:** graph capture in the model runner · **Test:** `tests/test_13_graphs.py` (cuda)
 **Moves:** per-step latency for small batches — sometimes a lot
-**Prereq:** [12 — Speculative decoding](12-speculative-decoding.md)
+**Prereq:** [12b — Structured output and adapters](12b-structured-output.md)
 
 > **NVIDIA GPU required.** No CUDA-graph equivalent exists on MPS. Tests here are
 > marked `cuda` and skip cleanly on a laptop.
@@ -62,6 +62,17 @@ padding is real waste, traded against launch savings.
 
 **Static memory.** Inputs must be copied into the same buffers each time. You
 cannot pass fresh tensors.
+
+> This constraint is why `StaticCache` exists (Lecture 05). A `DynamicCache`
+> grows by concatenation, so its tensors move — new addresses every step, which a
+> captured graph cannot follow. `StaticCache` pre-allocates to `max_cache_len` and
+> writes in place, so the addresses hold still.
+>
+> The cost is the one Lecture 09 spent a whole lecture on: pre-allocating the
+> worst case per sequence. **CUDA graphs and paged attention pull against each
+> other**, and every engine resolves it by capturing graphs over the *block
+> tables* rather than over contiguous cache tensors. Worth noticing in vLLM's
+> `gpu_model_runner.py`.
 
 **No data-dependent control flow.** `if token == eos: break` inside the captured
 region doesn't work — the branch was fixed at capture time. Sampling and stopping

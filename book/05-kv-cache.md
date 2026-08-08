@@ -121,6 +121,22 @@ The critical line is `model(next_id, past_key_values=past)` — **one** token go
 in, not the whole sequence. If you pass the full sequence *and* the cache, you get
 wrong output and no speedup, which is the classic first bug here.
 
+> **A note on the transformers API.** In transformers 5.x, `past_key_values` is a
+> `Cache` **object**, not the legacy tuple-of-tuples you'll see in older tutorials.
+> Treat it as opaque and thread it through — the code above works either way.
+>
+> Two implementations are worth knowing, because they're the same distinction
+> you'll rebuild yourself:
+>
+> - **`DynamicCache`** — grows by concatenation as tokens arrive. The default,
+>   and the direct analogue of the `KVCache` you're about to write.
+> - **`StaticCache`** — pre-allocated to `max_cache_len`, fixed shape, written
+>   in place. Wasteful for the same reason your `KVCache` will be (Lecture 09),
+>   but the fixed shape is exactly what CUDA graphs require. That's why it
+>   exists, and it comes back in Lecture 13.
+>
+> Notice that HuggingFace faced your Lecture 09 problem and shipped both answers.
+
 ### Then write it yourself
 
 Using HuggingFace's cache teaches you the shape. Implementing `KVCache` teaches

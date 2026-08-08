@@ -39,6 +39,7 @@ haven't hit yet.
 | Scheduler | L08 |
 | Chunked prefill | L11 |
 | Prefix caching | L10 |
+| Guided Decoding (FSM) | L12b |
 | Speculative decoding | L12 |
 | Disaggregated P/D | L27 (preview) |
 | MultiProcExecutor | L22 (preview) |

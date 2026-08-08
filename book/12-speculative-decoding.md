@@ -220,5 +220,5 @@ That last one has no honest single answer, which is the point.
 
 ---
 
-**Next:** [13 — CUDA graphs](13-cuda-graphs.md) — when the bottleneck stops being
-the GPU and starts being Python.
+**Next:** [12b — Structured output and adapters](12b-structured-output.md) — what
+comes out, not just how fast.

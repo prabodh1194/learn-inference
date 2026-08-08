@@ -57,6 +57,7 @@ the answer feels efficient and teaches you much less.
 - [10 — Prefix caching](10-prefix-caching.md) — content hashing, refcounts, and why context order matters
 - [11 — Chunked prefill](11-chunked-prefill.md) — protecting p99 from long prompts
 - [12 — Speculative decoding](12-speculative-decoding.md) — draft, verify, accept
+- [12b — Structured output and adapters](12b-structured-output.md) — guided decoding, tool calling, LoRA
 - [13 — CUDA graphs](13-cuda-graphs.md) — when launch overhead is the bottleneck
 - [14 — Reading vLLM](14-reading-vllm.md) — the capstone: now go read the real thing
 
