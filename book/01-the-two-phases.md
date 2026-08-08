@@ -36,11 +36,11 @@ Pure arithmetic — no GPU, no model download. Look for three things.
 
 ```
              compute     memory read    ops:byte
-prefill     360.8 GF          672 MiB      512.00
-decode      180.4 GF       189952 MiB        0.91
+prefill     451.0 GF          840 MiB      512.00
+decode      225.5 GF       232960 MiB        0.92
 ```
 
-Decode does *half* the compute of prefill and moves **283× more memory**.
+Decode does *half* the compute of prefill and moves **277× more memory**.
 
 **Second**, the per-token table. A generated token costs hundreds to thousands of
 times the memory traffic of a prompt token — and the ratio *falls* as prompts get
@@ -59,12 +59,12 @@ The asymmetry comes from one fact:
 > Decode reloads **all of them** for every single generated token.
 
 With a 512-token prompt, prefill does 512 tokens' worth of work per weight load.
-Decode does one. The weights are ~672 MiB either way.
+Decode does one. The weights are ~840 MiB either way.
 
 This is a **matrix-matrix vs. matrix-vector** distinction. Prefill multiplies a
 weight matrix by a matrix of 512 token vectors — lots of arithmetic per byte
 fetched. Decode multiplies the same weight matrix by a *single* vector. The GPU
-loads 672 MiB to do a rounding error's worth of math, then does it again for the
+loads 840 MiB to do a rounding error's worth of math, then does it again for the
 next token.
 
 So:

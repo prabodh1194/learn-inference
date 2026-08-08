@@ -11,7 +11,7 @@
 You can serve one request efficiently. Now serve thirty-two.
 
 The naive approach — one at a time — leaves the GPU almost entirely idle. Lecture
-01 showed why: decode reloads all 672 MiB of weights to generate one token. Those
+01 showed why: decode reloads all 840 MiB of weights to generate one token. Those
 same weights could have served 32 sequences for the same memory traffic.
 
 So batch them. It works, and it introduces a new problem that takes the next

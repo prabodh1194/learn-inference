@@ -12,7 +12,7 @@ Every optimization so far has attacked *waste*: recomputation, padding, idle
 slots, fragmentation, stalls. Decode is now efficient.
 
 It's still **sequential**. Token N+1 needs token N. One token per forward pass,
-and each pass drags all 672 MiB of weights through memory to produce ~2 bytes of
+and each pass drags all 840 MiB of weights through memory to produce ~2 bytes of
 output.
 
 Batching fixed this for *aggregate* throughput — but a single user still waits one

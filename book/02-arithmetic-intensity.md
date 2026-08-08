@@ -29,6 +29,20 @@ must do per byte loaded to keep its compute units busy. For an H100: 989 TFLOPS 
 3.35 TB/s ≈ **295 operations per byte**. Fetch a byte, do fewer than 295
 operations with it, and you've wasted the trip.
 
+> **Which FLOPS number?** Spec sheets list several, differing by up to 8×, and
+> picking the wrong one silently corrupts every prediction you make.
+>
+> TechPowerUp lists the RTX 3090 at "FP16 (half) 35.58 TFLOPS **(1:1)**" — that's
+> the *shader* rate, where fp16 runs no faster than fp32. Matmuls don't use
+> shaders; they use **tensor cores**, and the 3090's dense fp16 tensor rate is
+> ~71 TFLOPS. That's the number in `roofline.py`.
+>
+> Vendors also quote **sparse** rates, which are 2× dense and require 2:4
+> structured sparsity you almost certainly don't have. If a headline number looks
+> suspiciously round and large, check whether it's sparse.
+>
+> Rule: **dense tensor-core rate, at the dtype you actually run.**
+
 Now the same measure for an *algorithm*, called **arithmetic intensity**:
 
 ```
