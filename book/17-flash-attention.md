@@ -171,6 +171,16 @@ exists is the point.
 - **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022) —
   read §3.1 for the tiling algorithm and Algorithm 1. You've now implemented it,
   so the paper reads as confirmation rather than instruction.
+
+  Two things in the abstract are worth reading closely. It calls the algorithm
+  **"IO-aware"** — the framing that memory movement between HBM and SRAM, not
+  FLOPs, is the quantity to optimize. That's Lecture 02's roofline, stated as a
+  design principle.
+
+  And it proves the IO complexity is **optimal for a range of SRAM sizes** — not
+  merely better, but provably the least HBM traffic possible. That's rare in
+  systems work, and it's why FlashAttention became the default rather than one
+  option among several.
 - **[FlashAttention-2](https://arxiv.org/abs/2307.08691)** — better work
   partitioning; explains where your version's remaining gap comes from.
 - **[Online normalizer calculation for softmax](https://arxiv.org/abs/1805.02867)**

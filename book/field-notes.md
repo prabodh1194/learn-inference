@@ -106,8 +106,8 @@ grade, on inputs the model can't have memorized.
 
 ## Conventional wisdom about parallelism is worth re-measuring — **L22**
 
-An operator with **2× GH200 and no NVLink** (PCIe only — 125 GB/s instead of
-900 GB/s) followed the standard guidance that low interconnect bandwidth means
+An operator with **2× GH200 and no NVLink** (PCIe only; they quote 125 GB/s
+against NVLink's 900) followed the standard guidance that low interconnect bandwidth means
 you should use pipeline parallelism instead of tensor parallelism
 ([source](https://old.reddit.com/r/LocalLLaMA/comments/1qa1guo/i_bought_a_9k_gh200_desktop_to_save_127_on_claude/)).
 

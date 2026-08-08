@@ -71,13 +71,22 @@ time = compute/N + communication(N)
 Past some N, communication dominates and adding GPUs stops helping. Where that
 happens depends on interconnect:
 
-| Link | Bandwidth |
+| Link | Bandwidth per GPU |
 |---|---|
-| NVLink | ~900 GB/s |
-| PCIe 5 | ~125 GB/s |
+| NVLink 4 (Hopper) | 900 GB/s |
+| NVLink 5 (Blackwell) | 1,800 GB/s |
+| NVLink 6 (Rubin) | 3,600 GB/s |
+| **PCIe 5 ×16** | **~64 GB/s each way (~128 bidirectional)** |
 
-**A 7× difference in the thing that isn't parallelized.** This is why the same
+*(NVIDIA's published figures. NVLink numbers are bidirectional per GPU.)*
+
+**Roughly an order of magnitude, in the thing that isn't parallelized** — and the
+gap has widened with each NVLink generation, not narrowed. This is why the same
 model scales beautifully on one box and poorly on another with identical GPUs.
+
+Note also what this means for **rented** hardware: a Vast.ai listing advertising
+"2× 3090" tells you nothing about the link between them. Check
+`nvidia-smi topo -m` before you interpret a scaling curve.
 
 ### Where the rules of thumb break
 
@@ -85,7 +94,8 @@ Conventional guidance says: low interconnect bandwidth → use pipeline parallel
 instead of TP.
 
 The [field notes](field-notes.md) record an operator with **2× GH200 and no
-NVLink** (PCIe only, 125 GB/s instead of 900) who followed exactly that advice.
+NVLink** (PCIe only — they quote 125 GB/s against NVLink's 900) who followed
+exactly that advice.
 **Pipeline parallel lost. TP2 won.** On the hardware profile where guides say it
 shouldn't.
 
