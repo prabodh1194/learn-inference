@@ -8,6 +8,7 @@ runs before trusting anything downstream.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 
 @dataclass
@@ -18,6 +19,11 @@ class SamplingParams:
     repetition_penalty: float = 1.0
     max_tokens: int = 128
     seed: int | None = None
+
+    # Lecture 12b: called with the logits before sampling; returns masked
+    # logits. This one hook is how guided decoding, tool calling, and any
+    # custom constraint plug in.
+    logit_processor: "Callable[[object], object] | None" = None
 
     @property
     def greedy(self) -> bool:

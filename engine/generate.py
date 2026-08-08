@@ -75,3 +75,13 @@ def generate_speculative(model, tokenizer, prompt: str, max_tokens: int = 128,
     tok/s or you cannot tell a real win from a lucky one.
     """
     raise NotImplementedError("M1.8")
+
+
+def generate_graphed(model, tokenizer, prompt: str, max_tokens: int = 128,
+                     on_token: OnToken = None) -> str:
+    """M1.9 (Lecture 13). Decode step replayed from a captured CUDA graph.
+
+    Needs a StaticCache: a captured graph replays against fixed addresses, and
+    DynamicCache grows by concatenation so its tensors move.
+    """
+    raise NotImplementedError("M1.9")

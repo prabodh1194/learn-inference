@@ -49,11 +49,25 @@ correctness, a test tells you.
 
 ## Progress
 
-| Lecture | Test | Needs |
-|---|---|---|
-| 02 arithmetic intensity | `test_02_roofline.py` | ✅ passes today |
-| 03 naive generation | `test_03_generation.py` | `model.py::load`, `generate_naive` |
-| 04 measuring | `test_04_measuring.py` | ✅ passes today |
-| 05 KV cache | `test_05_kv_cache.py` | `generate_cached` |
-| 06 sampling | `test_06_sampling.py` | `sampling.py::sample` |
-| 07 static batching | `test_07_batching.py` | `generate_batched` |
+Run `uv run python scripts/progress.py` for live status. Statuses mean:
+
+| | |
+|---|---|
+| `[x]` | verified — implemented and passing |
+| `[~]` | arithmetic passes, model tests skipped (fetch the model) |
+| `[ ]` | not implemented — this is your homework |
+| `[-]` | needs a GPU, or needs the model downloaded |
+| `[!]` | **regression** — something you already built broke |
+
+`[!]` is the only one that means something is wrong.
+
+## What passes today
+
+Some tests are green on a fresh clone because they pin *arithmetic* rather
+than your implementation — the roofline derivation, Amdahl bounds, cost-per-
+million-tokens, sharding math, MoE parameter accounting.
+
+Those aren't filler. They caught three real bugs while this repo was being
+written: a wrong percentile assertion, a `code_completion` workload with zero
+n-gram repetition (which would have taught the opposite of Lecture 12), and a
+block-size table that showed no fragmentation at all.

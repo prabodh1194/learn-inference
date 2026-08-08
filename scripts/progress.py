@@ -27,6 +27,21 @@ LECTURES = [
     ("10", "Prefix caching", "test_10_prefix.py"),
     ("11", "Chunked prefill", "test_11_chunked.py"),
     ("12", "Speculative decoding", "test_12_speculative.py"),
+    ("12b", "Structured output", "test_12b_structured.py"),
+    ("13", "CUDA graphs", "test_13_graphs.py"),
+    ("15", "Profiling", "test_15_profiling.py"),
+    ("16", "Triton basics", "test_16_triton.py"),
+    ("17", "FlashAttention", "test_17_flash.py"),
+    ("18", "Paged attn kernel", "test_18_paged_kernel.py"),
+    ("19", "Quantization", "test_19_quantization.py"),
+    ("20", "Raw CUDA", "test_20_cuda.py"),
+    ("21", "JAX and XLA", "test_21_jax.py"),
+    ("22", "Tensor parallelism", "test_22_tp.py"),
+    ("23", "MoE / expert parallel", "test_23_moe.py"),
+    ("24", "Serving", "test_24_serving.py"),
+    ("25", "Load testing", "test_25_load.py"),
+    ("27", "Routing / disagg", "test_27_routing.py"),
+    ("28", "Autoscaling / cost", "test_28_cost.py"),
 ]
 
 GREEN, RED, GREY, DIM, RESET = "\033[32m", "\033[31m", "\033[90m", "\033[2m", "\033[0m"
@@ -51,6 +66,12 @@ def run(test_file: str) -> str:
 
     passed = int(m.group(1)) if (m := re.search(r"(\d+) passed", out)) else 0
     skipped = int(m.group(1)) if (m := re.search(r"(\d+) skipped", out)) else 0
+    deselected = int(m.group(1)) if (m := re.search(r"(\d+) deselected", out)) else 0
+
+    # Everything deselected means the whole lecture is CUDA-only. On a laptop
+    # that is expected, not unknown -- say so plainly.
+    if deselected and not passed and not skipped:
+        return "gpu_only"
 
     # A lecture is only "done" when its model-backed tests actually RAN.
     # Reporting done off the pure-arithmetic tests alone would tell you a
@@ -76,9 +97,10 @@ def main() -> None:
             "failing":  ("[!]", RED, "FAILING -- something you built broke"),
             "skipped":  ("[-]", GREY, "skipped -- run scripts/fetch_model.py"),
             "unwritten": ("[ ]", DIM, "lecture not written yet"),
+            "gpu_only": ("[-]", GREY, "needs a GPU -- rent one (see L09)"),
             "unknown":  ("[?]", GREY, ""),
         }[status]
-        line = f"  {color}{mark} L{num}  {title:<24}{RESET}"
+        line = f"  {color}{mark} L{num:<4}{title:<24}{RESET}"
         print(f"{line}{DIM}{note}{RESET}" if note else line)
 
     done = counts.get("done", 0)
