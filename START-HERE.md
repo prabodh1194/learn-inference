@@ -175,7 +175,7 @@ nano-vllm file by file.
 
 ---
 
-## Part III — Kernels 🖥️ *(rent a 3090, ~$0.25/hr)*
+## Part III — Kernels 🖥️ *(rent a 3090 — [median ~$0.16/hr](https://vast.ai/pricing))*
 
 **27.** [L15 — Profiling](book/15-profiling.md). **Build your kernel ranking
 table first.** Every later optimization must cite it.

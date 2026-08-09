@@ -1,15 +1,19 @@
 # 00 — Introduction
 
-**Build:** the environment · **Test:** `pytest -m "not cuda"` · **Prereq:** you've trained a transformer
+**Build:** the environment · **Test:** `uv run python scripts/progress.py`
+**Prereq:** you can read PyTorch and know what attention computes
 
 ---
 
 ## Why inference is its own discipline
 
-You know how a transformer works. You've implemented attention, trained a model,
-watched a loss curve go down. That knowledge is necessary here and it is not
-sufficient, because **inference optimizes for something training never cares
-about: one token, right now.**
+This book assumes you can read PyTorch and know roughly what attention computes
+— Q, K, V, and why it's causal. It does **not** assume you've trained a model,
+and it never asks you to.
+
+If you have trained one, one habit needs unlearning, and it's the reason this
+lecture leads with it: **inference optimizes for something training never cares
+about — one token, right now.**
 
 Training is **throughput-only**. Nobody is waiting on any individual step, so
 you're free to make batches as large as memory allows. Every sequence in a batch
@@ -46,25 +50,34 @@ nearly everything in this book:
 A matrix-*matrix* multiply over a batch does lots of work per byte loaded. A
 matrix-*vector* multiply for a single token does almost none. Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
-Qwen3-0.6B decode runs at **0.75 operations per byte** on a machine that can
-sustain 295. You are using roughly 0.25% of the arithmetic the GPU can do.
+Qwen3-0.6B decode runs at **0.75 operations per byte**, against an H100 that
+needs 295 to keep its arithmetic units busy. That's roughly 0.25% — and the
+conclusion isn't hardware-specific: the same calculation puts decode far to the
+memory-bound side on an A100, a 3090, and an M1 alike.
 
-Nearly every technique in this book is a different answer to *"how do we get more
-work out of each byte we were going to load anyway?"*
+Most of Part II answers one question: *"how do we get more work out of each byte
+we were going to load anyway?"*
 
 - **Batching** — load the weights once, generate for 32 sequences instead of 1.
 - **KV caching** — don't recompute what you already computed.
 - **Quantization** — make the bytes smaller.
 - **Speculative decoding** — verify several tokens in the time one would take.
 
-Four techniques, one bottleneck. Once you see it, the field stops being a list of
-tricks and becomes a single idea with variations.
+Four techniques, one bottleneck. Once you see it, that part of the field stops
+being a list of tricks and becomes a single idea with variations.
+
+It is not the *only* idea, and this book doesn't pretend otherwise. Paged
+attention (L09) attacks **memory capacity**, not bandwidth. CUDA graphs (L13)
+attack **CPU launch overhead** — cases where the GPU isn't the bottleneck at all.
+Chunked prefill (L11) redistributes work without reducing it. And Part V is about
+utilization and cost, where the biggest lever is often not touching the engine.
 
 ---
 
 ## How this book works
 
-Same method as Karpathy's Zero-to-Hero, aimed at a different target:
+The method is borrowed from Karpathy's Zero-to-Hero (no affiliation — it's
+simply the format that works), aimed at a different target:
 
 > **build the naive thing → measure it → find the bottleneck → fix it → measure again**
 
@@ -90,7 +103,11 @@ notes/    your results and surprises  RECORD
 `tests/` is what makes progress unambiguous. Every implementation milestone has a
 test asserting your version matches a reference — your greedy output must match
 HuggingFace's exactly, your paged attention must match contiguous attention, your
-Triton kernel must match PyTorch. Green means done, not "seems fine."
+Triton kernel must match PyTorch.
+
+Green means **correct on the cases tested**, which is weaker than "done" but far
+stronger than "seems fine" — and it's what lets you optimize aggressively later,
+because you find out immediately when speed costs you correctness.
 
 ### Notes
 
@@ -109,9 +126,14 @@ slower. These are not embarrassing; they're most of what expertise actually is.
 ## What you'll build
 
 By Lecture 14 you'll have an engine that does continuous batching over a paged KV
-cache with prefix caching and speculative decoding — the same architecture as
-vLLM, smaller and slower but genuinely the same ideas. Then you read vLLM and
-find it comprehensible.
+cache, with prefix caching and speculative decoding.
+
+Those are the same *ideas* vLLM is built on, and enough shared structure — a
+scheduler/runner split, a block manager, a block table — that its source becomes
+readable. It is **not** the same system: vLLM has multi-backend support, dozens
+of quantization schemes, hardware-specific kernels, multimodal inputs, LoRA, and
+years of production edge cases. Expect to lose to it decisively in Lecture 26,
+and to be able to explain exactly where and why.
 
 Parts III–V go down (Triton and CUDA kernels), sideways (JAX, tensor parallelism),
 and out (serving, load testing, cost).
@@ -134,8 +156,17 @@ uv run python book/code/roofline.py
 uv run pytest -m "not cuda" -q
 ```
 
-The test suite should pass with a few skips — those are tests waiting on code
-you haven't written yet, which is the correct starting state.
+**The test suite will report a lot of failures. That is the correct starting
+state**, not a broken checkout. Every failure is a `NotImplementedError` naming
+the lecture that fills it in — the suite is a specification, and you turn it
+green as you go.
+
+```bash
+uv run python scripts/progress.py     # the readable version
+```
+
+Roughly 58 tests pass on a fresh clone; those pin arithmetic you can check
+before writing any code (the roofline derivation, cost models, sharding math).
 
 The first command prints a **roofline** analysis. If that word means nothing
 yet, that's fine and expected — Lecture 02 derives it properly. The one-line
@@ -151,14 +182,40 @@ exists.
 
 ### Hardware
 
-Parts I and II through Lecture 08 run fine on a laptop. **An Apple M1 with 8GB is
-enough**, using PyTorch's MPS backend. Correctness, scheduling logic, and the
-shape of every curve are all visible there.
+Parts I and II through Lecture 08 run on a laptop, using PyTorch's MPS backend
+on Apple silicon. Correctness, scheduling logic, and the shape of every curve are
+all visible there.
+
+**On 8GB it is tight but workable.** Qwen3-0.6B is 2.2 GiB in float32 (which
+Lecture 03 recommends on MPS, because fp16 has accuracy quirks there) against
+8GB of *unified* memory shared with the OS. If you hit memory pressure, switch
+to bfloat16 — halving the weights to 1.1 GiB — and re-check the Lecture 03
+correctness test still passes before trusting any later numbers.
 
 From Lecture 09 you want a real NVIDIA GPU — paged attention and CUDA graphs are
-CUDA-specific, and Part III's profiling requires Nsight. An **RTX 3090 on Vast.ai
-runs about $0.20–0.25/hour**, which is a few dollars for everything in this book.
-Rent in blocks, prepare offline, and always stop the pod.
+CUDA-specific, and Part III's profiling requires Nsight.
+
+A **24GB card** is the sweet spot: enough VRAM to make the memory lectures real,
+without paying datacenter prices. From [Vast.ai's pricing
+page](https://vast.ai/pricing) (checked while writing this — **verify before you
+rent**, these move):
+
+| GPU | VRAM | from | median |
+|---|---|---|---|
+| **RTX 3090** (Ampere) | 24GB | $0.05/hr | **$0.16/hr** |
+| RTX 4090 (Ada) | 24GB | $0.13/hr | $0.36/hr |
+| H100 NVL (Hopper) | 80GB | $1.53/hr | $2.33/hr |
+
+The 3090 is the recommendation: cheapest of the three, and 24GB is plenty for
+Qwen3-0.6B. Its one gap is no FP8, which affects exactly one milestone in
+Lecture 19 — INT8 works fine there, and the 3090 has hardware INT4 besides.
+
+Treat the "from" column with suspicion: it's the cheapest listing on the
+marketplace, often an unreliable host or a bad location. **Median is the number
+to plan against.** Even so, everything in this book is a few dollars of GPU
+time, not hundreds.
+
+Rent in blocks, prepare your code offline, and **always stop the pod**.
 
 ### The model
 

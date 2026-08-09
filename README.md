@@ -145,7 +145,7 @@ uv sync --extra serve
 | M3.3 | rented multi-GPU (2–4×) |
 | Phase 4 | rented, longer blocks — load testing needs sustained runtime |
 
-**Default rental: RTX 3090 on Vast.ai (~$0.20–0.25/hr).** 24GB, Ampere sm_86 —
+**Default rental: RTX 3090 on Vast.ai (median ~$0.16/hr, [check current](https://vast.ai/pricing)).** 24GB, Ampere sm_86 —
 bf16, Triton, and Nsight all work. No FP8, which only affects M2.5 (INT8 is a
 fine substitute). Cheaper and faster than the comparable AWS spot options.
 
