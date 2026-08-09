@@ -22,9 +22,15 @@ Do the arithmetic. 400 kernels × 7µs ≈ **2.8ms of pure launch overhead**, be
 the GPU computes anything. If your decode step's actual compute is 3ms, you're
 spending nearly half your time on submission.
 
-The signature is unmistakable once you know it: **GPU utilization is low, the step
-is slow, and making the GPU faster changes nothing.** You are CPU-bound in a
-program that appears to be about GPUs.
+The signature is unmistakable once you know it: **the GPU has visible gaps in its
+timeline, the step is slow, and making the GPU faster changes nothing.** You are
+CPU-bound in a program that appears to be about GPUs.
+
+> Read that as *gaps in the profiler timeline*, not "low utilization percentage."
+> The coarse utilization metric is unreliable here for the reason Lecture 00
+> flagged — it can read high during memory-bound decode regardless of useful
+> work. What you want is Nsight Systems showing idle stretches between kernels
+> (Lecture 15), which is a direct observation rather than a summary statistic.
 
 ---
 

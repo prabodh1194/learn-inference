@@ -54,10 +54,63 @@ Compare the two and you have your answer:
 - intensity **>** ops:byte → **compute-bound** (arithmetic is the limit)
 - intensity **<** ops:byte → **memory-bound** (bandwidth is the limit)
 
-Plotted, this is the **roofline**: a diagonal bandwidth ceiling meeting a
-horizontal compute ceiling. The corner is the ops:byte ratio. Left of it you're
-on the diagonal, limited by memory; right of it you're on the flat, limited by
-compute.
+### The roofline
+
+Plot those two facts together and you get the chart the lecture is named after.
+It's called a roofline because of its shape — a diagonal rising into a flat,
+like a roof:
+
+```
+  performance
+  (FLOP/s)
+      ^
+      |              ______________________  <- compute ceiling
+      |             /                           (peak FLOPS)
+      |            /
+      |           /   ← compute-bound: adding
+      |          /      bandwidth won't help
+      |         /
+      |        /  <- bandwidth ceiling
+      |       /      (slope = bytes/s)
+      |      /
+      |     /  ← memory-bound: adding
+      |    /     FLOPS won't help
+      |   /
+      +--+--------|-------------------------> arithmetic intensity
+                the ridge                        (FLOP per byte)
+             (= ops:byte ratio)
+```
+
+Two ceilings, because the machine has two limits:
+
+- **The diagonal** — you cannot compute faster than memory can feed you. Its
+  slope *is* the memory bandwidth.
+- **The horizontal** — you cannot exceed the arithmetic units. Its height *is*
+  peak FLOPS.
+
+The corner where they meet is the **ridge point**, and it sits at exactly the
+ops:byte ratio (295 for an H100, 76 for a 3090). That's the whole reason the
+ratio matters: it's the intensity at which the two ceilings cross.
+
+Now locate your algorithm on the x-axis by its arithmetic intensity:
+
+- **Left of the ridge → memory-bound.** You're on the diagonal. A faster GPU
+  changes nothing; more bandwidth is the only thing that helps.
+- **Right of the ridge → compute-bound.** You're on the flat. More bandwidth
+  changes nothing; more FLOPS is the only thing that helps.
+
+That's the entire tool. One number (your intensity), one comparison (against the
+ridge), and you know which half of the hardware you're wasting.
+
+**Why this book is organized around it:** decode lands at **0.75 ops:byte**
+against a ridge of 295 — roughly 400× to the left, using about a quarter of one
+percent of the GPU's arithmetic. Prefill lands at ~510, on the other side. Same
+weights, same kernels, opposite ceilings.
+
+Every technique in Parts II and III is an answer to the same question: *how do I
+get more arithmetic out of bytes I was going to load anyway?* Batching, KV
+caching, quantization, and speculative decoding are four different answers, and
+the roofline is what tells you they're all the same idea.
 
 ### Doing it for attention
 

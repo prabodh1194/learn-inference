@@ -11,15 +11,31 @@ watched a loss curve go down. That knowledge is necessary here and it is not
 sufficient, because **inference optimizes for something training never cares
 about: one token, right now.**
 
-Training is throughput-only. You have a giant batch, every sequence is the same
-length because you padded them, the GPU is saturated, and nobody is waiting. If a
-step takes 400ms instead of 380ms, you shrug.
+Training is **throughput-only**. Nobody is waiting on any individual step, so
+you're free to make batches as large as memory allows. Every sequence in a batch
+is processed in parallel, which means the matrix multiplies are large and the
+weights you load get used for a great deal of arithmetic.
 
 Serving is the opposite. Requests arrive when they arrive, at wildly different
 lengths. Someone is watching a cursor blink. You generate **one token at a time**,
-each depending on the last, so there's no way to parallelize across the sequence
-— and the GPU that was 90% utilized during training now sits mostly idle,
-waiting on memory.
+each depending on the last, so there's no parallelism *along* the sequence to
+exploit — and the same matrix multiply that was large and efficient during
+training becomes a matrix-*vector* product that barely uses the hardware.
+
+> **Two honest caveats**, since this comparison is doing a lot of work.
+>
+> Training isn't purely throughput-bound in practice — gradient synchronization,
+> optimizer state, and activation memory all impose their own limits, and real
+> pipelines use sequence packing rather than the naive padding this contrast
+> implies. The claim that survives all of that is narrower and is the only one
+> this book relies on: **training processes many tokens per weight load; decode
+> processes one.**
+>
+> And note what is *deliberately* absent above: any claim about "GPU
+> utilization." That metric is misleading here — a memory-bound decode loop can
+> report high utilization while doing very little useful work. Lecture 15 shows
+> why, and Lecture 28 explains why you must not autoscale on it. We'll use
+> arithmetic intensity instead, which doesn't have that failure mode.
 
 That last part is the crux, and it's worth stating precisely because it drives
 nearly everything in this book:
@@ -118,9 +134,20 @@ uv run python book/code/roofline.py
 uv run pytest -m "not cuda" -q
 ```
 
-You should see the roofline numbers print, and the test suite pass with a few
-skips (those are the tests waiting on code you haven't written yet — that's the
-correct starting state).
+The test suite should pass with a few skips — those are tests waiting on code
+you haven't written yet, which is the correct starting state.
+
+The first command prints a **roofline** analysis. If that word means nothing
+yet, that's fine and expected — Lecture 02 derives it properly. The one-line
+version, so the output isn't opaque:
+
+> A GPU has two ceilings — how fast it can compute, and how fast it can read
+> memory. The roofline compares them, and tells you which one an operation is
+> actually stuck against.
+
+The number to look for in that output is **0.75 ops:byte** for decode, against a
+ceiling that only stops mattering above ~295. That gap is the reason this book
+exists.
 
 ### Hardware
 

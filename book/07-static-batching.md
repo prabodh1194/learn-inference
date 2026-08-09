@@ -86,8 +86,8 @@ And the trap in the batch-size sweep:
      16          65.9%           2.93x
 ```
 
-Bigger batches give better GPU utilization **and** more waste, simultaneously.
-Static batching cannot escape this; the two move together.
+Bigger batches do more useful work per weight load **and** waste more slots,
+simultaneously. Static batching cannot escape this; the two move together.
 
 > **Note what the uniform row implies.** If you benchmark only on uniform load,
 > static batching looks as good as anything else and you'd conclude the next
@@ -196,8 +196,8 @@ so. That gap is the next lecture.
    are wasted? What fraction?
 3. Why does `padding_side="left"` matter for decode but not for prefill-only
    scoring?
-4. Larger batches raise both utilization and waste. What would let you keep the
-   utilization without the waste?
+4. Larger batches raise both useful work per weight load and slot waste. What
+   would let you keep the first without the second?
 
 That last one is the next lecture.
 
