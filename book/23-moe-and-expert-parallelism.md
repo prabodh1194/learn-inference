@@ -37,8 +37,8 @@ The vocabulary that follows from this, and which trips people up:
 - **Total parameters** — everything stored. Determines memory.
 - **Active parameters** — what runs per token. Determines compute.
 
-A "397B-A3B" model has 397B total, 3B active. **You must hold all 397B in memory
-even though each token touches 3B**, because the router might select any expert.
+DeepSeek-V3 is 671B total, 37B active. **You must hold all 671B in memory even
+though each token touches 37B**, because the router might select any expert.
 
 That mismatch is the entire inference story for MoE.
 
@@ -52,8 +52,11 @@ Go back to Lecture 02 and re-derive it.
 
 **Memory *bandwidth* per token falls** — you only read the active experts.
 
-So MoE is *more* arithmetic-intensity-friendly than dense at the same total size:
-fewer bytes moved per token. Decode gets relatively cheaper.
+Note what this does **not** say. Arithmetic intensity is roughly *unchanged* —
+compute and bytes both fall by the same active/total factor, so you haven't moved
+along the roofline. What falls is the **absolute** bytes per token, and decode
+latency is made of absolute bytes. MoE buys capacity at nearly fixed decode cost;
+it does not buy you a better roofline position.
 
 But a new cost appears: **routing is dynamic and unbalanced.** Which experts a
 token needs isn't known until the router runs, and different tokens in a batch
@@ -147,10 +150,10 @@ communication pattern with different scaling behaviour.
 
 ## Check yourself
 
-1. A 397B-A3B model: how much VRAM to serve it, and how much compute per token?
-   Why is the answer to the first question not "3B worth"?
-2. Why is MoE *more* arithmetic-intensity-friendly than a dense model of the same
-   total size?
+1. DeepSeek-V3 (671B total, 37B active): how much VRAM to serve it, and how much
+   compute per token? Why is the answer to the first not "37B worth"?
+2. MoE moves far fewer bytes per token than a dense model of the same total size,
+   yet its arithmetic intensity is about the same. Explain both.
 3. TP optimizes latency, EP optimizes throughput. Why does that follow from their
    communication patterns?
 4. Why does load imbalance hurt more in EP than in TP?

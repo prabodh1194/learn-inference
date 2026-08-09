@@ -120,9 +120,10 @@ remaining gap is in the linear layers.
 - **[FlashDecoding](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)** —
   the context-splitting idea, explained well and short.
 - **vLLM `vllm/v1/attention/backends/triton_attn.py`** — the production Triton
-  path. Compare its block-table handling to yours.
-- **vLLM `csrc/attention/paged_attention_v1.cu`** — the CUDA version, if you want
-  a preview of Lecture 20.
+  path. Compare its block-table handling to yours. Note that V1 moved paged
+  attention here from hand-written CUDA; the old
+  `csrc/attention/paged_attention_v1.cu` no longer exists on `main`, and lives
+  only in pre-V1 tags.
 
 ---
 

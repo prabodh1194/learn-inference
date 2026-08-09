@@ -172,7 +172,7 @@ accounting, but note the hook now.
 5. Measure on the workload that shows it:
 
 ```bash
-uv run python book/code/batch_bench.py --continuous
+uv run python book/code/batch_bench.py
 ```
 
 **Compare against Lecture 07 on `mixed_length`.** Record throughput, slot waste,

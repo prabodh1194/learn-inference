@@ -156,7 +156,7 @@ the arithmetic the machine can do. It is not a little memory-bound; it is almost
 entirely memory-bound.
 
 And the verdict table shows this holds on *every* device — H100 (ridge 295), A100
-(153), 3090 (76), M1 (38). A conclusion that survives a 4× range of hardware is a
+(153), 3090 (76), M1 (38). A conclusion that survives an 8× range of ridge points is a
 property of the algorithm, not a quirk of one GPU.
 
 One aside worth noticing: the **3090's ridge is 76, the H100's is 295.** The
@@ -176,7 +176,8 @@ same claim.
 4. **The exercise that matters — KV cache sizing.** Kiely §5.4 (Fig 5.11, p.142)
    gives the formula for VRAM. Using `ModelDims.kv_bytes_per_token()`:
    - How much KV cache does one 4096-token sequence need?
-   - On a 24GB 3090 with ~1.2GB of weights, how many such sequences fit?
+   - On a 24GB 3090 with ~840 MiB of weights (what `roofline.py` prints), how
+     many such sequences fit?
    - Now recompute with `n_kv_heads=16` instead of 8 (i.e. no GQA). How many fit?
 
    That last comparison is why grouped-query attention exists, and "how big is

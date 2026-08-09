@@ -86,8 +86,9 @@ assert d.mean < 10.0         # mean hides both
 
 **A caveat about your own p99.** Percentiles interpolate between samples, so a
 p99 from 100 requests is essentially one data point — noisy and not to be
-trusted. Want a real p99? Thousands of requests (Lecture 25). There's a test
-pinning this too, because it's a genuinely easy way to over-claim.
+trusted. Want a real p99? Thousands of requests (Lecture 25). There's a test showing the failure
+directly: with 100 samples, a single large outlier lands at p99 *below* 10 — the
+estimate is biased low, not merely noisy.
 
 ### Throughput and latency trade against each other
 
@@ -105,7 +106,7 @@ most marketing material.
 
 Nothing new. Instead:
 
-**1. Read `bench/harness.py`.** It's ~300 lines and you'll use it constantly.
+**1. Read `bench/harness.py`.** It's ~360 lines and you'll use it constantly.
 Focus on `synchronize()`, `RequestRecord`, and `Distribution`.
 
 **2. Run the tests and read them:**

@@ -134,8 +134,10 @@ the honest summary of this tradeoff.
 - **[Optimizing Parallel Reduction in CUDA](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf)**
   (Mark Harris) — the classic seven-stage walkthrough. Still the best single
   document on why memory access dominates.
-- **vLLM `csrc/attention/paged_attention_v1.cu`** — production paged attention in
-  CUDA. You can read this now.
+- **vLLM `csrc/`** — the remaining hand-written CUDA. Note that V1 moved paged
+  attention itself to Triton, so `csrc/attention/` now holds mostly headers; the
+  old `paged_attention_v1.cu` lives only in pre-V1 tags. A good reminder that
+  hand-written CUDA gets replaced when a portable version gets close enough.
 - **Kiely §4.1–4.1.3** (p.96–100) — CUDA kernels, selection, and fusion.
 
 ---

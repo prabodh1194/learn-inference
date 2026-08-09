@@ -58,6 +58,7 @@ Nothing is free. From `recomputation.py`:
 Storing K/V per token: 112 KiB
    seq len    cache size
        512         56 MiB
+      2048        224 MiB
       8192        896 MiB
      32768       3584 MiB
 ```
@@ -71,7 +72,7 @@ cache_bytes = 2 × n_layers × n_kv_heads × head_dim × dtype_bytes × seq_len 
 ```
 
 For Qwen3-0.6B: 2 × 28 × 8 × 128 × 2 = **112 KiB per token**. At 32k context
-that's 3.5 GiB for a *single* sequence — on a model whose weights are 1.2 GiB.
+that's 3.5 GiB for a *single* sequence — on a model whose weights are 840 MiB.
 
 **The cache outgrows the model.** This is why Lectures 09 (paging) and 10 (prefix
 sharing) exist: once you have a cache, the entire game becomes spending that

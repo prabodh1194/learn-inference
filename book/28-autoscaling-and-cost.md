@@ -24,7 +24,12 @@ tokens/sec completely hides.
 
 ## The idea
 
-### Utilization dominates
+### Fleet utilization dominates
+
+A note on the word, because it does two jobs in this book. **Fleet utilization**
+— below — is the fraction of your paid GPU-hours that do paid work. **GPU
+busy-percentage** is what `nvidia-smi` reports for one card, and it's the
+misleading one (see the autoscaling signal section). They are unrelated.
 
 Work an example. A 3090 at $0.25/hour sustaining 2,000 tok/s:
 
@@ -40,8 +45,8 @@ like:
 1.44M tokens/hour  ->  $0.174 per million tokens
 ```
 
-**5× more expensive, and the engine didn't change.** You optimized nothing and got
-5× worse.
+**5× more expensive than the same engine at 100% utilization, and the engine
+didn't change.** (Against a more realistic 80% baseline it's 4×.)
 
 This is the punchline of Part V: **at low utilization, utilization dominates every
 kernel optimization in Part III.** A 30% faster attention kernel is worth far less
@@ -62,8 +67,8 @@ Mitigations, roughly in order of usefulness:
 - **Faster loading** — cached images, `safetensors`, streaming weights
 - **Scale to zero** for dev and spiky low-volume workloads only
 
-**Scale on the right signal.** CPU utilization is meaningless here. GPU utilization
-is misleading — a memory-bound decode loop shows high utilization while doing
+**Scale on the right signal.** CPU utilization is meaningless here. GPU
+busy-percentage is misleading — a memory-bound decode loop shows high utilization while doing
 little work. Scale on **queue depth** or **concurrent sequences**: queue depth
 growing is the honest saturation signal from Lecture 25.
 
@@ -79,7 +84,7 @@ marginally more throughput and unbounded latency growth.
 
 | Lever | Effect | Lecture |
 |---|---|---|
-| Utilization | **largest** at low load | this one |
+| Fleet utilization | **largest** at low load | this one |
 | Batch size | more tokens per GPU-hour | 07–09 |
 | Quantization | cheaper GPU, or bigger batches | 19 |
 | Prefix caching | fewer tokens computed at all | 10 |
@@ -116,7 +121,7 @@ direction — is informative.
 
 ## What you should see
 
-**Cost dominated by utilization**, not by engine quality, below ~50%.
+**Cost dominated by fleet utilization**, not by engine quality, below ~50%.
 
 **Cold starts measured in minutes.** This is why scale-to-zero is unsuitable for
 latency-sensitive production.
@@ -146,7 +151,7 @@ reverse.
 
 1. Same engine, 20% vs 80% utilization. How much does cost per million tokens
    change, and why?
-2. Why is GPU utilization a poor autoscaling signal for LLM serving?
+2. Why is GPU busy-percentage a poor autoscaling signal for LLM serving?
 3. Your cold start is 4 minutes. What does that rule out?
 4. Why can prefix caching beat every kernel optimization in Part III on cost?
 5. Your cost is 3× a hosted API. Name two structural reasons, and one thing you'd

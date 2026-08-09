@@ -12,7 +12,8 @@ Lecture 08 warned you about this, and you should have measured it: continuous
 batching raised throughput and made **p99 latency worse**.
 
 Here's the mechanism. A step containing a 4,000-token prefill is enormous —
-compute-bound, and roughly 100× the work of a decode step. Every sequence
+compute-bound, and roughly 125× the work of a decode step (4,000 prefill tokens
+against 32 decode tokens). Every sequence
 decoding alongside it waits for the whole thing to finish.
 
 ```

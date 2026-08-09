@@ -35,16 +35,20 @@ Pure arithmetic — no GPU, no model download. Look for three things.
 **First**, for a 512-token prompt and 256 tokens out:
 
 ```
-             compute     memory read    ops:byte
-prefill     451.0 GF          840 MiB      512.00
-decode      225.5 GF       232960 MiB        0.92
+                 compute     memory read    ops:byte
+prefill         451.0 GF          840 MiB      512.00
+decode          225.5 GF       232960 MiB        0.92
 ```
 
 Decode does *half* the compute of prefill and moves **277× more memory**.
 
 **Second**, the per-token table. A generated token costs hundreds to thousands of
-times the memory traffic of a prompt token — and the ratio *falls* as prompts get
-longer, which is a hint about the fix.
+times the memory traffic of a prompt token — and the ratio **widens** as prompts
+get longer, from 34× at a 32-token prompt to 2596× at 2048.
+
+Read the two columns separately and the reason is plain: **prefill per token
+falls** (one weight load spread over more tokens) while **decode per token stays
+flat** (every step reloads everything). That asymmetry is the hint about the fix.
 
 **Third**, the batching table. Batch size goes 1 → 256, memory traffic stays
 **exactly the same**, arithmetic intensity rises 256×.

@@ -56,13 +56,20 @@ Column-then-row means **one all-reduce per MLP block**, not two. Attention shard
 the same way, by heads: each GPU owns a subset of heads, then all-reduce after the
 output projection.
 
+> **GQA caps your TP degree.** Sharding is by *KV* heads, and Qwen3-0.6B has only
+> 8 of them (against 16 query heads). So TP-8 is the ceiling before you must
+> replicate KV heads across ranks and give back some of the memory saving. This is
+> a real limit people hit, and it's exactly the "where scaling stops" question
+> this lecture is about.
+
 So: **two all-reduces per transformer layer.** For a 28-layer model, 56 collectives
 per forward pass. That's the cost, and it's why interconnect matters.
 
 ### Why scaling isn't linear
 
-Compute per GPU divides by N. Communication does not — an all-reduce moves data
-proportional to the *hidden size*, regardless of how many GPUs share it.
+Compute per GPU divides by N. Communication does not shrink with it — a ring
+all-reduce moves `2(N-1)/N · S` bytes per rank, which *approaches* a constant 2S
+rather than falling like `compute/N`.
 
 ```
 time = compute/N + communication(N)
@@ -75,10 +82,11 @@ happens depends on interconnect:
 |---|---|
 | NVLink 4 (Hopper) | 900 GB/s |
 | NVLink 5 (Blackwell) | 1,800 GB/s |
-| NVLink 6 (Rubin) | 3,600 GB/s |
+| NVLink 6 (Rubin, announced) | 3,600 GB/s |
 | **PCIe 5 ×16** | **~64 GB/s each way (~128 bidirectional)** |
 
-*(NVIDIA's published figures. NVLink numbers are bidirectional per GPU.)*
+*(NVIDIA's published figures as of 2026; NVLink numbers are bidirectional per
+GPU. Rubin is announced, not shipping — check before planning around it.)*
 
 **Roughly an order of magnitude, in the thing that isn't parallelized** — and the
 gap has widened with each NVLink generation, not narrowed. This is why the same

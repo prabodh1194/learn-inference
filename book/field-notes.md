@@ -124,8 +124,9 @@ benchmarking beats a blog post. Measure your own scaling curve in Lecture 22.
 
 ## KV cache quantization is its own frontier — **L19, L05**
 
-Several recent projects compress the **KV cache** rather than the weights,
-reporting 3–5× compression. Worth knowing because it attacks a different
+Reports circulate of projects compressing the **KV cache** rather than the
+weights, claiming 3–5× compression. Unlike the entries above, I have no specific
+source for this one — treat the number as hearsay until you measure it. Worth knowing because it attacks a different
 bottleneck than weight quantization: from Lecture 05, the cache can exceed the
 model's size at long context, and from Lecture 09, cache capacity directly caps
 your batch size.

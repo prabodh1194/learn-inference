@@ -78,9 +78,12 @@ def main() -> None:
               f"{per_decode/1024**2:>11.0f} MiB{per_decode/per_prefill:>9.0f}x")
 
     print("\nA generated token costs orders of magnitude more memory traffic")
-    print("than a prompt token -- and the ratio shrinks as prompts get longer,")
-    print("because a long prompt amortizes that one weight load over more")
-    print("tokens. Same effect as batching, applied along the prompt.")
+    print("than a prompt token -- and the ratio WIDENS as prompts get longer.")
+    print("\nRead the two columns separately to see why:")
+    print("  prefill/tok FALLS  -- one weight load amortized over more tokens")
+    print("                        (the same effect as batching, along the prompt)")
+    print("  decode/tok  is FLAT -- every step reloads every weight regardless")
+    print("\nSo the gap is not fixed. It is set by how much you amortize.")
 
     print("\nIt also means request SHAPE decides which phase you should tune:")
     print("  summarization (long prompt, short answer) -> prefill-bound, TTFT")

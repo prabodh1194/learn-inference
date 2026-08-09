@@ -41,10 +41,10 @@ On a 24GB 3090 with realistic mixed traffic:
 
 ```
   max_seq_len   contiguous     paged     gain
-         2048           97       121     1.2x
-         4096           48        85     1.8x
-         8192           24        85     3.5x
-        32768            6        85    14.2x
+         2048           96       121     1.3x
+         4096           48        84     1.8x
+         8192           24        84     3.5x
+        32768            6        84    14.0x
 ```
 
 **Six sequences at 32k context. Six.** And where that memory goes:
@@ -57,7 +57,7 @@ On a 24GB 3090 with realistic mixed traffic:
 ```
 
 Note the shape of the table: the longer the context you *support*, the worse
-contiguous allocation gets — while paged stays flat at 85. Contiguous is punished
+contiguous allocation gets — while paged stays flat at 84. Contiguous is punished
 for capability you're not even using.
 
 ---
@@ -107,15 +107,22 @@ From the demo:
 
 ```
   block_size   sequences   waste/seq   blocks/seq
-           1          86        0.0t         2062
-          16          85        7.7t          129
+           1          84        0.0t         2062
+           8          84        3.5t          258
+          16          84        7.7t          129
+          32          83       15.6t           65
+         128          83       63.0t           17
          512          77      253.0t            5
 ```
 
-Small blocks waste almost nothing but need long block tables — more indirection
-per attention step. Large blocks are cheap to track and waste a lot. **vLLM
-defaults to 16**: waste is already negligible (7.7 tokens per sequence) and the
-table stays manageable.
+Read the columns, not the row order. Block sizes 1 and 16 fit the *same* 84
+sequences — the memory saved by finer blocks is already negligible by 16. What
+differs is the block table: **2062 entries per sequence at block 1, versus 129 at
+16**, every one an indirection on the hottest path in the system.
+
+Only at 512 does waste start costing you real capacity (77 sequences, 253 tokens
+wasted each). **vLLM defaults to 16** because that's where waste has gone to
+nothing and the table is still short.
 
 ### The part that isn't free
 
@@ -245,7 +252,7 @@ Lecture 18 wins most of it back.
 
 ## Check yourself
 
-1. Contiguous fits 6 sequences at 32k context and 97 at 2k. Paged fits ~85 at
+1. Contiguous fits 6 sequences at 32k context and 96 at 2k. Paged fits ~84 at
    both. Why is paged flat?
 2. Why is paged waste bounded by `block_size - 1` per sequence, while contiguous
    waste is unbounded?

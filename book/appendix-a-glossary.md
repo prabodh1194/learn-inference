@@ -174,8 +174,8 @@ all-reduce. *(L22)*
 
 **MoE** — mixture of experts: many MLPs, few active per token. *(L23)*
 
-**Total vs. active parameters** — what you must store vs. what runs per token. A
-397B-A3B model needs VRAM for 397B. *(L23)*
+**Total vs. active parameters** — what you must store vs. what runs per token.
+DeepSeek-V3 is 671B total / 37B active, and needs VRAM for 671B. *(L23)*
 
 ---
 
@@ -196,5 +196,8 @@ the KV cache between them. *(L27)*
 **Cold start** — time from scale-up to serving traffic. Minutes, not seconds.
 *(L28)*
 
-**Cost per million tokens** — the unifying metric. Dominated by **utilization** at
-low load, not by engine quality. *(L28)*
+**Fleet utilization** — fraction of paid GPU-hours doing paid work. Distinct from
+GPU busy-percentage, which is a poor scaling signal. *(L28)*
+
+**Cost per million tokens** — the unifying metric. Dominated by **fleet
+utilization** at low load, not by engine quality. *(L28)*

@@ -42,7 +42,8 @@ Generating 512 tokens from a 64-token prompt, with no cache:
         2048         2,227,200          136.5x
 ```
 
-16× the output, 136× the work. Quadratic.
+16× the output, 136× the work — heading for quadratic. (Not the full 256×:
+the fixed 64-token prompt contributes a large linear term at these lengths.)
 
 ---
 
@@ -105,6 +106,9 @@ loop — fight one battle at a time.
 ```bash
 uv run pytest tests/test_03_generation.py -v
 ```
+
+On a fresh checkout these **skip** (`4 skipped`) — they need the model
+downloaded and `generate_naive` implemented. That is expected, not a failure.
 
 Your greedy output must match HuggingFace's **exactly**. Greedy is deterministic,
 so a mismatch is a bug, not noise. This test is the foundation for the rest of

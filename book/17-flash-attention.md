@@ -16,7 +16,9 @@ compute = 4N²d + 3N² ops
 intensity = 62 ops:byte     (vs. an H100's ridge of 295)
 ```
 
-Memory-bound by nearly 5×. And the `N²` terms dominate — that's the score matrix
+Memory-bound by nearly 5× on an H100 — though on the 3090 you're actually
+renting (ridge 76) it's memory-bound by only 1.2×, so temper your speedup
+expectations accordingly. And the `N²` terms dominate — that's the score matrix
 `S = QK^T`, written to HBM and immediately read back, twice:
 
 ```
@@ -131,6 +133,12 @@ leaks future information — the model will look *better* at predicting, which i
 uniquely confusing bug.
 
 **Wrong scale.** `1/sqrt(head_dim)`, applied before softmax.
+
+**`-inf` minus `-inf` is NaN.** If a whole tile is masked out (entirely above the
+diagonal) while `m_i` is still `-inf`, then `correction = exp(m_i - m_new)`
+evaluates `exp(-inf - -inf)` = `exp(nan)` and poisons the accumulator. Skip
+fully-masked tiles rather than masking them, or clamp `m_i` to a finite floor.
+This one only bites on hardware, which is the worst place to find it.
 
 ---
 

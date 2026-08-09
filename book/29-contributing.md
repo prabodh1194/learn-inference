@@ -21,12 +21,17 @@ Before proposing anything, prove you can build and test the project:
 ```bash
 git clone https://github.com/vllm-project/vllm && cd vllm
 pip install -e .                    # slow; a long build
-pytest tests/ -x -k "not distributed and not slow"
+pytest tests/test_utils.py -q       # a bounded, CPU-only smoke test
 ```
 
-Expect friction — CUDA versions, compilation, hardware-specific skips. Working
-through it is part of the job, and it teaches you the project's structure faster
-than reading would.
+**Do not start with the full `tests/` directory.** Much of it needs GPUs,
+downloads models, and requires extras that `pip install -e .` doesn't pull —
+so an unscoped run aborts early and tells you nothing about your setup. Start
+narrow and widen.
+
+Expect friction anyway — CUDA versions, compilation, hardware-specific skips.
+Working through it is part of the job, and it teaches you the project's
+structure faster than reading would.
 
 Note which tests skip on your hardware. That tells you what you can and can't
 credibly change.
