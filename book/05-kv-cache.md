@@ -78,6 +78,16 @@ that's 3.5 GiB for a *single* sequence — on a model whose weights are 840 MiB.
 sharing) exist: once you have a cache, the entire game becomes spending that
 memory well.
 
+??? question "What's the difference between an attention head and a KV head?"
+    An attention head has its own **Q**; a KV head owns a **K,V** pair. Classic
+    MHA ties them 1:1. GQA lets several queries share one K/V — Qwen3-0.6B has
+    16 query heads against 8 KV heads.
+
+    Only K and V are cached (Q is recomputed each step and never needed again),
+    so the cache is sized by **KV heads**. That's the 8 in the formula above.
+
+    [Q&A — what's an attention head?](qa.md#whats-an-attention-head-how-is-it-different-from-a-kv-head)
+
 > **GQA is doing real work here.** Qwen3-0.6B has 16 query heads but only 8 KV
 > heads, and the cache is sized by *KV* heads. Grouped-query attention halves
 > this number outright. Since decode is memory-bound, that's a direct 2× on the

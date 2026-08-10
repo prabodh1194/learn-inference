@@ -1,0 +1,133 @@
+site_name: Inference Zero-to-Hero
+site_description: Building an LLM inference engine from scratch — measure everything.
+site_url: https://prabodh1194.github.io/learn-inference/
+repo_url: https://github.com/prabodh1194/learn-inference
+repo_name: prabodh1194/learn-inference
+edit_uri: edit/main/book/
+
+docs_dir: book
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+markdown_extensions:
+  - admonition                 # !!! note / warning callouts
+  - pymdownx.details           # collapsible <details> asides
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:       # LaTeX for the roofline math
+      generic: true
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+extra_javascript:
+  - js/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - css/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/prabodh1194
+  generator: false
+
+nav:
+  - Start here:
+      - index.md
+      - Introduction: 00-intro.md
+  - Part I — Foundations:
+      - 01 The two phases: 01-the-two-phases.md
+      - 02 Arithmetic intensity: 02-arithmetic-intensity.md
+      - 03 Naive generation: 03-naive-generation.md
+      - 04 Measuring: 04-measuring.md
+  - Part II — The engine:
+      - 05 The KV cache: 05-kv-cache.md
+      - 06 Sampling: 06-sampling.md
+      - 07 Static batching: 07-static-batching.md
+      - 08 Continuous batching: 08-continuous-batching.md
+      - 09 Paged attention: 09-paged-attention.md
+      - 10 Prefix caching: 10-prefix-caching.md
+      - 11 Chunked prefill: 11-chunked-prefill.md
+      - 12 Speculative decoding: 12-speculative-decoding.md
+      - 12b Structured output: 12b-structured-output.md
+      - 13 CUDA graphs: 13-cuda-graphs.md
+      - 14 Reading vLLM: 14-reading-vllm.md
+  - Part III — Kernels:
+      - 15 Profiling: 15-profiling.md
+      - 16 Triton basics: 16-triton-basics.md
+      - 17 FlashAttention: 17-flash-attention.md
+      - 18 Paged attention kernel: 18-paged-attention-kernel.md
+      - 19 Quantization: 19-quantization.md
+      - 20 Raw CUDA: 20-raw-cuda.md
+  - Part IV — Parallelism:
+      - 21 JAX and XLA: 21-jax-and-xla.md
+      - 22 Tensor parallelism: 22-tensor-parallelism.md
+      - 23 MoE and expert parallelism: 23-moe-and-expert-parallelism.md
+  - Part V — Production:
+      - 24 Serving: 24-serving.md
+      - 25 Load testing: 25-load-testing.md
+      - 26 Versus vLLM: 26-versus-vllm.md
+      - 27 Routing and disaggregation: 27-routing-and-disaggregation.md
+      - 28 Autoscaling and cost: 28-autoscaling-and-cost.md
+      - 29 Contributing: 29-contributing.md
+  - Reference:
+      - Q&A — worked answers: qa.md
+      - Field notes: field-notes.md
+      - Appendix A — Glossary: appendix-a-glossary.md
+      - Appendix B — Papers: appendix-b-reading.md

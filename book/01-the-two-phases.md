@@ -65,6 +65,17 @@ The asymmetry comes from one fact:
 With a 512-token prompt, prefill does 512 tokens' worth of work per weight load.
 Decode does one. The weights are ~840 MiB either way.
 
+??? question "Do prefill and decode need *different* weights?"
+    No — both read the same 840 MiB. What differs is how many tokens share one
+    read: prefill amortizes across 512, decode across 1.
+
+    The question usually comes from conflating **weights** (fixed, 840 MiB,
+    re-read every pass) with the **KV cache** (grows per token, written once then
+    re-read). Both matter, on different scales — and past ~8k context the KV term
+    overtakes the weights.
+
+    [Q&A — why do prefill and decode have different weight requirements?](qa.md#why-do-prefill-and-decode-have-different-weight-requirements)
+
 Both phases read the same 840 MiB out of VRAM. Neither touches the CPU — the
 weights were copied to the GPU once at startup and stay there. What repeats is
 the VRAM → on-chip transfer, and it repeats *per forward pass*.

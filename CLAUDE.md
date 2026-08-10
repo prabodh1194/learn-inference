@@ -39,6 +39,27 @@ This is a Zero-to-Hero-style course. When I'm on a milestone:
 - Commit result JSONs in `bench/results/`. They're the record.
 - Same model (`Qwen3-0.6B`) everywhere so numbers stay comparable.
 
+## Capture every good question — automatically
+
+**Standing rule: when a question in conversation produces an explanation that
+clarifies something, write it into `book/qa.md` before moving on.** Do not wait
+to be asked. This has already caught several real errors in the lectures.
+
+Two places, both required:
+
+1. **`book/qa.md`** — the full answer, under a `##` heading phrased as the
+   question that was actually asked. Include the wrong intuition and why it's
+   wrong; the misunderstanding is the valuable part.
+2. **The relevant lecture** — a `??? question "..."` collapsible aside at the
+   exact point a reader would stall, with a 2–3 sentence summary and a link to
+   the Q&A entry. Forward links matter more than backward ones: the reader is in
+   the lecture, not the appendix.
+
+Prefer questions that came from genuine confusion over ones I invented. If an
+answer contradicts the book, **fix the book too** and say so in the commit.
+
+Then rebuild: `uv run mkdocs build --strict` (must be warning-free).
+
 ## Notes
 
 `notes/` is the deliverable, not an afterthought — prose and runnable code

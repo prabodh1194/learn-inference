@@ -1,0 +1,27 @@
+:root {
+  --md-code-font: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Lecture headers: the Build/Test/Moves/Prereq line under each title. */
+.md-typeset h1 + p strong:first-child { color: var(--md-accent-fg-color); }
+
+/* Numbers should not wrap mid-table. */
+.md-typeset table:not([class]) td { white-space: normal; }
+.md-typeset table:not([class]) code { white-space: nowrap; }
+
+/* ASCII diagrams and demo output: keep them tight and scrollable. */
+.md-typeset pre > code { font-size: 0.72rem; line-height: 1.45; }
+
+/* Collapsible asides -- the "finer notes" -- should read as secondary. */
+.md-typeset details { border-left: 3px solid var(--md-accent-fg-color); }
+.md-typeset details > summary { font-weight: 600; }
+
+/* Blockquotes carry the book's key claims; make them stand out. */
+.md-typeset blockquote {
+  border-left: 4px solid var(--md-accent-fg-color);
+  background: var(--md-code-bg-color);
+  padding: 0.4rem 0.8rem;
+}
+
+/* Wide tables scroll rather than breaking the page. */
+.md-typeset__table { overflow-x: auto; }

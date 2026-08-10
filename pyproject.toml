@@ -17,6 +17,11 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=8.0", "pytest-timeout"]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocs-material[imaging]",
+    "pymdown-extensions>=10",
+]
 
 [project.optional-dependencies]
 # Phase 2 — kernels. Triton is Linux/NVIDIA only; install on the rented box.

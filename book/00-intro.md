@@ -47,6 +47,14 @@ nearly everything in this book:
 > Generating one token requires reading **every weight in the model** out of GPU
 > memory and doing almost no arithmetic with them.
 
+??? question "Wait — if the weights are already on the GPU, why is anything slow?"
+    Because "on the GPU" means *in VRAM*, and VRAM isn't where arithmetic
+    happens. On-chip SRAM is ~6 MB against 840 MiB of weights — off by 140×, so
+    a weight streams in, gets used once, and is evicted before it can be reused.
+
+    Longer answer: [Q&A — why is decode memory-bound if the weights are already
+    on the GPU?](qa.md#why-is-decode-memory-bound-if-the-weights-are-already-on-the-gpu)
+
 **Which memory matters here.** The weights already live in **VRAM** — they were
 copied there once at startup. The traffic that costs you is VRAM → the GPU's
 on-chip SRAM and registers, and it happens on *every forward pass*, because
@@ -62,7 +70,16 @@ If weights crossed PCIe every step you'd be another ~15× slower. When that
 doesn't fit — not how normal serving works.
 
 A matrix-*matrix* multiply over a batch does lots of work per byte loaded. A
-matrix-*vector* multiply for a single token does almost none. Same weights, same
+matrix-*vector* multiply for a single token does almost none.
+
+??? question "Why is prefill a *matrix* and decode a *vector*?"
+    Prefill puts one row per prompt token into a `(512, 1024)` matrix and runs
+    them together — the causal mask, not the input layout, is what stops a token
+    seeing the future. Decode has one new token, so `Q` is `(1, 1024)`.
+
+    Same weights, same kernel, 1 row instead of 512. That *is* the 512 vs 0.92.
+
+    [Q&A — does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
 Qwen3-0.6B decode runs at **0.75 operations per byte**, against an H100 that
 needs 295 to keep its arithmetic units busy. That's roughly 0.25% — and the
@@ -73,6 +90,7 @@ Most of Part II answers one question: *"how do we get more work out of each byte
 we were going to load anyway?"*
 
 - **Batching** — load the weights once, generate for 32 sequences instead of 1.
+  ([why not 512?](qa.md#can-batches-be-larger-than-the-sequence-length))
 - **KV caching** — don't recompute what you already computed.
 - **Quantization** — make the bytes smaller.
 - **Speculative decoding** — verify several tokens in the time one would take.

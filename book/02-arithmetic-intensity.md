@@ -112,6 +112,17 @@ get more arithmetic out of bytes I was going to load anyway?* Batching, KV
 caching, quantization, and speculative decoding are four different answers, and
 the roofline is what tells you they're all the same idea.
 
+!!! tip "You are not meant to memorize any of this"
+    Do the arithmetic once, here, to build the intuition — then let
+    `book/code/roofline.py` do it forever after. Practitioners don't carry these
+    figures around.
+
+    The three sentences worth retaining: **prefill is compute-bound; decode is
+    memory-bound; which one you're in depends on how many tokens share one weight
+    load.** Everything else is re-derivable in ten seconds.
+
+    [Q&A — what is the ops:byte math actually for?](qa.md#what-is-the-opsbyte-math-actually-for)
+
 ### Doing it for attention
 
 Take unoptimized attention — `S = QK^T`, `P = softmax(S)`, `O = PV` — with
