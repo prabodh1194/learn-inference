@@ -1,8 +1,8 @@
-# 22 — Tensor parallelism
+# 22. Tensor parallelism
 
 **Build:** `jaxlm/sharding.py`, then TP by hand in `engine/`
 **Test:** `tests/test_22_tp.py` (cuda, multi-GPU) · **Moves:** per-user latency, and reveals where scaling stops
-**Prereq:** [21 — JAX and XLA](21-jax-and-xla.md)
+**Prereq:** [21. JAX and XLA](21-jax-and-xla.md)
 
 > **Two or more GPUs required.** On Vast.ai, a 2×3090 box. Sharding *logic* can be
 > reasoned about on one device; scaling curves cannot.
@@ -88,7 +88,7 @@ happens depends on interconnect:
 *(NVIDIA's published figures as of 2026; NVLink numbers are bidirectional per
 GPU. Rubin is announced, not shipping, check before planning around it.)*
 
-**Roughly an order of magnitude, in the thing that isn't parallelized** — and the
+**Roughly an order of magnitude, in the thing that isn't parallelized**: and the
 gap has widened with each NVLink generation, not narrowed. This is why the same
 model scales beautifully on one box and poorly on another with identical GPUs.
 
@@ -179,10 +179,10 @@ Compare against nano-vllm's `layers/linear.py`, which does exactly this.
 
 **Better scaling with NVLink** than PCIe, on identical GPUs.
 
-**Better scaling on larger models** — more compute per layer amortizes the same
+**Better scaling on larger models**: more compute per layer amortizes the same
 all-reduce.
 
-**Worse scaling at small batch sizes** — less compute to hide the collective
+**Worse scaling at small batch sizes**: less compute to hide the collective
 behind.
 
 **Latency improves; throughput per GPU falls.** You're spending hardware to make
@@ -192,13 +192,13 @@ one user faster. That's the trade, and it's the right one only sometimes.
 
 ## Go deeper
 
-- **[Megatron-LM](https://arxiv.org/abs/1909.08053)** (Shoeybi et al.) — §3 has
+- **[Megatron-LM](https://arxiv.org/abs/1909.08053)** (Shoeybi et al.), §3 has
   the column/row split you just implemented. The original.
-- **Kiely §5.4–5.4.1** (p.142–145) — TP/PP/EP compared, and TP for latency.
+- **Kiely §5.4–5.4.1** (p.142–145), TP/PP/EP compared, and TP for latency.
 - **Kiely §5.4.3** (p.146), multi-node, where TP stops being the answer.
-- **nano-vllm `nanovllm/layers/linear.py`** — a readable production TP
+- **nano-vllm `nanovllm/layers/linear.py`**: a readable production TP
   implementation.
-- **[Field notes](field-notes.md)** — the GH200 case where PP lost to TP without
+- **[Field notes](field-notes.md)**: the GH200 case where PP lost to TP without
   NVLink.
 
 ---
@@ -216,7 +216,7 @@ one user faster. That's the trade, and it's the right one only sometimes.
 
 ## Next
 
-**[23 — MoE and expert parallelism](23-moe-and-expert-parallelism.md)** — a
+**[23. MoE and expert parallelism](23-moe-and-expert-parallelism.md)**: a
 different axis to split along, and how most frontier open models are now built.
 
 The distinction to get exactly right: **total vs. active parameters.**

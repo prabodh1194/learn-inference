@@ -1,8 +1,8 @@
-# 05 — The KV cache
+# 05. The KV cache
 
 **Build:** `engine/cache.py::KVCache`, `engine/generate.py::generate_cached`
 **Test:** `tests/test_05_kv_cache.py` · **Moves:** the curve goes flat; tok/s stops falling with position
-**Prereq:** [04 — Measuring](04-measuring.md)
+**Prereq:** [04. Measuring](04-measuring.md)
 
 ---
 
@@ -45,8 +45,8 @@ have stopped doing avoidable work on top of it.
 
 This is where Lecture 01's split becomes structural rather than conceptual:
 
-- **Prefill** — one forward pass over the whole prompt, filling the cache.
-- **Decode** — one token at a time, appending one entry per step.
+- **Prefill**: one forward pass over the whole prompt, filling the cache.
+- **Decode**: one token at a time, appending one entry per step.
 
 Same weights, two different code paths. Every engine in this book has this shape.
 
@@ -80,18 +80,18 @@ memory well.
 
 ??? question "What's the difference between an attention head and a KV head?"
     An attention head has its own **Q**; a KV head owns a **K,V** pair. Classic
-    MHA ties them 1:1. GQA lets several queries share one K/V — Qwen3-0.6B has
+    MHA ties them 1:1. GQA lets several queries share one K/V, Qwen3-0.6B has
     16 query heads against 8 KV heads.
 
     Only K and V are cached (Q is recomputed each step and never needed again),
     so the cache is sized by **KV heads**. That's the 8 in the formula above.
 
-    [Q&A — what's an attention head?](qa.md#whats-an-attention-head-how-is-it-different-from-a-kv-head)
+    [Q&A: what's an attention head?](qa.md#whats-an-attention-head-how-is-it-different-from-a-kv-head)
 
 > **GQA is doing real work here.** Qwen3-0.6B has 16 query heads but only 8 KV
 > heads, and the cache is sized by *KV* heads. Grouped-query attention halves
 > this number outright. Since decode is memory-bound, that's a direct 2× on the
-> thing that bottlenecks you — which is why essentially every modern model uses
+> thing that bottlenecks you, which is why essentially every modern model uses
 > it.
 
 ---
@@ -134,14 +134,14 @@ wrong output and no speedup, which is the classic first bug here.
 
 > **A note on the transformers API.** In transformers 5.x, `past_key_values` is a
 > `Cache` **object**, not the legacy tuple-of-tuples you'll see in older tutorials.
-> Treat it as opaque and thread it through — the code above works either way.
+> Treat it as opaque and thread it through, the code above works either way.
 >
 > Two implementations are worth knowing, because they're the same distinction
 > you'll rebuild yourself:
 >
-> - **`DynamicCache`** — grows by concatenation as tokens arrive. The default,
+> - **`DynamicCache`**, grows by concatenation as tokens arrive. The default,
 >   and the direct analogue of the `KVCache` you're about to write.
-> - **`StaticCache`** — pre-allocated to `max_cache_len`, fixed shape, written
+> - **`StaticCache`**, pre-allocated to `max_cache_len`, fixed shape, written
 >   in place. Wasteful for the same reason your `KVCache` will be (Lecture 09),
 >   but the fixed shape is exactly what CUDA graphs require. That's why it
 >   exists, and it comes back in Lecture 13.
@@ -223,7 +223,7 @@ workload choice determines what you can even see.
   field.
 - **[GQA: Training Generalized Multi-Query Transformer Models](https://arxiv.org/abs/2305.13245)**
   (Ainslie et al., 2023), why 8 KV heads instead of 16.
-- **[Field notes](field-notes.md)** — practitioners running 170k context on 2×3090.
+- **[Field notes](field-notes.md)**: practitioners running 170k context on 2×3090.
   At that length the cache dwarfs the weights.
 
 ---
@@ -244,7 +244,7 @@ That last one is Lecture 09.
 
 ## Next
 
-**[06 — Sampling](06-sampling.md)** — short, and load-bearing: it's what makes
+**[06. Sampling](06-sampling.md)**: short, and load-bearing: it's what makes
 every later test trustworthy.
 
 Implement `engine/sampling.py::sample`, then `pytest tests/test_06_sampling.py`.

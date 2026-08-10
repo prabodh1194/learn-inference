@@ -1,8 +1,8 @@
-# 13 — CUDA graphs
+# 13. CUDA graphs
 
 **Build:** graph capture in the model runner · **Test:** `tests/test_13_graphs.py` (cuda)
 **Moves:** per-step latency for small batches, sometimes a lot
-**Prereq:** [12b — Structured output and adapters](12b-structured-output.md)
+**Prereq:** [12b. Structured output and adapters](12b-structured-output.md)
 
 > **NVIDIA GPU required.** No CUDA-graph equivalent exists on MPS. Tests here are
 > marked `cuda` and skip cleanly on a laptop.
@@ -28,7 +28,7 @@ CPU-bound in a program that appears to be about GPUs.
 
 > Read that as *gaps in the profiler timeline*, not "low utilization percentage."
 > The coarse utilization metric is unreliable here for the reason Lecture 00
-> flagged — it can read high during memory-bound decode regardless of useful
+> flagged, it can read high during memory-bound decode regardless of useful
 > work. What you want is Nsight Systems showing idle stretches between kernels
 > (Lecture 15), which is a direct observation rather than a summary statistic.
 
@@ -70,7 +70,7 @@ padding is real waste, traded against launch savings.
 cannot pass fresh tensors.
 
 > This constraint is why `StaticCache` exists (Lecture 05). A `DynamicCache`
-> grows by concatenation, so its tensors move — new addresses every step, which a
+> grows by concatenation, so its tensors move, new addresses every step, which a
 > captured graph cannot follow. `StaticCache` pre-allocates to `max_cache_len` and
 > writes in place, so the addresses hold still.
 >
@@ -146,11 +146,11 @@ rather than a free win.
 
 - **[NVIDIA: Getting Started with CUDA Graphs](https://developer.nvidia.com/blog/cuda-graphs/)**
  : the mechanism, with launch-overhead measurements.
-- **[PyTorch CUDA Graphs](https://pytorch.org/docs/stable/notes/cuda.html#cuda-graphs)**
-  — `torch.cuda.graph` and the memory-pool constraints.
-- **vLLM `vllm/v1/worker/gpu_model_runner.py`** — search for `capture`. Note the
+- **[PyTorch CUDA Graphs](https://pytorch.org/docs/stable/notes/cuda.html#cuda-graphs)**:
+  `torch.cuda.graph` and the memory-pool constraints.
+- **vLLM `vllm/v1/worker/gpu_model_runner.py`**: search for `capture`. Note the
   list of captured batch sizes and the padding logic.
-- **nano-vllm `nanovllm/engine/model_runner.py`** — ~12KB, the readable version.
+- **nano-vllm `nanovllm/engine/model_runner.py`**: ~12KB, the readable version.
 - **Kiely §4.1.3** (p.100), kernel fusion and reducing memory accesses.
 
 ---
@@ -169,7 +169,7 @@ rather than a free win.
 
 ## Next
 
-**[14 — Reading vLLM](14-reading-vllm.md)** — you've built it. Now read the real
+**[14. Reading vLLM](14-reading-vllm.md)**: you've built it. Now read the real
 thing.
 
 **Nothing to implement.** This is the capstone: Gordić's *Inside vLLM*, then

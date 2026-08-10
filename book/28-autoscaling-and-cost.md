@@ -1,8 +1,8 @@
-# 28 — Autoscaling and cost
+# 28. Autoscaling and cost
 
 **Build:** `serve/autoscale.py`, `bench/cost_model.py` · **Test:** `tests/test_28_cost.py`
 **Moves:** dollars per million tokens: the number that decides whether any of this matters
-**Prereq:** [27 — Routing and disaggregation](27-routing-and-disaggregation.md)
+**Prereq:** [27. Routing and disaggregation](27-routing-and-disaggregation.md)
 
 ---
 
@@ -27,7 +27,8 @@ tokens/sec completely hides.
 ### Fleet utilization dominates
 
 A note on the word, because it does two jobs in this book. **Fleet utilization**
-— below, is the fraction of your paid GPU-hours that do paid work. **GPU
+(the subject of this section) is the fraction of your paid GPU-hours that do paid
+work. **GPU
 busy-percentage** is what `nvidia-smi` reports for one card, and it's the
 misleading one (see the autoscaling signal section). They are unrelated.
 
@@ -63,8 +64,8 @@ and you're always behind the traffic.
 
 Mitigations, roughly in order of usefulness:
 - **Predictive scaling** on known daily patterns
-- **Warm pools** — idle-but-loaded replicas, paying to avoid latency
-- **Faster loading** — cached images, `safetensors`, streaming weights
+- **Warm pools**: idle-but-loaded replicas, paying to avoid latency
+- **Faster loading**: cached images, `safetensors`, streaming weights
 - **Scale to zero** for dev and spiky low-volume workloads only
 
 **Scale on the right signal.** CPU utilization is meaningless here. GPU
@@ -88,7 +89,7 @@ marginally more throughput and unbounded latency growth.
 | Batch size | more tokens per GPU-hour | 07–09 |
 | Quantization | cheaper GPU, or bigger batches | 19 |
 | Prefix caching | fewer tokens computed at all | 10 |
-| Spot instances | 60–80% cheaper, can vanish | — |
+| Spot instances | 60–80% cheaper, can vanish |, |
 | Kernels | real, but smaller than the above | 15–20 |
 
 Sobering and worth sitting with: **prefix caching can beat every kernel
@@ -126,7 +127,7 @@ direction, is informative.
 **Cold starts measured in minutes.** This is why scale-to-zero is unsuitable for
 latency-sensitive production.
 
-**Autoscaling saving real money on diurnal traffic** — and hurting p99 during
+**Autoscaling saving real money on diurnal traffic**: and hurting p99 during
 scale-up events. There's the trade.
 
 **Your cost above hosted APIs at low volume.** They amortize across many customers,
@@ -142,7 +143,7 @@ reverse.
 - **Kiely §7.4.2** (p.201), cost estimation.
 - **Kiely §7.3** (p.193), multi-cloud capacity, GPU procurement, reliability.
 - **Kiely §7.4.3** (p.203), observability: what to actually monitor.
-- **[Field notes](field-notes.md)** — the €9k GH200 bought "to save $1.27 on Claude
+- **[Field notes](field-notes.md)**: the €9k GH200 bought "to save $1.27 on Claude
   Code." Funny, and a real lesson about amortization at low volume.
 
 ---
@@ -164,7 +165,7 @@ measured it honestly, and priced it.
 
 ## Next
 
-**[29 — Contributing](29-contributing.md)** — go work on the real thing.
+**[29. Contributing](29-contributing.md)**: go work on the real thing.
 
 Nothing left to build here. The remaining gap between you and someone who does
 this professionally is **context**: which problems are open, which tradeoffs are

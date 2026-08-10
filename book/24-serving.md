@@ -1,8 +1,8 @@
-# 24 — Serving
+# 24. Serving
 
 **Build:** `serve/api.py` · **Test:** `tests/test_24_serving.py`
 **Moves:** nothing about the engine, everything about whether it's usable
-**Prereq:** [23 — MoE and expert parallelism](23-moe-and-expert-parallelism.md)
+**Prereq:** [23. MoE and expert parallelism](23-moe-and-expert-parallelism.md)
 
 ---
 
@@ -135,10 +135,9 @@ deliberately: it's a convincing demonstration.
 - **Kiely §7.5–7.5.3** (p.204–207), client overhead, async inference, streaming
   protocols.
 - **Kiely §7.1** (p.179), containerization and dependency management.
-- **vLLM `vllm/entrypoints/openai/api_server.py`** — the production surface. Note
+- **vLLM `vllm/entrypoints/openai/api_server.py`**: the production surface. Note
   how much is spec compatibility rather than inference.
-- **[OpenAI API reference](https://platform.openai.com/docs/api-reference/chat)** —
-  the shape you're implementing.
+- **[OpenAI API reference](https://platform.openai.com/docs/api-reference/chat)**:   the shape you're implementing.
 
 ---
 
@@ -155,11 +154,11 @@ deliberately: it's a convincing demonstration.
 
 ## Next
 
-**[25 — Load testing](25-load-testing.md)** — find out what your service actually
+**[25. Load testing](25-load-testing.md)**: find out what your service actually
 does under pressure.
 
-**Use an open loop.** A closed-loop test — N clients each waiting for a response
-— self-limits, so it literally cannot show you overload. Sweep the arrival rate
+**Use an open loop.** A closed-loop test, N clients each waiting for a response
+self-limits, so it literally cannot show you overload. Sweep the arrival rate
 and find your knee.
 
 **Predict your knee before measuring.** Most people guess high.

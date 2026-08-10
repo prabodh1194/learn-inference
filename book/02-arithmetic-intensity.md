@@ -1,4 +1,4 @@
-# 02 — Arithmetic intensity
+# 02. Arithmetic intensity
 
 **Demo:** `book/code/roofline.py` · **Test:** `tests/test_02_roofline.py`
 **Moves:** nothing: this is how you *predict* what will move · **Prereq:** [01](01-the-two-phases.md)
@@ -21,8 +21,8 @@ kernel buys you nothing.
 
 Two numbers describe a GPU:
 
-- **Peak compute** — floating-point operations per second.
-- **Peak bandwidth** — bytes per second from memory.
+- **Peak compute**: floating-point operations per second.
+- **Peak bandwidth**: bytes per second from memory.
 
 Divide them and you get the **ops:byte ratio**, how much arithmetic the machine
 must do per byte loaded to keep its compute units busy. For an H100: 989 TFLOPS ÷
@@ -32,7 +32,7 @@ operations with it, and you've wasted the trip.
 > **Which FLOPS number?** Spec sheets list several, differing by up to 8×, and
 > picking the wrong one silently corrupts every prediction you make.
 >
-> TechPowerUp lists the RTX 3090 at "FP16 (half) 35.58 TFLOPS **(1:1)**" — that's
+> TechPowerUp lists the RTX 3090 at "FP16 (half) 35.58 TFLOPS **(1:1)**", which is
 > the *shader* rate, where fp16 runs no faster than fp32. Matmuls don't use
 > shaders; they use **tensor cores**, and the 3090's dense fp16 tensor rate is
 > ~71 TFLOPS. That's the number in `roofline.py`.
@@ -83,9 +83,9 @@ like a roof:
 
 Two ceilings, because the machine has two limits:
 
-- **The diagonal** — you cannot compute faster than memory can feed you. Its
+- **The diagonal**: you cannot compute faster than memory can feed you. Its
   slope *is* the memory bandwidth.
-- **The horizontal** — you cannot exceed the arithmetic units. Its height *is*
+- **The horizontal**: you cannot exceed the arithmetic units. Its height *is*
   peak FLOPS.
 
 The corner where they meet is the **ridge point**, and it sits at exactly the
@@ -121,7 +121,7 @@ the roofline is what tells you they're all the same idea.
     memory-bound; which one you're in depends on how many tokens share one weight
     load.** Everything else is re-derivable in ten seconds.
 
-    [Q&A — what is the ops:byte math actually for?](qa.md#what-is-the-opsbyte-math-actually-for)
+    [Q&A: what is the ops:byte math actually for?](qa.md#what-is-the-opsbyte-math-actually-for)
 
 ### Doing it for attention
 
@@ -166,7 +166,7 @@ prefill ( 512 tokens)    510.48 ops:byte
 the arithmetic the machine can do. It is not a little memory-bound; it is almost
 entirely memory-bound.
 
-And the verdict table shows this holds on *every* device — H100 (ridge 295), A100
+And the verdict table shows this holds on *every* device, H100 (ridge 295), A100
 (153), 3090 (76), M1 (38). A conclusion that survives an 8× range of ridge points is a
 property of the algorithm, not a quirk of one GPU.
 
@@ -184,7 +184,7 @@ same claim.
    them; they encode the claims above as assertions.
 3. **Fill in your own hardware.** The `Device` entries are nominal spec-sheet
    figures. Find your laptop's real numbers and add them.
-4. **The exercise that matters — KV cache sizing.** Kiely §5.4 (Fig 5.11, p.142)
+4. **The exercise that matters, KV cache sizing.** Kiely §5.4 (Fig 5.11, p.142)
    gives the formula for VRAM. Using `ModelDims.kv_bytes_per_token()`:
    - How much KV cache does one 4096-token sequence need?
    - On a 24GB 3090 with ~840 MiB of weights (what `roofline.py` prints), how
@@ -206,8 +206,7 @@ Record the answers in `notes/00-baseline/README.md`.
 - **[Roofline: An Insightful Visual Performance Model](https://dl.acm.org/doi/10.1145/1498765.1498785)**
   (Williams et al., 2009): the original. Predates GPUs in this role and still
   the clearest statement of the idea.
-- **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022) —
-  §2 has the memory-traffic analysis. Skim now, implement in Lecture 17.
+- **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022),   §2 has the memory-traffic analysis. Skim now, implement in Lecture 17.
 
 ---
 
@@ -226,7 +225,7 @@ Answer from your own output:
 
 ## Next
 
-**[03 — Naive generation](03-naive-generation.md)** — stop predicting, start
+**[03. Naive generation](03-naive-generation.md)**: stop predicting, start
 measuring. **This is where you first write code.**
 
 ```bash

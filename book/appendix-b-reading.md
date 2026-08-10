@@ -1,8 +1,8 @@
-# Appendix B — Papers
+# Appendix B: Papers
 
 Indexed to the lecture that makes each one readable. **Read them in that order.**
 
-A paper you've implemented reads completely differently from one you haven't —
+A paper you've implemented reads completely differently from one you haven't,
 you skip the motivation, argue with the design choices, and go straight to the
 details you got wrong. That's the whole reason this book puts building first.
 
@@ -131,7 +131,7 @@ overload.
 **Philip Kiely, *Inference Engineering*** (Baseten, 2026)
 The breadth-first survey this book indexes throughout. Appendix A is a good
 glossary; Appendix B has its own curated reading list. **Chapter 6** covers
-modalities this book skips entirely — VLM, embedding, ASR, TTS, image, video.
+modalities this book skips entirely, VLM, embedding, ASR, TTS, image, video.
 
 **Aleksa Gordić, [*Inside vLLM*](https://www.aleksagordic.com/blog/vllm)** · **L14**
 Top-down read of vLLM V1. Save it for Lecture 14.

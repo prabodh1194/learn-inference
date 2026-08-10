@@ -1,8 +1,8 @@
-# 12 — Speculative decoding
+# 12. Speculative decoding
 
 **Build:** `engine/speculative.py::NgramSpeculator`, `verify`
 **Test:** `tests/test_12_speculative.py` · **Moves:** tok/s per user, and only on the right workload
-**Prereq:** [11 — Chunked prefill](11-chunked-prefill.md)
+**Prereq:** [11. Chunked prefill](11-chunked-prefill.md)
 
 ---
 
@@ -46,24 +46,24 @@ production.
 
 ### Where drafts come from
 
-**Draft model** — a small model (0.5B guessing for 70B). Good acceptance, but you
+**Draft model**: a small model (0.5B guessing for 70B). Good acceptance, but you
 run and maintain a second model.
 
-**Medusa** — extra heads on the target model predicting several positions ahead.
+**Medusa**: extra heads on the target model predicting several positions ahead.
 No separate model, but requires training.
 
-**EAGLE** — predicts at the *feature* level rather than the token level, using
+**EAGLE**: predicts at the *feature* level rather than the token level, using
 hidden states. Higher acceptance than Medusa; the current default when you can
 train heads.
 
-**N-gram / prompt lookup** — no model at all. Build an n-gram map from the prompt
+**N-gram / prompt lookup**: no model at all. Build an n-gram map from the prompt
 and the text so far; if the recent suffix appeared before, propose whatever
 followed it. **This is what you'll implement**, because it needs no training and
 the entire draft/verify/accept loop is visible in a few dozen lines.
 
 ### The metric that matters
 
-**Acceptance rate** — what fraction of drafted tokens survive verification. Report
+**Acceptance rate**: what fraction of drafted tokens survive verification. Report
 it alongside tok/s, always. Without it you can't tell these apart:
 
 - Fast because acceptance is high → real win
@@ -153,7 +153,7 @@ it, so it's invalid regardless of what it says.
 
 > For sampling (`T > 0`), exact equivalence requires **rejection sampling** with
 > the acceptance probability from the Leviathan et al. paper, not simple argmax
-> comparison. Greedy is a fair place to start — but if you claim "identical
+> comparison. Greedy is a fair place to start, but if you claim "identical
 > output distribution" while sampling, you need the real algorithm.
 
 ---
@@ -179,9 +179,9 @@ Runs `code_completion` and `prose`. **Report acceptance rate for both.**
 
 ## What you should see
 
-**Solid gains on `code_completion`** — repetitive syntax, high acceptance.
+**Solid gains on `code_completion`**: repetitive syntax, high acceptance.
 
-**Little or nothing on `prose`** — novel text, n-grams miss. That's not a failure;
+**Little or nothing on `prose`**: novel text, n-grams miss. That's not a failure;
 it's the lesson.
 
 **A peak in the draft-length sweep**, then decline. Past the peak you're paying to
@@ -197,12 +197,12 @@ verify tokens that get thrown away.
   (Leviathan et al., 2022): the original. §2.3's rejection-sampling proof is what
   makes this exact rather than approximate; read it before claiming distributional
   equivalence.
-- **[EAGLE](https://arxiv.org/abs/2401.15077)** — feature-level drafting, the
+- **[EAGLE](https://arxiv.org/abs/2401.15077)**: feature-level drafting, the
   current practical default.
-- **[Medusa](https://arxiv.org/abs/2401.10774)** — multiple decoding heads.
+- **[Medusa](https://arxiv.org/abs/2401.10774)**: multiple decoding heads.
 - **Kiely §5.2–5.2.4** (p.129–136), all four approaches compared, including the
   n-gram/lookahead variant you built.
-- **[Field notes](field-notes.md)** — docs said 3 draft tokens, measurement said 5,
+- **[Field notes](field-notes.md)**: docs said 3 draft tokens, measurement said 5,
   and >5 was worse. Tune on *your* workload.
 
 ---
@@ -222,7 +222,7 @@ That last one has no honest single answer, which is the point.
 
 ## Next
 
-**[12b — Structured output and adapters](12b-structured-output.md)** — what comes
+**[12b. Structured output and adapters](12b-structured-output.md)**: what comes
 out, not just how fast: guided decoding, tool calling, LoRA.
 
 Lighter on implementation than the last few. The one thing to build is a

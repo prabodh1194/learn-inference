@@ -1,7 +1,7 @@
-# 14 — Reading vLLM
+# 14. Reading vLLM
 
 **Build:** nothing · **Test:** none · **Moves:** your ability to read production code
-**Prereq:** [13 — CUDA graphs](13-cuda-graphs.md), and a working engine
+**Prereq:** [13. CUDA graphs](13-cuda-graphs.md), and a working engine
 
 ---
 
@@ -10,7 +10,7 @@
 You have built: a KV cache, a scheduler doing continuous batching, a paged block
 manager with prefix caching, chunked prefill, and speculative decoding.
 
-Every one of those is a thing vLLM does. You now have **opinions** about them —
+Every one of those is a thing vLLM does. You now have **opinions** about them,
 you know why the parent hash goes in the block hash, why retire comes before
 admit, why chunk size trades p99 against throughput.
 
@@ -27,7 +27,7 @@ haven't hit yet.
 
 ## Read in this order
 
-### 1. Gordić, *Inside vLLM* — the whole thing
+### 1. Gordić, *Inside vLLM*: the whole thing
 
 **[aleksagordic.com/blog/vllm](https://www.aleksagordic.com/blog/vllm)**
 
@@ -47,10 +47,10 @@ haven't hit yet.
 Read it in one sitting. **Keep a list of every place vLLM does something
 differently than you did**, and don't resolve them yet, just collect.
 
-### 2. nano-vllm — read the source
+### 2. nano-vllm: read the source
 
 **[github.com/GeeeekExplorer/nano-vllm](https://github.com/GeeeekExplorer/nano-vllm)**
-— ~1,200 lines, MIT. The nanoGPT of inference: the same architecture as vLLM with
+~1,200 lines, MIT. The nanoGPT of inference: the same architecture as vLLM with
 the production complexity removed.
 
 One sitting per file, in this order:
@@ -66,7 +66,7 @@ One sitting per file, in this order:
 For each: read it, then **diff it against yours mentally**. Where it differs, ask
 whether they're handling a case you didn't, or making a different tradeoff.
 
-### 3. vLLM itself — targeted, not exhaustive
+### 3. vLLM itself: targeted, not exhaustive
 
 Do **not** read vLLM top to bottom. It's hundreds of thousands of lines with
 multi-backend support, quantization schemes, and hardware variants. Read these
@@ -77,7 +77,7 @@ four files, each against the lecture that taught it:
 | `vllm/v1/core/sched/scheduler.py` | L08, L11 |
 | `vllm/v1/core/block_pool.py` | L09 |
 | `vllm/v1/core/kv_cache_manager.py` | L09 |
-| `vllm/v1/core/kv_cache_utils.py` | L10 — block hashing |
+| `vllm/v1/core/kv_cache_utils.py` | L10, block hashing |
 
 In `kv_cache_utils.py`, look closely at what goes **into** the block hash. LoRA
 adapter id, multimodal inputs, cache salt. Every one of those is a correctness
@@ -149,7 +149,7 @@ If (4) feels reachable, Part II worked.
 
 ## Next
 
-**[15 — Profiling](15-profiling.md)** — Part III goes down a level, to where the
+**[15. Profiling](15-profiling.md)**: Part III goes down a level, to where the
 time actually goes.
 
 > **Part III needs an NVIDIA GPU for every lecture.** Nsight is CUDA-only. This

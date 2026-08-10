@@ -1,4 +1,4 @@
-# 00 — Introduction
+# 00. Introduction
 
 **Build:** the environment · **Test:** `uv run python scripts/progress.py`
 **Prereq:** you can read PyTorch and know what attention computes
@@ -7,13 +7,13 @@
 
 ## Why inference is its own discipline
 
-This book assumes you can read PyTorch and know roughly what attention computes
-— Q, K, V, and why it's causal. It does **not** assume you've trained a model,
+This book assumes you can read PyTorch and know roughly what attention computes:
+Q, K, V, and why it's causal. It does **not** assume you've trained a model,
 and it never asks you to.
 
 If you have trained one, one habit needs unlearning, and it's the reason this
 lecture leads with it: **inference optimizes for something training never cares
-about, one token, right now.**
+about: one token, right now.**
 
 Training is **throughput-only**. Nobody is waiting on any individual step, so
 you're free to make batches as large as memory allows. Every sequence in a batch
@@ -28,7 +28,7 @@ training becomes a matrix-*vector* product that barely uses the hardware.
 
 > **Two honest caveats**, since this comparison is doing a lot of work.
 >
-> Training isn't purely throughput-bound in practice — gradient synchronization,
+> Training isn't purely throughput-bound in practice. Gradient synchronization,
 > optimizer state, and activation memory all impose their own limits, and real
 > pipelines use sequence packing rather than the naive padding this contrast
 > implies. The claim that survives all of that is narrower and is the only one
@@ -36,7 +36,7 @@ training becomes a matrix-*vector* product that barely uses the hardware.
 > processes one.**
 >
 > And note what is *deliberately* absent above: any claim about "GPU
-> utilization." That metric is misleading here — a memory-bound decode loop can
+> utilization." That metric is misleading here; a memory-bound decode loop can
 > report high utilization while doing very little useful work. Lecture 15 shows
 > why, and Lecture 28 explains why you must not autoscale on it. We'll use
 > arithmetic intensity instead, which doesn't have that failure mode.
@@ -52,7 +52,7 @@ nearly everything in this book:
     happens. On-chip SRAM is ~6 MB against 840 MiB of weights, off by 140×, so
     a weight streams in, gets used once, and is evicted before it can be reused.
 
-    Longer answer: [Q&A — why is decode memory-bound if the weights are already
+    Longer answer: [Q&A: why is decode memory-bound if the weights are already
     on the GPU?](qa.md#why-is-decode-memory-bound-if-the-weights-are-already-on-the-gpu)
 
 **Which memory matters here.** The weights already live in **VRAM**, they were
@@ -62,7 +62,7 @@ there is nowhere near enough on-chip memory to hold 840 MiB of weights.
 
 | Path | Bandwidth (RTX 3090) | When |
 |---|---|---|
-| **VRAM → on-chip** | ~936 GB/s | **every step** — this is the bottleneck |
+| **VRAM → on-chip** | ~936 GB/s | **every step**; the bottleneck |
 | CPU RAM → VRAM (PCIe) | ~64 GB/s | once at load time |
 
 If weights crossed PCIe every step you'd be another ~15× slower. When that
@@ -79,7 +79,7 @@ matrix-*vector* multiply for a single token does almost none.
 
     Same weights, same kernel, 1 row instead of 512. That *is* the 512 vs 0.92.
 
-    [Q&A — does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
+    [Q&A: does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
 Qwen3-0.6B decode runs at **0.75 operations per byte**, against an H100 that
 needs 295 to keep its arithmetic units busy. That's roughly 0.25%, and the
@@ -89,11 +89,11 @@ memory-bound side on an A100, a 3090, and an M1 alike.
 Most of Part II answers one question: *"how do we get more work out of each byte
 we were going to load anyway?"*
 
-- **Batching** — load the weights once, generate for 32 sequences instead of 1.
+- **Batching**: load the weights once, generate for 32 sequences instead of 1.
   ([why not 512?](qa.md#can-batches-be-larger-than-the-sequence-length))
-- **KV caching** — don't recompute what you already computed.
-- **Quantization** — make the bytes smaller.
-- **Speculative decoding** — verify several tokens in the time one would take.
+- **KV caching**: don't recompute what you already computed.
+- **Quantization**: make the bytes smaller.
+- **Speculative decoding**: verify several tokens in the time one would take.
 
 Four techniques, one bottleneck. Once you see it, that part of the field stops
 being a list of tricks and becomes a single idea with variations.
@@ -133,7 +133,7 @@ notes/    your results and surprises  RECORD
 ```
 
 `tests/` is what makes progress unambiguous. Every implementation milestone has a
-test asserting your version matches a reference, your greedy output must match
+test asserting your version matches a reference: your greedy output must match
 HuggingFace's exactly, your paged attention must match contiguous attention, your
 Triton kernel must match PyTorch.
 
@@ -201,10 +201,10 @@ Roughly 58 tests pass on a fresh clone; those pin arithmetic you can check
 before writing any code (the roofline derivation, cost models, sharding math).
 
 The first command prints a **roofline** analysis. If that word means nothing
-yet, that's fine and expected — Lecture 02 derives it properly. The one-line
+yet, that's fine and expected; Lecture 02 derives it properly. The one-line
 version, so the output isn't opaque:
 
-> A GPU has two ceilings — how fast it can compute, and how fast it can read
+> A GPU has two ceilings, how fast it can compute, and how fast it can read
 > memory. The roofline compares them, and tells you which one an operation is
 > actually stuck against.
 
@@ -224,7 +224,7 @@ Lecture 03 recommends on MPS, because fp16 has accuracy quirks there) against
 to bfloat16 (halving the weights to 1.1 GiB) and re-check the Lecture 03
 correctness test still passes before trusting any later numbers.
 
-From Lecture 09 you want a real NVIDIA GPU — paged attention and CUDA graphs are
+From Lecture 09 you want a real NVIDIA GPU, paged attention and CUDA graphs are
 CUDA-specific, and Part III's profiling requires Nsight.
 
 A **24GB card** is the sweet spot: enough VRAM to make the memory lectures real,
@@ -240,7 +240,7 @@ rent**, these move):
 
 The 3090 is the recommendation: cheapest of the three, and 24GB is plenty for
 Qwen3-0.6B. Its one gap is no FP8, which affects exactly one milestone in
-Lecture 19 — INT8 works fine there, and the 3090 has hardware INT4 besides.
+Lecture 19, INT8 works fine there, and the 3090 has hardware INT4 besides.
 
 Treat the "from" column with suspicion: it's the cheapest listing on the
 marketplace, often an unreliable host or a bad location. **Median is the number
@@ -287,7 +287,7 @@ worth getting exactly right before you go on.
 
 ## Next
 
-**[01 — The two phases](01-the-two-phases.md)** — prefill and decode are
+**[01. The two phases](01-the-two-phases.md)**: prefill and decode are
 different problems.
 
 Do these in order:

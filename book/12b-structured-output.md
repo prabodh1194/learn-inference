@@ -1,8 +1,8 @@
-# 12b — Structured output and adapters
+# 12b. Structured output and adapters
 
 **Build:** a logit-processor hook in `engine/sampling.py` · **Test:** `tests/test_12b_structured.py`
 **Moves:** output *validity*, and reveals a scheduling cost most people miss
-**Prereq:** [12 — Speculative decoding](12-speculative-decoding.md)
+**Prereq:** [12. Speculative decoding](12-speculative-decoding.md)
 
 ---
 
@@ -14,9 +14,9 @@ also cares about *what* comes out, and about serving many models from one engine
 Three features you'll meet immediately in any real deployment, all first-class in
 vLLM, none of them free:
 
-- **Structured output** — force valid JSON, or a schema, or a grammar
-- **Tool calling** — the dominant use case for LLM inference in 2026
-- **LoRA adapters** — serve many fine-tunes from one set of base weights
+- **Structured output**: force valid JSON, or a schema, or a grammar
+- **Tool calling**: the dominant use case for LLM inference in 2026
+- **LoRA adapters**: serve many fine-tunes from one set of base weights
 
 They're grouped here because each is a *constraint on the engine* rather than a
 speed optimization, and each interacts with machinery you've already built.
@@ -64,7 +64,7 @@ Real implementations attack this with:
   `{"na` in a schema, `me":` is the only legal continuation), emit them **without
   running the model at all.** Free tokens.
 
-That last one is worth pausing on: it's the same insight as speculative decoding —
+That last one is worth pausing on: it's the same insight as speculative decoding,
 tokens you can predict with certainty don't need a forward pass, arrived at from
 a completely different direction.
 
@@ -160,14 +160,14 @@ than a toy version.
 
 ## Go deeper
 
-- **[XGrammar](https://arxiv.org/abs/2411.15100)** — vLLM's default backend;
+- **[XGrammar](https://arxiv.org/abs/2411.15100)**: vLLM's default backend;
   explains the token-trie and jump-ahead optimizations.
 - **[Outlines](https://arxiv.org/abs/2307.09702)** (Willard & Louf), regex and
   grammar-guided generation via FSM indexing. The clearest statement of the core
   idea.
-- **[S-LoRA](https://arxiv.org/abs/2311.03285)** — serving thousands of LoRA
+- **[S-LoRA](https://arxiv.org/abs/2311.03285)**: serving thousands of LoRA
   adapters concurrently; unified paging for adapters and KV cache.
-- **[Punica](https://arxiv.org/abs/2310.18547)** — the multi-LoRA batching kernel.
+- **[Punica](https://arxiv.org/abs/2310.18547)**: the multi-LoRA batching kernel.
 - **[vLLM feature compatibility matrix](https://docs.vllm.ai/en/latest/features/)**
  , which combinations work. Genuinely useful as a research map.
 - **Gordić, *Inside vLLM***, has a guided-decoding (FSM) section. Another reason
@@ -190,9 +190,9 @@ than a toy version.
 
 ## Next
 
-**[13 — CUDA graphs](13-cuda-graphs.md)** — back to raw speed, and the first
+**[13. CUDA graphs](13-cuda-graphs.md)**: back to raw speed, and the first
 lecture where the GPU *isn't* the bottleneck.
 
-> **NVIDIA GPU required** — no equivalent exists on MPS, and the tests are
+> **NVIDIA GPU required**, no equivalent exists on MPS, and the tests are
 > marked `cuda` so they skip cleanly on a laptop. If you're still local, read it
 > and move to L14; come back when you rent.

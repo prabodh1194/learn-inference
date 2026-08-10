@@ -24,10 +24,10 @@ Each lecture gives you four things:
 
 | | |
 |---|---|
-| **the text** | the idea, derived — 5–10 minutes |
-| **a demo** | `uv run python book/code/NN_*.py` — shows the phenomenon |
+| **the text** | the idea, derived, 5–10 minutes |
+| **a demo** | `uv run python book/code/NN_*.py`, shows the phenomenon |
 | **a build** | you implement it in `engine/` |
-| **a test** | `pytest tests/test_NN_*.py` — proves it's right |
+| **a test** | `pytest tests/test_NN_*.py`, proves it's right |
 
 And a **number that must move**. Record it in `notes/`.
 
@@ -59,7 +59,7 @@ what makes the fix feel inevitable rather than arbitrary.
 
     Intro, then Part I. Demos run with no GPU.
 
-    [00 — Introduction](00-intro.md)
+    [00. Introduction](00-intro.md)
 
 -   :material-help-circle: **Chase a confusion**
 

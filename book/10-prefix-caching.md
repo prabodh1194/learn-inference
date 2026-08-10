@@ -1,8 +1,8 @@
-# 10 — Prefix caching
+# 10. Prefix caching
 
 **Build:** `BlockManager.match_prefix`, content hashing, LRU eviction
 **Test:** `tests/test_10_prefix.py` · **Moves:** TTFT on shared-prefix traffic, often dramatically
-**Prereq:** [09 — Paged attention](09-paged-attention.md)
+**Prereq:** [09. Paged attention](09-paged-attention.md)
 
 ---
 
@@ -177,7 +177,7 @@ for each before running.**
 **TTFT collapses on `shared_prefix`** after the first request. Those 400 tokens
 are already computed; you skip nearly all prefill.
 
-**Essentially nothing on `late_divergence`** — same token count, first token
+**Essentially nothing on `late_divergence`**: same token count, first token
 differs, zero reuse.
 
 **Throughput up too**, since skipped prefill frees the GPU for decode.
@@ -191,13 +191,12 @@ completely different results.
 
 - **[Efficient Memory Management ... PagedAttention](https://arxiv.org/abs/2309.06180)**
   §4.3, copy-on-write and sharing, which you just built.
-- **[SGLang / RadixAttention](https://arxiv.org/abs/2312.07104)** (Zheng et al.) —
-  a radix tree instead of a flat hash map, so prefixes share *structurally*.
+- **[SGLang / RadixAttention](https://arxiv.org/abs/2312.07104)** (Zheng et al.),   a radix tree instead of a flat hash map, so prefixes share *structurally*.
   Better for branching conversation trees.
 - **Kiely §5.3.1** (p.136–138): the ordering rule, with the SF/NYC example this
   lecture borrows.
-- **vLLM `vllm/v1/core/kv_cache_utils.py`** — production block hashing. Note how
-  much care goes into what's included in the hash (LoRA id, multimodal inputs) —
+- **vLLM `vllm/v1/core/kv_cache_utils.py`**: production block hashing. Note how
+  much care goes into what's included in the hash (LoRA id, multimodal inputs),
   every one of those is a correctness bug someone hit.
 
 ---
@@ -218,7 +217,7 @@ completely different results.
 
 ## Next
 
-**[11 — Chunked prefill](11-chunked-prefill.md)** — fixing the p99 damage L08
+**[11. Chunked prefill](11-chunked-prefill.md)**: fixing the p99 damage L08
 caused.
 
 ```bash

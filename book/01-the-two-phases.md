@@ -1,7 +1,7 @@
-# 01 — The two phases
+# 01. The two phases
 
 **Demo:** `book/code/two_phases.py` · **Moves:** nothing yet: this is the map
-**Prereq:** [00 — Introduction](00-intro.md)
+**Prereq:** [00. Introduction](00-intro.md)
 
 ---
 
@@ -12,13 +12,13 @@ differently that production systems eventually run them on separate machines.
 
 **Prefill** processes your prompt. All of it, at once, in a single forward pass.
 The model computes keys and values for every prompt token in parallel and
-produces the first output token. This determines **time to first token (TTFT)** —
+produces the first output token. This determines **time to first token (TTFT)**:
 how long before the cursor starts moving.
 
 **Decode** generates the rest. One token per forward pass, each depending on the
 one before, so there's nothing to parallelize across. Five hundred output tokens
-means five hundred sequential passes. This determines **tokens per second (TPS)**
-— how fast the text streams.
+means five hundred sequential passes. This determines **tokens per second (TPS)**:
+how fast the text streams.
 
 Same weights, same kernels. Completely different performance characteristics.
 
@@ -74,9 +74,9 @@ Decode does one. The weights are ~840 MiB either way.
     re-read). Both matter, on different scales, and past ~8k context the KV term
     overtakes the weights.
 
-    [Q&A — why do prefill and decode have different weight requirements?](qa.md#why-do-prefill-and-decode-have-different-weight-requirements)
+    [Q&A: why do prefill and decode have different weight requirements?](qa.md#why-do-prefill-and-decode-have-different-weight-requirements)
 
-Both phases read the same 840 MiB out of VRAM. Neither touches the CPU — the
+Both phases read the same 840 MiB out of VRAM. Neither touches the CPU, the
 weights were copied to the GPU once at startup and stay there. What repeats is
 the VRAM → on-chip transfer, and it repeats *per forward pass*.
 
@@ -103,7 +103,7 @@ optimization ahead is "make decode less memory-bound":
 | Quantization | make the bytes smaller | 19 |
 | Speculative decoding | check several tokens per weight load | 12 |
 
-That third table in the demo is the key. Memory traffic is **fixed**, you were
+That third table in the demo is the key. Memory traffic is **fixed**; you were
 going to load those weights regardless. Batching gets the extra work for free.
 That's not a minor optimization; it's why serving engines exist.
 
@@ -111,8 +111,8 @@ That's not a minor optimization; it's why serving engines exist.
 
 Request shape decides which phase you're fighting:
 
-- **Summarization** — long prompt, short answer → prefill-heavy, tune TTFT.
-- **Chat and agents** — short prompt, long answer → decode-heavy, tune TPS.
+- **Summarization**: long prompt, short answer → prefill-heavy, tune TTFT.
+- **Chat and agents**: short prompt, long answer → decode-heavy, tune TPS.
 
 They pull in opposite directions, and mixing them on one machine means each
 degrades the other. Lecture 11 (chunked prefill) is the first patch for that;
@@ -134,13 +134,13 @@ Nothing to build yet. Do this instead, it takes five minutes and it matters:
 
 ## Go deeper
 
-- **[Field notes](field-notes.md)** — a 2×3090 setup measuring **~1500 tok/s
+- **[Field notes](field-notes.md)**: a 2×3090 setup measuring **~1500 tok/s
   prefill against ~100 tok/s decode**. This lecture's asymmetry, as a production
   number. Same source: 100 tok/s for one user, **585 tok/s across 8**, the
   batching table, confirmed.
 - **Kiely §2.4.2** (p.63–66), "LLM Inference Bottlenecks." The same split, with
   the memory-movement table this book's Lecture 02 reproduces.
-- **Kiely §1.4** (p.35–37) — TTFT and TPS as product metrics, not just numbers.
+- **Kiely §1.4** (p.35–37), TTFT and TPS as product metrics, not just numbers.
 - **vLLM** `vllm/v1/core/sched/scheduler.py`, search for `prefill` and `decode`.
   Don't try to follow it yet; just note that the split is *structural* in real
   engines, not an analysis convenience.
@@ -161,7 +161,7 @@ Nothing to build yet. Do this instead, it takes five minutes and it matters:
 
 ## Next
 
-**[02 — Arithmetic intensity](02-arithmetic-intensity.md)** — make this precise
+**[02. Arithmetic intensity](02-arithmetic-intensity.md)**: make this precise
 with numbers you compute yourself.
 
 ```bash

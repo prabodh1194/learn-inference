@@ -1,4 +1,4 @@
-# Q&A — worked answers
+# Q&A: worked answers
 
 Real questions asked while working through this book, with the answers that
 clarified them. **Several of these caught genuine errors in the lectures.**
@@ -14,14 +14,14 @@ once, it will trip the next one. Each links to the lecture it belongs to.
 
 ## What's an attention head? How is it different from a KV head?
 
-**Lecture:** [01 — The two phases](01-the-two-phases.md) · [05 — The KV cache](05-kv-cache.md)
+**Lecture:** [01. The two phases](01-the-two-phases.md) · [05. The KV cache](05-kv-cache.md)
 
 An attention head asks: *for this token, which earlier tokens should I look at,
 and what should I take from them?* It does that with three projections:
 
-- **Q (query)** — what I'm looking for
-- **K (key)** — what I offer, so others can find me
-- **V (value)** — what I actually hand over
+- **Q (query)**: what I'm looking for
+- **K (key)**: what I offer, so others can find me
+- **V (value)**: what I actually hand over
 
 It computes `softmax(Q·Kᵀ)·V`. Models have many heads per layer so they can
 specialize, one tracks syntax, another the sentence subject, another matches
@@ -56,7 +56,7 @@ is a direct 2× on the exact thing that bottlenecks you.
 
 ## Is every token 2 bytes?
 
-**Lecture:** [02 — Arithmetic intensity](02-arithmetic-intensity.md)
+**Lecture:** [02. Arithmetic intensity](02-arithmetic-intensity.md)
 
 No, **2 bytes is one number**, not one token. fp16 is 16 bits.
 
@@ -85,7 +85,7 @@ halving both the cache and the weight traffic.
 
 ## What is the ops:byte math actually for?
 
-**Lecture:** [02 — Arithmetic intensity](02-arithmetic-intensity.md)
+**Lecture:** [02. Arithmetic intensity](02-arithmetic-intensity.md)
 
 One division that answers: **which of the GPU's two limits am I hitting?**
 
@@ -119,7 +119,7 @@ more work per byte are the only levers.
 
 ## Why do prefill and decode have different weight requirements?
 
-**Lecture:** [01 — The two phases](01-the-two-phases.md)
+**Lecture:** [01. The two phases](01-the-two-phases.md)
 
 **They don't.** Both read all 840 MiB. The difference is *how many tokens share
 one read*, prefill amortizes across 512, decode across 1.
@@ -151,8 +151,8 @@ The question usually comes from conflating two different things:
     | Context | Weights/step | KV read/step |
     |---|---|---|
     | 512 | 840 MiB | 56 MiB |
-    | 8k | 840 MiB | 896 MiB — **equal** |
-    | 32k | 840 MiB | 3,584 MiB — **KV dominates** |
+    | 8k | 840 MiB | 896 MiB, **equal** |
+    | 32k | 840 MiB | 3,584 MiB, **KV dominates** |
 
     This is why long-context serving is a different engineering problem, and why
     KV-cache quantization is a separate lever from weight quantization.
@@ -161,7 +161,7 @@ The question usually comes from conflating two different things:
 
 ## Does prefill build a matrix of growing prefixes?
 
-**Lecture:** [01 — The two phases](01-the-two-phases.md)
+**Lecture:** [01. The two phases](01-the-two-phases.md)
 
 A natural guess, and the fix explains why prefill is one shot:
 
@@ -199,7 +199,7 @@ Decode has one row, so `Q` is `(1, 1024)`, a vector. Same weights, same kernel,
 
 ## Can batches be larger than the sequence length?
 
-**Lecture:** [07 — Static batching](07-static-batching.md) · [09 — Paged attention](09-paged-attention.md)
+**Lecture:** [07. Static batching](07-static-batching.md) · [09. Paged attention](09-paged-attention.md)
 
 Yes: the tensor is 3-D, `(batch, tokens, hidden)`, and **both** axes raise
 ops:byte by putting more rows behind one weight load.
@@ -233,7 +233,7 @@ what runs out.** Hence [Lecture 09](09-paged-attention.md).
 
 ## Why is decode memory-bound if the weights are already on the GPU?
 
-**Lecture:** [00 — Introduction](00-intro.md)
+**Lecture:** [00. Introduction](00-intro.md)
 
 Because "on the GPU" means **in VRAM**, and VRAM is not where arithmetic happens.
 
@@ -243,7 +243,7 @@ pass**:
 
 | Path | Bandwidth (3090) | When |
 |---|---|---|
-| **VRAM → on-chip** | ~936 GB/s | **every step** — the bottleneck |
+| **VRAM → on-chip** | ~936 GB/s | **every step**, the bottleneck |
 | CPU RAM → VRAM (PCIe) | ~64 GB/s | once at load time |
 
 ??? question "Why can't the GPU just keep the weights on-chip?"

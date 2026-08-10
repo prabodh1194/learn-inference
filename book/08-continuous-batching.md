@@ -1,8 +1,8 @@
-# 08 — Continuous batching
+# 08. Continuous batching
 
 **Build:** `engine/scheduler.py::Scheduler`, `engine/sequence.py` · **Test:** `tests/test_08_scheduler.py`
 **Moves:** throughput up ~2.5× on mixed load; slot waste 61% → ~0%
-**Prereq:** [07 — Static batching](07-static-batching.md)
+**Prereq:** [07. Static batching](07-static-batching.md)
 
 ---
 
@@ -22,7 +22,7 @@ So make it change shape mid-flight.
 ## The idea
 
 > **Schedule per step, not per batch.** When a sequence finishes, evict it and
-> admit a waiting one — immediately, at the next step boundary.
+> admit a waiting one, immediately, at the next step boundary.
 
 The batch stops being a fixed group and becomes a *sliding window* over a queue.
 Idle slots are refilled instead of held. This is **continuous batching**
@@ -30,7 +30,7 @@ Idle slots are refilled instead of held. This is **continuous batching**
 
 The insight it rests on is one you already proved in Lecture 01: **decode steps
 are memory-bound**, so adding a sequence to an in-flight batch is nearly free.
-The weights were being loaded anyway. An empty slot isn't saving you anything —
+The weights were being loaded anyway. An empty slot isn't saving you anything,
 it's pure waste.
 
 ### The architectural consequence
@@ -47,9 +47,9 @@ generate(prompts):              scheduler.schedule()  -> which requests run now
 
 Two components:
 
-- **Scheduler** — owns the queue. Decides which requests are in this step's batch,
+- **Scheduler**: owns the queue. Decides which requests are in this step's batch,
   handles admission, completion, and preemption.
-- **Model runner** — stateless. Given a batch, executes one forward pass.
+- **Model runner**: stateless. Given a batch, executes one forward pass.
 
 **This split is the architecture of every serving engine in existence.** vLLM has
 it (`vllm/v1/core/sched/scheduler.py`), so does nano-vllm, so does TensorRT-LLM.
@@ -82,8 +82,8 @@ Each step, three questions:
 
 Two budgets bound the answer:
 
-- **`max_batch_size`** — concurrent sequences.
-- **`max_batched_tokens`** — total tokens per step. A prefill of 4,000 tokens is
+- **`max_batch_size`**: concurrent sequences.
+- **`max_batched_tokens`**: total tokens per step. A prefill of 4,000 tokens is
   much more work than 32 decode steps, so counting sequences alone underestimates
   a step's cost badly.
 
@@ -187,7 +187,7 @@ scheduler; you'll be under that, and the gap is your scheduling overhead).
 
 **Slot waste near zero.** Sequences no longer wait on each other.
 
-**On `uniform`, almost no improvement** — nothing was being wasted, so nothing was
+**On `uniform`, almost no improvement**: nothing was being wasted, so nothing was
 recovered. If that surprises you, re-read Lecture 07's demo.
 
 **p99 latency possibly worse.** Prefills interleaving with decodes cause stalls.
@@ -200,13 +200,13 @@ That's Lecture 11.
 - **[Orca: A Distributed Serving System for Transformer-Based Generative Models](https://www.usenix.org/conference/osdi22/presentation/yu)**
   (Yu et al., OSDI '22): the source. "Iteration-level scheduling" is their term
   for what you just built. §3 is the core.
-- **vLLM `vllm/v1/core/sched/scheduler.py`** — read `schedule()` now. It's your
+- **vLLM `vllm/v1/core/sched/scheduler.py`**: read `schedule()` now. It's your
   function plus chunked prefill, prefix caching, preemption, and specdec. You'll
   recognize the skeleton.
-- **nano-vllm `nanovllm/engine/scheduler.py`** — ~3.7KB, much closer to what you
+- **nano-vllm `nanovllm/engine/scheduler.py`**: ~3.7KB, much closer to what you
   just wrote. Good for a direct diff.
 - **Kiely §7.2.1** (p.186), concurrency and batch sizing in production.
-- **[Field notes](field-notes.md)** — 100 tok/s single-user vs. 585 tok/s across 8.
+- **[Field notes](field-notes.md)**: 100 tok/s single-user vs. 585 tok/s across 8.
 
 ---
 
@@ -225,7 +225,7 @@ That's Lecture 11.
 
 ## Next
 
-**[09 — Paged attention](09-paged-attention.md)** — your scheduler now wants to
+**[09. Paged attention](09-paged-attention.md)**: your scheduler now wants to
 admit more requests, and memory says no.
 
 ```bash
@@ -233,6 +233,6 @@ uv run python book/code/fragmentation.py    # run before reading
 ```
 
 > **This is where a GPU starts to matter.** The block logic is testable on a
-> laptop and the tests are written that way — but the payoff is a capacity
-> number you can only see with real VRAM. See [00 — Introduction](00-intro.md)
+> laptop and the tests are written that way, but the payoff is a capacity
+> number you can only see with real VRAM. See [00. Introduction](00-intro.md)
 > for rental notes.

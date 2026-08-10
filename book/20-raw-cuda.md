@@ -1,7 +1,7 @@
-# 20 — Raw CUDA
+# 20. Raw CUDA
 
 **Build:** `kernels/cuda/`, one kernel, by hand · **Test:** `tests/test_20_cuda.py` (cuda)
-**Moves:** probably nothing. That's the lesson. · **Prereq:** [19 — Quantization](19-quantization.md)
+**Moves:** probably nothing. That's the lesson. · **Prereq:** [19. Quantization](19-quantization.md)
 
 ---
 
@@ -103,7 +103,7 @@ way to internalize why memory access patterns dominate.
 **Your first version much slower**, most likely from uncoalesced access. Finding
 that in `ncu` is the single most valuable exercise here.
 
-**Big gains from small changes** — the reduction progression makes this vivid.
+**Big gains from small changes**: the reduction progression makes this vivid.
 
 **A new ability:** you can now read CUDA in vLLM (`csrc/`) and follow it. That's
 the durable outcome.
@@ -117,7 +117,7 @@ Not often, and it's worth being clear about when:
 - **Novel algorithms** Triton can't express well (unusual memory patterns,
   specialized warp cooperation).
 - **The last 10–20%** on a kernel that dominates your profile.
-- **Hardware-specific features** — tensor core instructions, async copy, TMA on
+- **Hardware-specific features**: tensor core instructions, async copy, TMA on
   Hopper.
 
 For everything else, Triton is a better default: dramatically less code, portable
@@ -129,16 +129,16 @@ the honest summary of this tradeoff.
 
 ## Go deeper
 
-- **[CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)**
-  — chapters 3 (model) and 5 (performance).
+- **[CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)**:
+  chapters 3 (model) and 5 (performance).
 - **[Optimizing Parallel Reduction in CUDA](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf)**
   (Mark Harris): the classic seven-stage walkthrough. Still the best single
   document on why memory access dominates.
-- **vLLM `csrc/`** — the remaining hand-written CUDA. Note that V1 moved paged
+- **vLLM `csrc/`**: the remaining hand-written CUDA. Note that V1 moved paged
   attention itself to Triton, so `csrc/attention/` now holds mostly headers; the
   old `paged_attention_v1.cu` lives only in pre-V1 tags. A good reminder that
   hand-written CUDA gets replaced when a portable version gets close enough.
-- **Kiely §4.1–4.1.3** (p.96–100) — CUDA kernels, selection, and fusion.
+- **Kiely §4.1–4.1.3** (p.96–100), CUDA kernels, selection, and fusion.
 
 ---
 
@@ -161,7 +161,7 @@ down to raw CUDA.
 
 ## Next
 
-**[21 — JAX and XLA](21-jax-and-xla.md)** — a different way to think about all
+**[21. JAX and XLA](21-jax-and-xla.md)**: a different way to think about all
 of this: you declare *what*, the compiler decides *how*.
 
 Verify your JAX forward pass against PyTorch **before** moving on. A silent

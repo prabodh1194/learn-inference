@@ -1,8 +1,8 @@
-# 25 — Load testing
+# 25. Load testing
 
 **Build:** `bench/load_test.py` · **Test:** `tests/test_25_load.py`
 **Moves:** your understanding of what your service can actually promise
-**Prereq:** [24 — Serving](24-serving.md)
+**Prereq:** [24. Serving](24-serving.md)
 
 ---
 
@@ -12,7 +12,7 @@ Every number so far came from a benchmark you controlled, fixed batches, request
 you fired all at once. Real traffic doesn't behave that way.
 
 Requests arrive **randomly**. They **queue**. Latency depends on what else is
-running. And the honest answer to "how fast is your service?" is not a number —
+running. And the honest answer to "how fast is your service?" is not a number,
 it's a **curve**.
 
 ---
@@ -40,11 +40,11 @@ look far more predictable than it is.
 
 A distinction that changes what you're measuring:
 
-**Closed loop** — N clients, each waits for its response before sending again.
+**Closed loop**: N clients, each waits for its response before sending again.
 Load *self-limits*: if the server slows down, offered load drops. This is what
 most naive load tests do, and it cannot show you overload.
 
-**Open loop** — requests arrive at a fixed rate regardless of how the server is
+**Open loop**: requests arrive at a fixed rate regardless of how the server is
 doing. If service is slower than arrival, the queue grows without bound.
 
 **You want open loop.** It's what real traffic does, and it's the only way to find
@@ -133,7 +133,7 @@ saturation signal.
 
 - **Kiely §4.5–4.5.2** (p.112–114), benchmarking tooling and practical tips.
 - **Kiely §1.4.2** (p.37), end-to-end metrics, including what the client sees.
-- **vLLM `benchmarks/benchmark_serving.py`** — the standard harness. Note how much
+- **vLLM `benchmarks/benchmark_serving.py`**: the standard harness. Note how much
   is realistic load generation rather than timing.
 - **[Open Versus Closed: A Cautionary Tale](https://www.usenix.org/legacy/event/nsdi06/tech/schroeder.html)**
   (Schroeder et al., NSDI '06), why the distinction above changes your
@@ -155,9 +155,9 @@ saturation signal.
 
 ## Next
 
-**[26 — Versus vLLM](26-versus-vllm.md)** — benchmark against the real thing.
+**[26. Versus vLLM](26-versus-vllm.md)**: benchmark against the real thing.
 
-**You will lose. That is the expected result.** The deliverable is not a win —
+**You will lose. That is the expected result.** The deliverable is not a win,
 it's a per-subsystem explanation of the gap, with profiler numbers.
 
 It also turns your skepticism outward: after this, you'll know exactly which

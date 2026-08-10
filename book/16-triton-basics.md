@@ -1,8 +1,8 @@
-# 16 — Triton basics
+# 16. Triton basics
 
 **Build:** `kernels/triton/softmax.py`, `kernels/triton/rmsnorm.py`
 **Test:** `tests/test_16_triton.py` (cuda) · **Moves:** fewer memory round-trips on elementwise ops
-**Prereq:** [15 — Profiling](15-profiling.md), with your kernel ranking in hand
+**Prereq:** [15. Profiling](15-profiling.md), with your kernel ranking in hand
 
 > **NVIDIA GPU required.** Triton is CUDA-only in practice.
 
@@ -67,14 +67,14 @@ def rmsnorm_kernel(x_ptr, w_ptr, out_ptr, n_cols,
 
 Four things to internalize:
 
-**`tl.program_id(0)`** — your block's index. Launch a grid of `n_rows` and each
+**`tl.program_id(0)`**: your block's index. Launch a grid of `n_rows` and each
 instance handles one row.
 
-**`BLOCK_SIZE: tl.constexpr`** — known at compile time, so Triton unrolls and
+**`BLOCK_SIZE: tl.constexpr`**: known at compile time, so Triton unrolls and
 allocates registers accordingly. A different `BLOCK_SIZE` is a different compiled
 kernel.
 
-**`mask`** — vocabulary sizes aren't powers of two. `BLOCK_SIZE` is. The mask
+**`mask`**: vocabulary sizes aren't powers of two. `BLOCK_SIZE` is. The mask
 suppresses out-of-bounds lanes, and `other=0.0` supplies a neutral value so
 reductions stay correct.
 
@@ -146,7 +146,7 @@ and finding out which is worth more than the 2%.
 
 ## What you should see
 
-**Softmax and RMSNorm meaningfully faster than PyTorch** — the fusion win is real.
+**Softmax and RMSNorm meaningfully faster than PyTorch**: the fusion win is real.
 
 **Vector add roughly tied.** Nothing to fuse.
 
@@ -158,13 +158,12 @@ ones.
 
 ## Go deeper
 
-- **[Triton tutorials](https://triton-lang.org/main/getting-started/tutorials/)** —
-  02 (fused softmax) and 05 (layer norm) are directly this lecture. Work them.
+- **[Triton tutorials](https://triton-lang.org/main/getting-started/tutorials/)**:   02 (fused softmax) and 05 (layer norm) are directly this lecture. Work them.
 - **[Triton: An Intermediate Language and Compiler for Tiled Neural Network
   Computations](https://dl.acm.org/doi/10.1145/3315508.3329973)** (Tillet et al.)
  : the design rationale for block-level programming.
 - **Kiely §4.1.3** (p.100), kernel fusion and reducing memory accesses.
-- **vLLM `vllm/model_executor/layers/layernorm.py`** — production fused norms.
+- **vLLM `vllm/model_executor/layers/layernorm.py`**: production fused norms.
 
 ---
 
@@ -181,7 +180,7 @@ ones.
 
 ## Next
 
-**[17 — FlashAttention](17-flash-attention.md)** — the kernel that actually
+**[17. FlashAttention](17-flash-attention.md)**: the kernel that actually
 matters, and the deepest idea in Part III.
 
 Two things to hold onto: it is **exact**, not an approximation; and it does

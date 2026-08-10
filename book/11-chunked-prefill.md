@@ -1,8 +1,8 @@
-# 11 — Chunked prefill
+# 11. Chunked prefill
 
 **Build:** chunked admission in `engine/scheduler.py` · **Test:** `tests/test_11_chunked.py`
 **Moves:** **p99 latency**, and barely touches the mean
-**Prereq:** [10 — Prefix caching](10-prefix-caching.md)
+**Prereq:** [10. Prefix caching](10-prefix-caching.md)
 
 ---
 
@@ -11,7 +11,7 @@
 Lecture 08 warned you about this, and you should have measured it: continuous
 batching raised throughput and made **p99 latency worse**.
 
-Here's the mechanism. A step containing a 4,000-token prefill is enormous —
+Here's the mechanism. A step containing a 4,000-token prefill is enormous,
 compute-bound, and roughly 125× the work of a decode step (4,000 prefill tokens
 against 32 decode tokens). Every sequence
 decoding alongside it waits for the whole thing to finish.
@@ -128,7 +128,7 @@ def schedule(self):
 ```
 
 **Finish in-flight prefills before admitting new ones.** Otherwise you accumulate
-half-prefilled sequences that each hold KV memory while producing nothing —
+half-prefilled sequences that each hold KV memory while producing nothing,
 memory pressure with no output, and every request's TTFT gets worse.
 
 One caveat: the *last* chunk of a prefill produces the first token, so that step
@@ -149,7 +149,7 @@ uv run python book/code/chunked_bench.py
 ```
 
 `workloads.long_prefill` mixes 8 long prompts (~3000 tokens) with 24 short ones.
-**Report p99 latency of the SHORT requests specifically** — that's where the
+**Report p99 latency of the SHORT requests specifically**: that's where the
 damage was, and `Request.tag` marks them.
 
 **Predict first:** what happens to mean latency? To p99? To throughput?
@@ -180,7 +180,7 @@ should see the trade directly.
 - **[Taming Throughput-Latency Tradeoff (Sarathi-Serve)](https://arxiv.org/abs/2403.02310)**
  : the follow-up, with stall-free scheduling.
 - **Kiely §5.3.4** (p.141), long-context handling, where this matters most.
-- **vLLM `vllm/v1/core/sched/scheduler.py`** — chunked prefill is on by default in
+- **vLLM `vllm/v1/core/sched/scheduler.py`**: chunked prefill is on by default in
   V1. Look for the token-budget accounting.
 - **Gordić, *Inside vLLM***, has a chunked-prefill section. Still hold off until
   Lecture 14, but note it exists.
@@ -201,7 +201,7 @@ should see the trade directly.
 
 ## Next
 
-**[12 — Speculative decoding](12-speculative-decoding.md)** — attack the
+**[12. Speculative decoding](12-speculative-decoding.md)**: attack the
 sequential nature of decode itself.
 
 ```bash

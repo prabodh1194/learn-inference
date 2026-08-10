@@ -1,8 +1,8 @@
-# 26 — Versus vLLM
+# 26. Versus vLLM
 
 **Build:** `bench/compare.py` · **Test:** none, this lecture *is* the test
 **Moves:** your ability to explain a performance gap instead of guessing at it
-**Prereq:** [25 — Load testing](25-load-testing.md)
+**Prereq:** [25. Load testing](25-load-testing.md)
 
 ---
 
@@ -59,7 +59,7 @@ vllm serve Qwen/Qwen3-0.6B --dtype float16 --max-model-len 4096 \
 
 For both engines, on identical workloads:
 
-1. **Single-stream latency** — TTFT and TPOT at batch 1. Tests raw per-step
+1. **Single-stream latency**, TTFT and TPOT at batch 1. Tests raw per-step
    efficiency: kernels and launch overhead.
 2. **Throughput at saturation**, max sustained tokens/sec. Tests scheduling and
    memory efficiency.
@@ -127,10 +127,10 @@ better" is a guess.
 
 **Slower across the board.** Expected.
 
-**Closest on single-stream latency** — fewer moving parts, and your kernels are
+**Closest on single-stream latency**: fewer moving parts, and your kernels are
 reasonable.
 
-**Furthest on saturated throughput** — this is where years of scheduling work
+**Furthest on saturated throughput**: this is where years of scheduling work
 show.
 
 **Possibly competitive on a specific feature.** If your prefix caching is close on
@@ -160,11 +160,11 @@ skepticism is worth more than the benchmark.
 ## Go deeper
 
 - **Kiely §4.5.2** (p.114), benchmarking tips, including common mistakes.
-- **vLLM `benchmarks/`** — read their harness before trusting your own.
-- **[Field notes](field-notes.md)** — compiling vLLM from source "doesn't seem to
+- **vLLM `benchmarks/`**: read their harness before trusting your own.
+- **[Field notes](field-notes.md)**: compiling vLLM from source "doesn't seem to
   increase the performance much," while `--max-num-seqs` mattered a lot.
   Configuration usually beats exotic builds.
-- **[SGLang benchmarks](https://github.com/sgl-project/sglang)** — a second point
+- **[SGLang benchmarks](https://github.com/sgl-project/sglang)**: a second point
   of comparison, with different strengths on shared-prefix workloads.
 
 ---
@@ -183,7 +183,7 @@ skepticism is worth more than the benchmark.
 
 ## Next
 
-**[27 — Routing and disaggregation](27-routing-and-disaggregation.md)** — scaling
+**[27. Routing and disaggregation](27-routing-and-disaggregation.md)**: scaling
 past one replica.
 
 Two problems appear that don't exist on one box: your prefix cache **fragments**

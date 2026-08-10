@@ -1,6 +1,6 @@
-# 29 — Contributing
+# 29. Contributing
 
-**Build:** a merged PR · **Prereq:** [28 — Autoscaling and cost](28-autoscaling-and-cost.md)
+**Build:** a merged PR · **Prereq:** [28. Autoscaling and cost](28-autoscaling-and-cost.md)
 
 ---
 
@@ -25,11 +25,11 @@ pytest tests/test_utils.py -q       # a bounded, CPU-only smoke test
 ```
 
 **Do not start with the full `tests/` directory.** Much of it needs GPUs,
-downloads models, and requires extras that `pip install -e .` doesn't pull —
+downloads models, and requires extras that `pip install -e .` doesn't pull,
 so an unscoped run aborts early and tells you nothing about your setup. Start
 narrow and widen.
 
-Expect friction anyway — CUDA versions, compilation, hardware-specific skips.
+Expect friction anyway, CUDA versions, compilation, hardware-specific skips.
 Working through it is part of the job, and it teaches you the project's
 structure faster than reading would.
 
@@ -61,14 +61,14 @@ than vLLM. Some of those are places *vLLM* could be faster too. Check.
 
 The strongest single exercise, and you have the substrate for it:
 
-- **[EAGLE](https://arxiv.org/abs/2401.15077)** — better speculation than your
+- **[EAGLE](https://arxiv.org/abs/2401.15077)**: better speculation than your
   n-grams (L12). You have the draft/verify loop already.
-- **[Medusa](https://arxiv.org/abs/2401.10774)** — multiple decode heads.
-- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)** — better work
+- **[Medusa](https://arxiv.org/abs/2401.10774)**: multiple decode heads.
+- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)**: better work
   partitioning than your L17 kernel. You'll find out exactly where yours loses.
-- **[DistServe](https://arxiv.org/abs/2401.09670)** — disaggregation, against your
+- **[DistServe](https://arxiv.org/abs/2401.09670)**: disaggregation, against your
   L27 implementation.
-- **A KV-cache compression method** — measured with your L19 quality harness.
+- **A KV-cache compression method**: measured with your L19 quality harness.
 
 Pick one, implement it against your engine, and measure. When your numbers differ
 from the paper's, work out why, that investigation is where most of the learning
@@ -129,8 +129,8 @@ corrected.
 
 - **Kiely Appendix B** (p.231–256), curated reading by topic.
 - **vLLM `CONTRIBUTING.md`** and the RFC process for larger changes.
-- **[vLLM Slack / SGLang Discord]** — where design discussion actually happens.
-- **[Appendix B](appendix-b-reading.md)** — this book's papers, indexed to
+- **[vLLM Slack / SGLang Discord]**: where design discussion actually happens.
+- **[Appendix B](appendix-b-reading.md)**: this book's papers, indexed to
   lectures.
 
 ---

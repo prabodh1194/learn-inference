@@ -1,8 +1,8 @@
-# 17 — FlashAttention
+# 17. FlashAttention
 
 **Build:** `kernels/triton/flash_attention.py` · **Test:** `tests/test_17_flash.py` (cuda)
 **Moves:** attention time, and peak memory, from O(N²) to O(N)
-**Prereq:** [16 — Triton basics](16-triton-basics.md)
+**Prereq:** [16. Triton basics](16-triton-basics.md)
 
 ---
 
@@ -165,7 +165,7 @@ This one only bites on hardware, which is the worst place to find it.
 **Peak memory much lower**, and now linear in N rather than quadratic. Often this
 matters more than the speed: it's what makes long context feasible at all.
 
-**Higher measured arithmetic intensity** — you moved right along the roofline.
+**Higher measured arithmetic intensity**: you moved right along the roofline.
 
 **You will probably not beat the official FlashAttention.** It's hand-tuned per
 architecture with warp specialization and careful pipelining. Getting within 2× of
@@ -176,12 +176,11 @@ exists is the point.
 
 ## Go deeper
 
-- **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022) —
-  read §3.1 for the tiling algorithm and Algorithm 1. You've now implemented it,
+- **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022),   read §3.1 for the tiling algorithm and Algorithm 1. You've now implemented it,
   so the paper reads as confirmation rather than instruction.
 
   Two things in the abstract are worth reading closely. It calls the algorithm
-  **"IO-aware"** — the framing that memory movement between HBM and SRAM, not
+  **"IO-aware"**: the framing that memory movement between HBM and SRAM, not
   FLOPs, is the quantity to optimize. That's Lecture 02's roofline, stated as a
   design principle.
 
@@ -189,14 +188,14 @@ exists is the point.
   merely better, but provably the least HBM traffic possible. That's rare in
   systems work, and it's why FlashAttention became the default rather than one
   option among several.
-- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)** — better work
+- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)**: better work
   partitioning; explains where your version's remaining gap comes from.
 - **[Online normalizer calculation for softmax](https://arxiv.org/abs/1805.02867)**
   (Milakov & Gimelshein): the running-max trick in isolation. Short and clear.
-- **Kiely §2.5** (p.67–70) — FlashAttention and PagedAttention as the two
+- **Kiely §2.5** (p.67–70), FlashAttention and PagedAttention as the two
   attention optimizations, now with your own kernel as the reference point.
-- **[Triton tutorial 06](https://triton-lang.org/main/getting-started/tutorials/06-fused-attention.html)**
-  — a reference implementation. Try yours first.
+- **[Triton tutorial 06](https://triton-lang.org/main/getting-started/tutorials/06-fused-attention.html)**:
+  a reference implementation. Try yours first.
 
 ---
 
@@ -215,7 +214,7 @@ exists is the point.
 
 ## Next
 
-**[18 — A paged attention kernel](18-paged-attention-kernel.md)** — combine this
+**[18. A paged attention kernel](18-paged-attention-kernel.md)**: combine this
 with L09's block tables.
 
 Start from the kernel you just wrote and change **only** the K/V addressing to

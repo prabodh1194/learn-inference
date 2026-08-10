@@ -1,9 +1,9 @@
-# 03 — Naive generation
+# 03. Naive generation
 
 **Build:** `engine/model.py::load`, `engine/generate.py::generate_naive`
 **Test:** `tests/test_03_generation.py` · **Demo:** `book/code/recomputation.py`
 **Moves:** your first real number, tok/s and the shape of the curve
-**Prereq:** [02 — Arithmetic intensity](02-arithmetic-intensity.md)
+**Prereq:** [02. Arithmetic intensity](02-arithmetic-intensity.md)
 
 ---
 
@@ -72,11 +72,11 @@ So step `n` costs O(n), and generating N tokens costs **O(N²)**.
 
 ### What to notice while implementing
 
-- **`logits[:, -1]`** — the last position's prediction. Off-by-one here is the
+- **`logits[:, -1]`**: the last position's prediction. Off-by-one here is the
   most common bug, and it produces plausible-but-wrong text rather than a crash.
-- **`torch.no_grad()`** — no backward pass; gradients would waste memory.
-- **`model.eval()`** — turns off dropout. Non-deterministic output otherwise.
-- **`on_token()`** — call once per generated token so the benchmark harness can
+- **`torch.no_grad()`**: no backward pass; gradients would waste memory.
+- **`model.eval()`**: turns off dropout. Non-deterministic output otherwise.
+- **`on_token()`**: call once per generated token so the benchmark harness can
   timestamp it. The test checks the count exactly; if it's wrong, every tok/s
   number in the course is off by the same factor and nothing else would catch it.
 
@@ -148,10 +148,10 @@ Save the plot. Lecture 05 overlays the cached version on it.
 
 ## Go deeper
 
-- **Kiely §2.2** (p.46–49) — LLM inference mechanics.
+- **Kiely §2.2** (p.46–49), LLM inference mechanics.
 - **[Attention Is All You Need](https://arxiv.org/abs/1706.03762)** §3.2.3, the
   causal masking that makes caching valid at all.
-- **HuggingFace `generate()`** — `transformers/generation/utils.py`. Enormous,
+- **HuggingFace `generate()`**: `transformers/generation/utils.py`. Enormous,
   because it handles beam search, constraints, stopping criteria. Yours does one
   thing. Worth a look to see how much of a production API is edge cases.
 
@@ -171,7 +171,7 @@ Save the plot. Lecture 05 overlays the cached version on it.
 
 ## Next
 
-**[04 — Measuring](04-measuring.md)** — make sure the numbers you just took are
+**[04. Measuring](04-measuring.md)**: make sure the numbers you just took are
 real. Short lecture, and it decides whether everything downstream is trustworthy.
 
 Its one exercise: time a forward pass **with and without** `synchronize()`.

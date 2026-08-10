@@ -1,8 +1,8 @@
-# 23 — MoE and expert parallelism
+# 23. MoE and expert parallelism
 
 **Build:** `jaxlm/moe.py`, routing and a small MoE layer
 **Test:** `tests/test_23_moe.py` · **Moves:** understanding of why frontier models are shaped this way
-**Prereq:** [22 — Tensor parallelism](22-tensor-parallelism.md)
+**Prereq:** [22. Tensor parallelism](22-tensor-parallelism.md)
 
 ---
 
@@ -34,8 +34,8 @@ the *compute* of 2.
 
 The vocabulary that follows from this, and which trips people up:
 
-- **Total parameters** — everything stored. Determines memory.
-- **Active parameters** — what runs per token. Determines compute.
+- **Total parameters**: everything stored. Determines memory.
+- **Active parameters**: what runs per token. Determines compute.
 
 DeepSeek-V3 is 671B total, 37B active. **You must hold all 671B in memory even
 though each token touches 37B**, because the router might select any expert.
@@ -46,13 +46,13 @@ That mismatch is the entire inference story for MoE.
 
 Go back to Lecture 02 and re-derive it.
 
-**Compute per token falls** — only active experts run.
+**Compute per token falls**: only active experts run.
 
-**Memory capacity requirement stays enormous** — all weights resident.
+**Memory capacity requirement stays enormous**: all weights resident.
 
 **Memory *bandwidth* per token falls**, you only read the active experts.
 
-Note what this does **not** say. Arithmetic intensity is roughly *unchanged* —
+Note what this does **not** say. Arithmetic intensity is roughly *unchanged*,
 compute and bytes both fall by the same active/total factor, so you haven't moved
 along the roofline. What falls is the **absolute** bytes per token, and decode
 latency is made of absolute bytes. MoE buys capacity at nearly fixed decode cost;
@@ -95,9 +95,9 @@ the bottleneck while others idle.
 
 Mitigations you'll see in the wild:
 
-- **Capacity factor** — cap tokens per expert; drop or reroute the overflow.
-- **Auxiliary load-balancing loss** — a training-time nudge toward uniformity.
-- **Expert replication** — duplicate hot experts across GPUs.
+- **Capacity factor**: cap tokens per expert; drop or reroute the overflow.
+- **Auxiliary load-balancing loss**: a training-time nudge toward uniformity.
+- **Expert replication**: duplicate hot experts across GPUs.
 
 This is an inference-time reality even though its main lever is at training time,
 and it's why MoE serving has more variance than dense serving.
@@ -125,25 +125,24 @@ Small scale: the concepts, not a production MoE:
 
 **Compute per token far below what total parameters suggest.**
 
-**Memory unchanged** — you still hold everything.
+**Memory unchanged**: you still hold everything.
 
 **Uneven expert utilization**, even on toy data.
 
-**All-to-all instead of all-reduce** in the sharded HLO — a different
+**All-to-all instead of all-reduce** in the sharded HLO, a different
 communication pattern with different scaling behaviour.
 
 ---
 
 ## Go deeper
 
-- **[Switch Transformers](https://arxiv.org/abs/2101.03961)** (Fedus et al.) —
-  top-1 routing, capacity factors, load balancing. The clearest introduction.
-- **[Mixtral of Experts](https://arxiv.org/abs/2401.04088)** — a real open MoE with
+- **[Switch Transformers](https://arxiv.org/abs/2101.03961)** (Fedus et al.),   top-1 routing, capacity factors, load balancing. The clearest introduction.
+- **[Mixtral of Experts](https://arxiv.org/abs/2401.04088)**: a real open MoE with
   inference details.
-- **[DeepSeek-V3](https://arxiv.org/abs/2412.19437)** — fine-grained experts and
+- **[DeepSeek-V3](https://arxiv.org/abs/2412.19437)**: fine-grained experts and
   shared experts; the current state of the art in MoE inference design.
-- **Kiely §2.2.4** (p.53) — MoE architecture.
-- **Kiely §5.4.2** (p.145) and **Fig 5.15** (p.146) — EP for throughput, and the
+- **Kiely §2.2.4** (p.53), MoE architecture.
+- **Kiely §5.4.2** (p.145) and **Fig 5.15** (p.146), EP for throughput, and the
   TP+EP mixed deployment.
 
 ---
@@ -167,11 +166,11 @@ hand, and understood the two axes models are split along.
 
 ## Next
 
-**[24 — Serving](24-serving.md)** — Part V turns your engine into a service.
+**[24. Serving](24-serving.md)**: Part V turns your engine into a service.
 
 Back to the laptop: most of Part V is systems work rather than kernels, and the
 tests fake the engine so they run without a GPU.
 
 The architectural point of L24 is why vLLM runs its API server in a **separate
-process** — HTTP handling and tokenization on the engine loop steal time from
+process**, HTTP handling and tokenization on the engine loop steal time from
 the scheduler.

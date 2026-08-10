@@ -1,13 +1,13 @@
-# 09 — Paged attention
+# 09. Paged attention
 
 **Build:** `engine/block_manager.py::BlockManager`, `engine/cache.py::PagedKVCache`
 **Test:** `tests/test_09_paged.py` · **Demo:** `book/code/fragmentation.py`
 **Moves:** concurrent sequences before OOM: the biggest single win in Part II
-**Prereq:** [08 — Continuous batching](08-continuous-batching.md)
+**Prereq:** [08. Continuous batching](08-continuous-batching.md)
 
-> **From here you want a real NVIDIA GPU.** The logic is testable on a laptop —
-> and the tests are written that way — but the payoff is a memory number you can
-> only see with real VRAM. See [00 — Introduction](00-intro.md#hardware).
+> **From here you want a real NVIDIA GPU.** The logic is testable on a laptop,
+> and the tests are written that way, but the payoff is a memory number you can
+> only see with real VRAM. See [00. Introduction](00-intro.md#hardware).
 
 ---
 
@@ -198,8 +198,8 @@ fuses it into the attention kernel so nothing is materialized at all.
 You can now answer the question Lecture 08 deferred. Out of blocks with requests
 waiting? Evict a running sequence:
 
-- **Swap** — copy its blocks to host RAM, restore later. Costs PCIe bandwidth.
-- **Recompute** — drop the blocks, redo prefill on resume. Costs compute.
+- **Swap**: copy its blocks to host RAM, restore later. Costs PCIe bandwidth.
+- **Recompute**: drop the blocks, redo prefill on resume. Costs compute.
 
 vLLM does both, choosing by sequence length. Short sequences are cheap to
 recompute; long ones are cheaper to swap.
@@ -225,7 +225,7 @@ Push concurrent sequences up until OOM, with and without paging. **Record both.*
 
 ## What you should see
 
-**Substantially more concurrent sequences** — how many depends on your
+**Substantially more concurrent sequences**: how many depends on your
 `max_seq_len` and traffic, but the gap widens as supported context grows.
 
 **Throughput up as a consequence.** More concurrent sequences means bigger decode
@@ -244,8 +244,8 @@ Lecture 18 wins most of it back.
   the thing. §4 is the memory manager; the OS analogy is drawn explicitly.
 - **vLLM `vllm/v1/core/block_pool.py`** and **`kv_cache_manager.py`**, the
   production version of what you wrote.
-- **nano-vllm `nanovllm/engine/block_manager.py`** — ~4.3KB, much closer to yours.
-- **Kiely §2.5** (p.68) — PagedAttention in context.
+- **nano-vllm `nanovllm/engine/block_manager.py`**: ~4.3KB, much closer to yours.
+- **Kiely §2.5** (p.68), PagedAttention in context.
 - **Kiely §5.3.2** (p.139): the G1–G4 storage hierarchy; where swapped blocks go.
 
 ---
@@ -268,7 +268,7 @@ That last one is the next lecture.
 
 ## Next
 
-**[10 — Prefix caching](10-prefix-caching.md)** — blocks can be shared, and the
+**[10. Prefix caching](10-prefix-caching.md)**: blocks can be shared, and the
 savings are larger than you'd guess.
 
 ```bash

@@ -1,8 +1,8 @@
-# 18 — A paged attention kernel
+# 18. A paged attention kernel
 
 **Build:** `kernels/triton/paged_attention.py` · **Test:** `tests/test_18_paged_kernel.py` (cuda)
 **Moves:** decode attention latency, recovers what Lecture 09 cost you
-**Prereq:** [17 — FlashAttention](17-flash-attention.md), [09 — Paged attention](09-paged-attention.md)
+**Prereq:** [17. FlashAttention](17-flash-attention.md), [09. Paged attention](09-paged-attention.md)
 
 ---
 
@@ -75,7 +75,7 @@ block 1: tokens 1024-2047  -> (m_1, l_1, acc_1)
                           final output
 ```
 
-The combination uses the *identical* online-softmax merge from Lecture 17 —
+The combination uses the *identical* online-softmax merge from Lecture 17,
 rescale each partial by `exp(m_i - m_global)`, sum, divide. Having built that
 already, this is a small step rather than a new idea.
 
@@ -117,9 +117,8 @@ remaining gap is in the linear layers.
 
 - **[PagedAttention / vLLM](https://arxiv.org/abs/2309.06180)** §4, re-read now
   that you've written the kernel; the memory-manager design reads differently.
-- **[FlashDecoding](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)** —
-  the context-splitting idea, explained well and short.
-- **vLLM `vllm/v1/attention/backends/triton_attn.py`** — the production Triton
+- **[FlashDecoding](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)**:   the context-splitting idea, explained well and short.
+- **vLLM `vllm/v1/attention/backends/triton_attn.py`**: the production Triton
   path. Compare its block-table handling to yours. Note that V1 moved paged
   attention here from hand-written CUDA; the old
   `csrc/attention/paged_attention_v1.cu` no longer exists on `main`, and lives
@@ -144,7 +143,7 @@ remaining gap is in the linear layers.
 
 ## Next
 
-**[19 — Quantization](19-quantization.md)** — make the bytes smaller, and learn
+**[19. Quantization](19-quantization.md)**: make the bytes smaller, and learn
 to measure what it costs you.
 
 > **Build the quality harness BEFORE you benchmark speed.** This is the only

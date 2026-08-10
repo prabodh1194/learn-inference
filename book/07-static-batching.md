@@ -1,8 +1,8 @@
-# 07 — Static batching
+# 07. Static batching
 
 **Build:** `engine/generate.py::generate_batched` · **Test:** `tests/test_07_batching.py`
 **Demo:** `book/code/batching_waste.py` · **Moves:** aggregate throughput up several ×; per-user latency **worse**
-**Prereq:** [06 — Sampling](06-sampling.md)
+**Prereq:** [06. Sampling](06-sampling.md)
 
 ---
 
@@ -92,7 +92,7 @@ simultaneously. Static batching cannot escape this; the two move together.
 > **Note what the uniform row implies.** If you benchmark only on uniform load,
 > static batching looks as good as anything else and you'd conclude the next
 > lecture is unnecessary. This is the most common way to fool yourself when
-> evaluating an inference optimization — and it's why `bench/workloads.py`
+> evaluating an inference optimization, and it's why `bench/workloads.py`
 > documents which workload exposes which win.
 
 ---
@@ -169,7 +169,7 @@ latency versus batch 1? Write it down.
 size while you have memory bandwidth to spare.
 
 **Per-user latency worse.** Your request now waits for a batch to form and shares
-a slower step. This is the fundamental trade — Lecture 25 plots it as a curve.
+a slower step. This is the fundamental trade, Lecture 25 plots it as a curve.
 
 **A gap between workloads.** `uniform` will look great, `mixed_length` much less
 so. That gap is the next lecture.
@@ -179,7 +179,7 @@ so. That gap is the next lecture.
 ## Go deeper
 
 - **Kiely §7.2.1** (p.186), concurrency and batch sizing as a production knob.
-- **[Field notes](field-notes.md)** — a 2×3090 setup: **~100 tok/s for one user,
+- **[Field notes](field-notes.md)**: a 2×3090 setup: **~100 tok/s for one user,
   585 tok/s across 8**. Aggregate up ~6×, per-user roughly flat. Exactly this
   trade, measured in the wild.
 - **[Orca: A Distributed Serving System for Transformer-Based Generative Models](https://www.usenix.org/conference/osdi22/presentation/yu)**
@@ -205,7 +205,7 @@ That last one is the next lecture.
 
 ## Next
 
-**[08 — Continuous batching](08-continuous-batching.md)** — the first real
+**[08. Continuous batching](08-continuous-batching.md)**: the first real
 architectural change, and the one that makes this an engine.
 
 **Budget more time for this one.** `generate()` turns inside out into a

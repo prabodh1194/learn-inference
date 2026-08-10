@@ -1,8 +1,8 @@
-# 27 — Routing and disaggregation
+# 27. Routing and disaggregation
 
 **Build:** `serve/router.py`, `serve/disaggregated.py` · **Test:** `tests/test_27_routing.py`
 **Moves:** cache hit rate across replicas; TTFT/TPOT interference
-**Prereq:** [26 — Versus vLLM](26-versus-vllm.md)
+**Prereq:** [26. Versus vLLM](26-versus-vllm.md)
 
 ---
 
@@ -47,11 +47,11 @@ load and you lose the cache. Every production router blends them, and the blend 
 a tuning decision, not a solved problem.
 
 Cheap approximations that work well:
-- **Session affinity** — hash the conversation id. Trivial, and captures most of
+- **Session affinity**: hash the conversation id. Trivial, and captures most of
   the win for chat.
-- **Prefix-hash routing** — hash the first N tokens; consistent hashing keeps it
+- **Prefix-hash routing**: hash the first N tokens; consistent hashing keeps it
   stable as replicas come and go.
-- **Global KV store** — a shared cache tier so any replica can fetch a computed
+- **Global KV store**: a shared cache tier so any replica can fetch a computed
   prefix. Kiely §5.3.3 (p.140) covers this; it's the G4 tier from §5.3.2.
 
 ---
@@ -143,7 +143,7 @@ whether you're actually transferring the cache.
   with a strong argument for heterogeneous hardware per phase.
 - **Gordić, *Inside vLLM***: the disaggregated P/D section, on how vLLM does the
   transfer.
-- **[SGLang RadixAttention](https://arxiv.org/abs/2312.07104)** — prefix-aware
+- **[SGLang RadixAttention](https://arxiv.org/abs/2312.07104)**: prefix-aware
   routing with a radix tree.
 
 ---
@@ -162,7 +162,7 @@ whether you're actually transferring the cache.
 
 ## Next
 
-**[28 — Autoscaling and cost](28-autoscaling-and-cost.md)** — the number the whole
+**[28. Autoscaling and cost](28-autoscaling-and-cost.md)**: the number the whole
 industry actually optimizes.
 
 ```bash

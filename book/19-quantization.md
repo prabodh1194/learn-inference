@@ -1,8 +1,8 @@
-# 19 — Quantization
+# 19. Quantization
 
 **Build:** `kernels/triton/quant_matmul.py`, `kernels/quality_eval.py`
 **Test:** `tests/test_19_quantization.py` (cuda) · **Moves:** memory, throughput, **and quality**
-**Prereq:** [18 — A paged attention kernel](18-paged-attention-kernel.md)
+**Prereq:** [18. A paged attention kernel](18-paged-attention-kernel.md)
 
 ---
 
@@ -35,27 +35,27 @@ w_fp16 ≈ scale × (w_int8 - zero_point)
 
 The interesting question is what `scale` covers.
 
-**Per-tensor** — one scale for the whole matrix. Smallest metadata, worst accuracy:
+**Per-tensor**: one scale for the whole matrix. Smallest metadata, worst accuracy:
 a single outlier stretches the range and crushes precision for everything else.
 
-**Per-channel** — one scale per output channel. Standard, and much better.
+**Per-channel**: one scale per output channel. Standard, and much better.
 
-**Per-group** — one scale per group of 64–128 weights. Best accuracy, most
+**Per-group**: one scale per group of 64–128 weights. Best accuracy, most
 metadata. What INT4 methods use, because 4 bits can't absorb any range waste.
 
 ### Weights vs. activations vs. KV cache
 
 Three separate decisions, often confused:
 
-**Weight-only (W8A16, W4A16)** — quantize weights, compute in FP16. Dominant for
+**Weight-only (W8A16, W4A16)**: quantize weights, compute in FP16. Dominant for
 inference. Decode is bound by *weight* traffic, so this attacks the bottleneck
 directly, and activations stay accurate. Dequantization happens in-kernel.
 
-**Weight + activation (W8A8)** — both quantized, so the matmul runs on INT8 tensor
+**Weight + activation (W8A8)**: both quantized, so the matmul runs on INT8 tensor
 cores. Faster in principle, but activations have outliers that make them much
 harder to quantize than weights.
 
-**KV cache quantization** — a different axis entirely. From Lecture 05 the cache can
+**KV cache quantization**: a different axis entirely. From Lecture 05 the cache can
 exceed the model's size; from Lecture 09 its capacity caps your batch size.
 Compressing it buys concurrency rather than per-step speed. The
 [field notes](field-notes.md) flag a recurring caveat: KV compression that looks
@@ -163,7 +163,7 @@ whether it's acceptable, which is precisely why you built it first.
   outlier difficulty from activations to weights.
 - **Kiely §5.1–5.1.3** (p.120–128), number formats, approaches, and §5.1.3
   specifically on measuring quality impact.
-- **[Field notes](field-notes.md)** — hardware-specific format choice, mixed
+- **[Field notes](field-notes.md)**: hardware-specific format choice, mixed
   precision across layer types, and the task-based eval methodology above.
 
 ---
@@ -181,7 +181,7 @@ whether it's acceptable, which is precisely why you built it first.
 
 ## Next
 
-**[20 — Raw CUDA](20-raw-cuda.md)** — one level lower, to see what Triton was
+**[20. Raw CUDA](20-raw-cuda.md)**: one level lower, to see what Triton was
 doing on your behalf.
 
 **You will probably not beat Triton, and that's the point.** Pick one kernel,

@@ -11,7 +11,7 @@ Each entry is tagged with the lecture it informs.
 
 ---
 
-## The prefill/decode gap is enormous in practice — **L01**
+## The prefill/decode gap is enormous in practice: **L01**
 
 A 2×3090 setup running Qwen3.5-27B dense
 ([source](https://old.reddit.com/r/LocalLLaMA/comments/1rianwb/running_qwen35_27b_dense_with_170k_context_at/))
@@ -23,7 +23,7 @@ reports:
 A **15× gap on the same hardware and model.** This is Lecture 01's asymmetry as a
 production number, and it's why TTFT and TPS get tuned separately.
 
-## Batching multiplies aggregate throughput — **L07, L08**
+## Batching multiplies aggregate throughput: **L07, L08**
 
 Same setup: **~100 tok/s for one user, 585 tok/s across 8 concurrent requests.**
 
@@ -35,7 +35,7 @@ It also shows why "tokens per second" is a near-meaningless claim without saying
 **per user or aggregate**. Those two numbers differ by 6× here, and by far more
 at larger batch sizes.
 
-## Speculative decoding: tune by acceptance rate, not by docs — **L12**
+## Speculative decoding: tune by acceptance rate, not by docs: **L12**
 
 Two findings that matter more than any tutorial:
 
@@ -52,7 +52,7 @@ This is precisely why `bench/workloads.py` ships both `code_completion` and
 `prose`. If you only benchmark one, you'll conclude speculative decoding is
 either magic or useless, and you'll be wrong either way.
 
-## Quantization interacts with your specific hardware — **L19**
+## Quantization interacts with your specific hardware: **L19**
 
 The 3090 operator picked a quant specifically because **3090s have hardware INT4
 support**, and separately noted that **linear attention layers quantize poorly**,
@@ -64,7 +64,7 @@ Two lessons:
 2. **Mixed precision across layer types** is normal in practice. "Quantize the
    model" is rarely the actual operation.
 
-## Tensor parallelism benefits from interconnect — **L22**
+## Tensor parallelism benefits from interconnect: **L22**
 
 The same operator credits **NVLink** for part of their TP performance. TP
 all-reduces after every layer, so interconnect bandwidth is directly on the
@@ -74,7 +74,7 @@ Relevant to your rentals: two GPUs in one box without NVLink will scale worse
 than the numbers you read in blog posts. Measure your own scaling curve (L22)
 rather than assuming linear.
 
-## Building from source is usually not the win — **L26**
+## Building from source is usually not the win: **L26**
 
 Same operator compiled vLLM from scratch and reported it "doesn't seem to
 increase the performance much."
@@ -83,7 +83,7 @@ A useful prior: **configuration and workload shape dominate build flags.** Befor
 reaching for exotic builds, tune engine arguments and check you're measuring the
 right workload. The boring lever is usually the bigger one.
 
-## Measure quality with a *task*, not just perplexity — **L19**
+## Measure quality with a *task*, not just perplexity: **L19**
 
 A systematic comparison of Qwen3-27B across BF16 → Q8 → Q6 → Q5 → Q4 → IQ3
 ([source](https://old.reddit.com/r/LocalLLaMA/comments/1t53dhp/quality_comparison_between_qwen_36_27b/))
@@ -104,7 +104,7 @@ recall.
 When Lecture 19 says "measure the quality axis," this is the bar: a task you can
 grade, on inputs the model can't have memorized.
 
-## Conventional wisdom about parallelism is worth re-measuring — **L22**
+## Conventional wisdom about parallelism is worth re-measuring: **L22**
 
 An operator with **2× GH200 and no NVLink** (PCIe only; they quote 125 GB/s
 against NVLink's 900) followed the standard guidance that low interconnect bandwidth means
@@ -122,7 +122,7 @@ The lesson isn't "TP always wins." It's that **rules of thumb about interconnect
 and parallelism are workload- and model-dependent**, and a weekend of
 benchmarking beats a blog post. Measure your own scaling curve in Lecture 22.
 
-## KV cache quantization is its own frontier — **L19, L05**
+## KV cache quantization is its own frontier: **L19, L05**
 
 Reports circulate of projects compressing the **KV cache** rather than the
 weights, claiming 3–5× compression. Unlike the entries above, I have no specific
@@ -141,7 +141,7 @@ evaluation over aggregate metrics.
 
 When a lecture predicts something, check whether the field notes agree on
 *magnitude*. If your measurement disagrees with both, you have a bug. If it
-disagrees only with the field notes, you may have found something interesting —
+disagrees only with the field notes, you may have found something interesting,
 different hardware, different model, different workload.
 
 **Add your own entries.** When you measure something that surprises you, write it

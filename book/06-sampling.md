@@ -1,4 +1,4 @@
-# 06 — Sampling
+# 06. Sampling
 
 **Build:** `engine/sampling.py::sample` · **Test:** `tests/test_06_sampling.py`
 **Moves:** nothing: this is correctness infrastructure · **Prereq:** [05](05-kv-cache.md)
@@ -160,7 +160,7 @@ greedy path as a bug**, not as noise to average away.
 - **[The Curious Case of Neural Text Degeneration](https://arxiv.org/abs/1904.09751)**
   (Holtzman et al., 2019), introduced nucleus sampling. The figures showing why
   pure likelihood maximization produces repetitive text are worth the read.
-- **vLLM `vllm/sampling_params.py`** — the production surface area. Note how many
+- **vLLM `vllm/sampling_params.py`**: the production surface area. Note how many
   parameters exist beyond these four, and that they're applied in a defined order
   for the same reason.
 - **Kiely §1.3.1** (p.31), evaluation, and why sampling settings make
@@ -180,7 +180,7 @@ greedy path as a bug**, not as noise to average away.
 
 ## Next
 
-**[07 — Static batching](07-static-batching.md)** — serve more than one request,
+**[07. Static batching](07-static-batching.md)**: serve more than one request,
 and meet a new kind of waste.
 
 ```bash

@@ -1,7 +1,7 @@
-# 15 — Profiling
+# 15. Profiling
 
 **Build:** `kernels/profile_engine.py` · **Test:** `tests/test_15_profiling.py` (cuda)
-**Moves:** nothing; this decides what's *worth* moving · **Prereq:** [14 — Reading vLLM](14-reading-vllm.md)
+**Moves:** nothing; this decides what's *worth* moving · **Prereq:** [14. Reading vLLM](14-reading-vllm.md)
 
 > **NVIDIA GPU required** for Nsight. `torch.profiler` works on MPS with reduced
 > detail, so you can practise the method on a laptop.
@@ -68,9 +68,9 @@ ncu --set full -o profile python bench_decode.py
 nsys profile -o timeline python bench_decode.py
 ```
 
-- **Nsight Systems (`nsys`)** — timeline. Gaps, overlap, CPU/GPU interaction.
+- **Nsight Systems (`nsys`)**: timeline. Gaps, overlap, CPU/GPU interaction.
   Answers "what is the machine doing?"
-- **Nsight Compute (`ncu`)** — per-kernel. Occupancy, memory throughput, achieved
+- **Nsight Compute (`ncu`)**: per-kernel. Occupancy, memory throughput, achieved
   vs. peak. Answers "is this kernel good?"
 
 The number to look for is **achieved memory bandwidth as a fraction of peak**.
@@ -144,12 +144,12 @@ Part II. That gap is Lecture 17's target.
 
 ## Go deeper
 
-- **[NVIDIA Nsight Compute docs](https://docs.nvidia.com/nsight-compute/)** — start
+- **[NVIDIA Nsight Compute docs](https://docs.nvidia.com/nsight-compute/)**: start
   with the "Speed of Light" section; it's the roofline in tool form.
-- **[PyTorch Profiler recipe](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html)**
-  — including the Chrome trace export, which is easier to read than the table.
+- **[PyTorch Profiler recipe](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html)**:
+  including the Chrome trace export, which is easier to read than the table.
 - **Kiely §4.5.3** (p.114), profiling in an inference context.
-- **Kiely §4.1.1–4.1.2** (p.98) — CUDA kernels and kernel selection, useful
+- **Kiely §4.1.1–4.1.2** (p.98), CUDA kernels and kernel selection, useful
   vocabulary before Lecture 16.
 
 ---
@@ -169,7 +169,7 @@ Write that prediction down. Lecture 20 checks it.
 
 ## Next
 
-**[16 — Triton basics](16-triton-basics.md)** — write your first kernel.
+**[16. Triton basics](16-triton-basics.md)**: write your first kernel.
 
 Before you start, use your L15 table to **predict the end-to-end gain**:
 
@@ -178,5 +178,5 @@ uv run python -c "from kernels.profile_engine import amdahl_speedup; \
   print(amdahl_speedup(share=0.04, speedup=2.0))"
 ```
 
-A 4% kernel made 2× faster buys 2.0%. Small is the *correct* answer here — L17
+A 4% kernel made 2× faster buys 2.0%. Small is the *correct* answer here, L17
 and L18 are where the big numbers live.

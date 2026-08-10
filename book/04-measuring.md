@@ -1,4 +1,4 @@
-# 04 — Measuring
+# 04. Measuring
 
 **Build:** nothing, read `bench/harness.py` · **Test:** `tests/test_04_measuring.py`
 **Moves:** your confidence that any of this is real · **Prereq:** [03](03-naive-generation.md)
@@ -56,8 +56,8 @@ them, or you're benchmarking initialization.
 
 | Metric | Is | Bound by |
 |---|---|---|
-| **TTFT** | time to first token | prefill — compute |
-| **TPOT** | time per output token, after the first | decode — memory |
+| **TTFT** | time to first token | prefill, compute |
+| **TPOT** | time per output token, after the first | decode, memory |
 | **Throughput** | total tokens/sec across all requests | how well you batch |
 | **p50/p90/p99** | latency distribution | your worst users |
 
@@ -127,10 +127,10 @@ not, rerun. Better to redo it now than to build five lectures on bad baselines.
 
 ## Go deeper
 
-- **Kiely §1.4–1.4.2** (p.35–37) — TTFT/TPOT and percentiles as product metrics,
+- **Kiely §1.4–1.4.2** (p.35–37), TTFT/TPOT and percentiles as product metrics,
   plus end-to-end measurement including network overhead.
 - **Kiely §4.5.1–4.5.2** (p.113–114), benchmarking tooling and practical tips.
-- **vLLM `benchmarks/benchmark_serving.py`** — the real thing. Note how much of
+- **vLLM `benchmarks/benchmark_serving.py`**: the real thing. Note how much of
   it is about *generating realistic load* rather than timing; that ratio is the
   lesson.
 
@@ -152,7 +152,7 @@ and measure it honestly.
 
 ## Next
 
-**[05 — The KV cache](05-kv-cache.md)** — the first real optimization, and the
+**[05. The KV cache](05-kv-cache.md)**: the first real optimization, and the
 curve you just plotted finally flattens.
 
 ```bash

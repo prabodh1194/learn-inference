@@ -1,8 +1,8 @@
-# 21 — JAX and XLA
+# 21. JAX and XLA
 
 **Build:** `jaxlm/model.py`, `jaxlm/decode.py` · **Test:** `tests/test_21_jax.py`
 **Moves:** nothing directly, it changes how you *think* about the next two lectures
-**Prereq:** [20 — Raw CUDA](20-raw-cuda.md)
+**Prereq:** [20. Raw CUDA](20-raw-cuda.md)
 
 ---
 
@@ -132,7 +132,7 @@ shape of problem.
 
 **Notably slow first call.** Compilation.
 
-**Recompilation on shape change** — deliberately trigger it and watch the stall.
+**Recompilation on shape change**: deliberately trigger it and watch the stall.
 It's the same failure mode that bites `torch.compile` in production.
 
 **Cleaner fusion in the HLO** than eager PyTorch, and a decode step that reads as
@@ -142,13 +142,12 @@ one fused region rather than a hundred kernel launches.
 
 ## Go deeper
 
-- **[JAX: The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html)**
-  — read before you debug. Purity, PRNG keys, and shape-static-ness.
+- **[JAX: The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html)**:
+  read before you debug. Purity, PRNG keys, and shape-static-ness.
 - **[`lax.scan` documentation](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.scan.html)**
  : the carry/output split takes a moment to click.
-- **[XLA operation semantics](https://openxla.org/xla/operation_semantics)** —
-  for reading the HLO.
-- **[MaxText](https://github.com/AI-Hypercomputer/maxtext)** — production JAX LLM
+- **[XLA operation semantics](https://openxla.org/xla/operation_semantics)**:   for reading the HLO.
+- **[MaxText](https://github.com/AI-Hypercomputer/maxtext)**: production JAX LLM
   code; useful for seeing conventions.
 - **Kiely §4.2.3** (p.104), where compilers sit in the inference stack.
 
@@ -167,7 +166,7 @@ one fused region rather than a hundred kernel launches.
 
 ## Next
 
-**[22 — Tensor parallelism](22-tensor-parallelism.md)** — the payoff: sharding
+**[22. Tensor parallelism](22-tensor-parallelism.md)**: the payoff: sharding
 declared, then sharding by hand.
 
 > **Needs 2+ GPUs** for the scaling curve. The sharding *arithmetic* is testable
