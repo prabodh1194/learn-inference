@@ -44,8 +44,22 @@ training becomes a matrix-*vector* product that barely uses the hardware.
 That last part is the crux, and it's worth stating precisely because it drives
 nearly everything in this book:
 
-> Generating one token requires reading **every weight in the model** from memory
-> and doing almost no arithmetic with them.
+> Generating one token requires reading **every weight in the model** out of GPU
+> memory and doing almost no arithmetic with them.
+
+**Which memory matters here.** The weights already live in **VRAM** — they were
+copied there once at startup. The traffic that costs you is VRAM → the GPU's
+on-chip SRAM and registers, and it happens on *every forward pass*, because
+there is nowhere near enough on-chip memory to hold 840 MiB of weights.
+
+| Path | Bandwidth (RTX 3090) | When |
+|---|---|---|
+| **VRAM → on-chip** | ~936 GB/s | **every step** — this is the bottleneck |
+| CPU RAM → VRAM (PCIe) | ~64 GB/s | once at load time |
+
+If weights crossed PCIe every step you'd be another ~15× slower. When that
+*does* happen it's called offloading, and it's what you resort to when a model
+doesn't fit — not how normal serving works.
 
 A matrix-*matrix* multiply over a batch does lots of work per byte loaded. A
 matrix-*vector* multiply for a single token does almost none. Same weights, same
@@ -245,8 +259,11 @@ Before Lecture 01, you should be able to say:
    serving latency?
 2. Decode reads every weight to produce one token. Why does batching 32 requests
    cost barely more time than batching 1?
+3. Those weights are read *from where, to where* — and how often? What would be
+   true if they came from CPU RAM instead?
 
-If (2) isn't obvious yet, good — that's Lecture 01.
+If (2) isn't obvious yet, good — that's Lecture 01. (3) is a common slip and
+worth getting exactly right before you go on.
 
 ---
 

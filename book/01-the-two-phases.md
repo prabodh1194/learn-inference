@@ -65,6 +65,10 @@ The asymmetry comes from one fact:
 With a 512-token prompt, prefill does 512 tokens' worth of work per weight load.
 Decode does one. The weights are ~840 MiB either way.
 
+Both phases read the same 840 MiB out of VRAM. Neither touches the CPU — the
+weights were copied to the GPU once at startup and stay there. What repeats is
+the VRAM → on-chip transfer, and it repeats *per forward pass*.
+
 This is a **matrix-matrix vs. matrix-vector** distinction. Prefill multiplies a
 weight matrix by a matrix of 512 token vectors — lots of arithmetic per byte
 fetched. Decode multiplies the same weight matrix by a *single* vector. The GPU
