@@ -13,7 +13,7 @@ and it never asks you to.
 
 If you have trained one, one habit needs unlearning, and it's the reason this
 lecture leads with it: **inference optimizes for something training never cares
-about — one token, right now.**
+about, one token, right now.**
 
 Training is **throughput-only**. Nobody is waiting on any individual step, so
 you're free to make batches as large as memory allows. Every sequence in a batch
@@ -23,7 +23,7 @@ weights you load get used for a great deal of arithmetic.
 Serving is the opposite. Requests arrive when they arrive, at wildly different
 lengths. Someone is watching a cursor blink. You generate **one token at a time**,
 each depending on the last, so there's no parallelism *along* the sequence to
-exploit — and the same matrix multiply that was large and efficient during
+exploit, and the same matrix multiply that was large and efficient during
 training becomes a matrix-*vector* product that barely uses the hardware.
 
 > **Two honest caveats**, since this comparison is doing a lot of work.
@@ -47,15 +47,15 @@ nearly everything in this book:
 > Generating one token requires reading **every weight in the model** out of GPU
 > memory and doing almost no arithmetic with them.
 
-??? question "Wait — if the weights are already on the GPU, why is anything slow?"
+??? question "Wait, if the weights are already on the GPU, why is anything slow?"
     Because "on the GPU" means *in VRAM*, and VRAM isn't where arithmetic
-    happens. On-chip SRAM is ~6 MB against 840 MiB of weights — off by 140×, so
+    happens. On-chip SRAM is ~6 MB against 840 MiB of weights, off by 140×, so
     a weight streams in, gets used once, and is evicted before it can be reused.
 
     Longer answer: [Q&A — why is decode memory-bound if the weights are already
     on the GPU?](qa.md#why-is-decode-memory-bound-if-the-weights-are-already-on-the-gpu)
 
-**Which memory matters here.** The weights already live in **VRAM** — they were
+**Which memory matters here.** The weights already live in **VRAM**, they were
 copied there once at startup. The traffic that costs you is VRAM → the GPU's
 on-chip SRAM and registers, and it happens on *every forward pass*, because
 there is nowhere near enough on-chip memory to hold 840 MiB of weights.
@@ -67,14 +67,14 @@ there is nowhere near enough on-chip memory to hold 840 MiB of weights.
 
 If weights crossed PCIe every step you'd be another ~15× slower. When that
 *does* happen it's called offloading, and it's what you resort to when a model
-doesn't fit — not how normal serving works.
+doesn't fit, not how normal serving works.
 
 A matrix-*matrix* multiply over a batch does lots of work per byte loaded. A
 matrix-*vector* multiply for a single token does almost none.
 
 ??? question "Why is prefill a *matrix* and decode a *vector*?"
     Prefill puts one row per prompt token into a `(512, 1024)` matrix and runs
-    them together — the causal mask, not the input layout, is what stops a token
+    them together: the causal mask, not the input layout, is what stops a token
     seeing the future. Decode has one new token, so `Q` is `(1, 1024)`.
 
     Same weights, same kernel, 1 row instead of 512. That *is* the 512 vs 0.92.
@@ -82,7 +82,7 @@ matrix-*vector* multiply for a single token does almost none.
     [Q&A — does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
 Qwen3-0.6B decode runs at **0.75 operations per byte**, against an H100 that
-needs 295 to keep its arithmetic units busy. That's roughly 0.25% — and the
+needs 295 to keep its arithmetic units busy. That's roughly 0.25%, and the
 conclusion isn't hardware-specific: the same calculation puts decode far to the
 memory-bound side on an A100, a 3090, and an M1 alike.
 
@@ -100,7 +100,7 @@ being a list of tricks and becomes a single idea with variations.
 
 It is not the *only* idea, and this book doesn't pretend otherwise. Paged
 attention (L09) attacks **memory capacity**, not bandwidth. CUDA graphs (L13)
-attack **CPU launch overhead** — cases where the GPU isn't the bottleneck at all.
+attack **CPU launch overhead**, cases where the GPU isn't the bottleneck at all.
 Chunked prefill (L11) redistributes work without reducing it. And Part V is about
 utilization and cost, where the biggest lever is often not touching the engine.
 
@@ -108,7 +108,7 @@ utilization and cost, where the biggest lever is often not touching the engine.
 
 ## How this book works
 
-The method is borrowed from Karpathy's Zero-to-Hero (no affiliation — it's
+The method is borrowed from Karpathy's Zero-to-Hero (no affiliation: it's
 simply the format that works), aimed at a different target:
 
 > **build the naive thing → measure it → find the bottleneck → fix it → measure again**
@@ -133,12 +133,12 @@ notes/    your results and surprises  RECORD
 ```
 
 `tests/` is what makes progress unambiguous. Every implementation milestone has a
-test asserting your version matches a reference — your greedy output must match
+test asserting your version matches a reference, your greedy output must match
 HuggingFace's exactly, your paged attention must match contiguous attention, your
 Triton kernel must match PyTorch.
 
 Green means **correct on the cases tested**, which is weaker than "done" but far
-stronger than "seems fine" — and it's what lets you optimize aggressively later,
+stronger than "seems fine", and it's what lets you optimize aggressively later,
 because you find out immediately when speed costs you correctness.
 
 ### Notes
@@ -147,7 +147,7 @@ Keep a lab journal in `notes/`. Two rules, both from experience:
 
 **Write your prediction before you run anything.** Every lecture that can be
 predicted asks you to. Wrong predictions, left unedited, are the highest-value
-thing in the repo — they're the record of a wrong model of the machine being
+thing in the repo, they're the record of a wrong model of the machine being
 corrected.
 
 **Keep the failures.** The optimization that did nothing. The kernel that came out
@@ -160,8 +160,8 @@ slower. These are not embarrassing; they're most of what expertise actually is.
 By Lecture 14 you'll have an engine that does continuous batching over a paged KV
 cache, with prefix caching and speculative decoding.
 
-Those are the same *ideas* vLLM is built on, and enough shared structure — a
-scheduler/runner split, a block manager, a block table — that its source becomes
+Those are the same *ideas* vLLM is built on, and enough shared structure, a
+scheduler/runner split, a block manager, a block table, that its source becomes
 readable. It is **not** the same system: vLLM has multi-backend support, dozens
 of quantization schemes, hardware-specific kernels, multimodal inputs, LoRA, and
 years of production edge cases. Expect to lose to it decisively in Lecture 26,
@@ -181,7 +181,7 @@ uv venv --python 3.12
 uv sync --group dev
 ```
 
-Check it works — this runs today, with no GPU and no model download:
+Check it works, this runs today, with no GPU and no model download:
 
 ```bash
 uv run python book/code/roofline.py
@@ -190,7 +190,7 @@ uv run pytest -m "not cuda" -q
 
 **The test suite will report a lot of failures. That is the correct starting
 state**, not a broken checkout. Every failure is a `NotImplementedError` naming
-the lecture that fills it in — the suite is a specification, and you turn it
+the lecture that fills it in: the suite is a specification, and you turn it
 green as you go.
 
 ```bash
@@ -221,7 +221,7 @@ all visible there.
 **On 8GB it is tight but workable.** Qwen3-0.6B is 2.2 GiB in float32 (which
 Lecture 03 recommends on MPS, because fp16 has accuracy quirks there) against
 8GB of *unified* memory shared with the OS. If you hit memory pressure, switch
-to bfloat16 — halving the weights to 1.1 GiB — and re-check the Lecture 03
+to bfloat16 (halving the weights to 1.1 GiB) and re-check the Lecture 03
 correctness test still passes before trusting any later numbers.
 
 From Lecture 09 you want a real NVIDIA GPU — paged attention and CUDA graphs are
@@ -229,7 +229,7 @@ CUDA-specific, and Part III's profiling requires Nsight.
 
 A **24GB card** is the sweet spot: enough VRAM to make the memory lectures real,
 without paying datacenter prices. From [Vast.ai's pricing
-page](https://vast.ai/pricing) (checked while writing this — **verify before you
+page](https://vast.ai/pricing) (checked while writing this, **verify before you
 rent**, these move):
 
 | GPU | VRAM | from | median |
@@ -252,7 +252,7 @@ Rent in blocks, prepare your code offline, and **always stop the pod**.
 ### The model
 
 **Qwen3-0.6B** throughout. Small enough to iterate on a laptop, real enough to be
-non-trivial — grouped-query attention, RoPE, RMSNorm, SwiGLU. Using one model
+non-trivial, grouped-query attention, RoPE, RMSNorm, SwiGLU. Using one model
 start to finish means every benchmark you take is comparable to every other.
 
 ```bash
@@ -263,9 +263,9 @@ uv run python scripts/fetch_model.py
 
 ## Go deeper
 
-- Kiely, *Inference Engineering*, Preface and Ch. 0 — why inference became the
+- Kiely, *Inference Engineering*, Preface and Ch. 0, why inference became the
   industry's center of gravity.
-- Kiely §1.1–1.2 (p.26–30) — where inference work sits in a product.
+- Kiely §1.1–1.2 (p.26–30), where inference work sits in a product.
 
 ---
 
@@ -277,10 +277,10 @@ Before Lecture 01, you should be able to say:
    serving latency?
 2. Decode reads every weight to produce one token. Why does batching 32 requests
    cost barely more time than batching 1?
-3. Those weights are read *from where, to where* — and how often? What would be
+3. Those weights are read *from where, to where*, and how often? What would be
    true if they came from CPU RAM instead?
 
-If (2) isn't obvious yet, good — that's Lecture 01. (3) is a common slip and
+If (2) isn't obvious yet, good: that's Lecture 01. (3) is a common slip and
 worth getting exactly right before you go on.
 
 ---
@@ -297,5 +297,5 @@ uv run python scripts/fetch_model.py     # start this now; ~1.1 GiB, needed at L
 uv run python book/code/two_phases.py    # L01's demo -- run it BEFORE reading
 ```
 
-Then read L01. **Run the demo first** — every lecture is written so the numbers
+Then read L01. **Run the demo first**, every lecture is written so the numbers
 land before the explanation does. That ordering is the method, not a suggestion.

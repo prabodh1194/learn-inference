@@ -1,6 +1,6 @@
 # 26 — Versus vLLM
 
-**Build:** `bench/compare.py` · **Test:** none — this lecture *is* the test
+**Build:** `bench/compare.py` · **Test:** none, this lecture *is* the test
 **Moves:** your ability to explain a performance gap instead of guessing at it
 **Prereq:** [25 — Load testing](25-load-testing.md)
 
@@ -14,8 +14,8 @@ prefill, speculative decoding, and custom kernels.
 So: how do you compare to the real thing?
 
 **You will lose.** That is the expected result and it is not the point. The point
-is to explain the gap *precisely* — which kernel, which code path, how many
-microseconds — using the profiler from Lecture 15.
+is to explain the gap *precisely*, which kernel, which code path, how many
+microseconds, using the profiler from Lecture 15.
 
 An engineer who can say "we're 2.3× slower, 60% of which is our attention kernel
 and 25% is Python overhead in the scheduler" is far more useful than one who
@@ -61,9 +61,9 @@ For both engines, on identical workloads:
 
 1. **Single-stream latency** — TTFT and TPOT at batch 1. Tests raw per-step
    efficiency: kernels and launch overhead.
-2. **Throughput at saturation** — max sustained tokens/sec. Tests scheduling and
+2. **Throughput at saturation**, max sustained tokens/sec. Tests scheduling and
    memory efficiency.
-3. **The knee** — from Lecture 25. Tests everything together.
+3. **The knee**, from Lecture 25. Tests everything together.
 
 Then run the workloads that isolate specific features: `shared_prefix` for prefix
 caching, `long_prefill` for chunked prefill, `code_completion` for speculative
@@ -75,7 +75,7 @@ number.**
 ## Explain the gap
 
 Now the actual work. For each gap, form a hypothesis and **verify it with the
-profiler** — do not speculate.
+profiler**, do not speculate.
 
 Common causes, roughly in order of size:
 
@@ -95,7 +95,7 @@ that took years of production feedback.
 **Memory efficiency.** More blocks available means bigger batches means better
 intensity (Lecture 01). Check `gpu_memory_utilization` and your own block count.
 
-For each: **cite a measurement.** "Our attention kernel is 2.1× slower — 340µs vs
+For each: **cite a measurement.** "Our attention kernel is 2.1× slower, 340µs vs
 162µs per step at 2k context, from `ncu`" is an explanation. "Their kernels are
 better" is a guess.
 
@@ -103,7 +103,7 @@ better" is a guess.
 
 ## Build it
 
-1. `bench/compare.py` — runs both engines through the same client harness.
+1. `bench/compare.py`, runs both engines through the same client harness.
 2. Produce a table:
 
 | Workload | Yours | vLLM | Ratio |
@@ -142,8 +142,8 @@ show.
 
 ## What this is really teaching
 
-Every performance claim you encounter for the rest of your career — a vendor
-benchmark, a blog post, a colleague's "we made it 3× faster" — should now trigger
+Every performance claim you encounter for the rest of your career, a vendor
+benchmark, a blog post, a colleague's "we made it 3× faster", should now trigger
 the same questions:
 
 - Same hardware, model, precision, workload?
@@ -159,7 +159,7 @@ skepticism is worth more than the benchmark.
 
 ## Go deeper
 
-- **Kiely §4.5.2** (p.114) — benchmarking tips, including common mistakes.
+- **Kiely §4.5.2** (p.114), benchmarking tips, including common mistakes.
 - **vLLM `benchmarks/`** — read their harness before trusting your own.
 - **[Field notes](field-notes.md)** — compiling vLLM from source "doesn't seem to
   increase the performance much," while `--max-num-seqs` mattered a lot.
@@ -189,5 +189,5 @@ past one replica.
 Two problems appear that don't exist on one box: your prefix cache **fragments**
 across replicas, and prefill still interferes with decode.
 
-Find the crossover — at what prompt length does disaggregation start to win?
+Find the crossover, at what prompt length does disaggregation start to win?
 Predict it first; on short prompts the KV transfer makes things *worse*.

@@ -8,7 +8,7 @@
 
 ## The problem
 
-One replica has a ceiling — you found it in Lecture 25. Past that you add
+One replica has a ceiling, you found it in Lecture 25. Past that you add
 replicas, and two new problems appear that don't exist on a single box.
 
 **Your prefix cache fragments.** Each replica has its own. Round-robin sends a
@@ -16,8 +16,8 @@ user's follow-up to a replica that has never seen their conversation, and every
 turn is a cache miss. Lecture 10's win evaporates precisely when you scale.
 
 **Prefill and decode still interfere.** Chunked prefill (Lecture 11) softened this,
-but they remain fundamentally different workloads — compute-bound versus
-memory-bound — competing for one GPU.
+but they remain fundamentally different workloads, compute-bound versus
+memory-bound, competing for one GPU.
 
 ---
 
@@ -70,7 +70,7 @@ request -> [PREFILL worker]  computes KV cache, first token
            [DECODE worker]   generates the rest
 ```
 
-Each side can then be optimized independently — and that's the actual payoff:
+Each side can then be optimized independently, and that's the actual payoff:
 
 | | Prefill workers | Decode workers |
 |---|---|---|
@@ -80,7 +80,7 @@ Each side can then be optimized independently — and that's the actual payoff:
 | Scale with | input tokens/sec | concurrent sequences |
 | Parallelism | TP for latency | more replicas for throughput |
 
-You can even use **different GPUs** for each — compute-dense cards for prefill,
+You can even use **different GPUs** for each, compute-dense cards for prefill,
 bandwidth-dense ones for decode.
 
 ### The cost
@@ -103,11 +103,11 @@ straight to decode and disaggregate only the long ones.
 
 ## Build it
 
-1. `serve/router.py` — multiple replicas, pluggable strategies: round-robin,
+1. `serve/router.py`, multiple replicas, pluggable strategies: round-robin,
    session affinity, prefix-hash.
 2. Measure **cache hit rate** for each on `shared_prefix` and on a simulated
    multi-turn conversation workload.
-3. `serve/disaggregated.py` — separate prefill and decode workers with KV transfer
+3. `serve/disaggregated.py`, separate prefill and decode workers with KV transfer
    between them.
 4. Measure TTFT and TPOT for both architectures, on short and long prompts.
 5. **Find the crossover**: at what prompt length does disaggregation start to win?
@@ -119,7 +119,7 @@ straight to decode and disaggregate only the long ones.
 ## What you should see
 
 **Cache-aware routing much better hit rates** than round-robin on multi-turn
-traffic — often the difference between a working prefix cache and a decorative one.
+traffic, often the difference between a working prefix cache and a decorative one.
 
 **Hotspots if you route purely by affinity.** Try it deliberately; the failure mode
 is instructive.
@@ -128,20 +128,20 @@ is instructive.
 transfer overhead makes it worse. If your measurement says it always wins, check
 whether you're actually transferring the cache.
 
-**More stable TPOT** when disaggregated — decode workers stop being interrupted.
+**More stable TPOT** when disaggregated, decode workers stop being interrupted.
 
 ---
 
 ## Go deeper
 
-- **Kiely §5.3.3** (p.140) — cache-aware routing, with the multi-replica diagram.
-- **Kiely §5.5–5.5.3** (p.148–151) — disaggregation, when to use it, and NVIDIA
+- **Kiely §5.3.3** (p.140), cache-aware routing, with the multi-replica diagram.
+- **Kiely §5.5–5.5.3** (p.148–151), disaggregation, when to use it, and NVIDIA
   Dynamo's dynamic variant.
-- **[DistServe](https://arxiv.org/abs/2401.09670)** (Zhong et al.) — the
+- **[DistServe](https://arxiv.org/abs/2401.09670)** (Zhong et al.), the
   disaggregation paper; §3 quantifies the interference you're removing.
-- **[Splitwise](https://arxiv.org/abs/2311.18677)** (Patel et al.) — same idea,
+- **[Splitwise](https://arxiv.org/abs/2311.18677)** (Patel et al.), same idea,
   with a strong argument for heterogeneous hardware per phase.
-- **Gordić, *Inside vLLM*** — the disaggregated P/D section, on how vLLM does the
+- **Gordić, *Inside vLLM***: the disaggregated P/D section, on how vLLM does the
   transfer.
 - **[SGLang RadixAttention](https://arxiv.org/abs/2312.07104)** — prefix-aware
   routing with a radix tree.
@@ -170,4 +170,4 @@ uv run python bench/cost_model.py
 ```
 
 Run it before reading. Idling at 20% utilization costs **more than doubling your
-batch size saves** — which reframes most of Part III.
+batch size saves**, which reframes most of Part III.

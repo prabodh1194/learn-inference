@@ -1,7 +1,7 @@
 # 13 — CUDA graphs
 
 **Build:** graph capture in the model runner · **Test:** `tests/test_13_graphs.py` (cuda)
-**Moves:** per-step latency for small batches — sometimes a lot
+**Moves:** per-step latency for small batches, sometimes a lot
 **Prereq:** [12b — Structured output and adapters](12b-structured-output.md)
 
 > **NVIDIA GPU required.** No CUDA-graph equivalent exists on MPS. Tests here are
@@ -14,7 +14,7 @@
 Every optimization so far assumed **the GPU** is the bottleneck. For small batches
 during decode, it often isn't.
 
-A single decode step launches hundreds of kernels — one or more per layer, times
+A single decode step launches hundreds of kernels, one or more per layer, times
 28 layers, plus normalization, RoPE, attention, MLP, sampling. Each launch is a
 CPU-side call costing roughly **5–10 microseconds**.
 
@@ -37,7 +37,7 @@ CPU-bound in a program that appears to be about GPUs.
 ## The idea
 
 Decode steps are **identical in shape**, every single time. Same kernels, same
-order, same tensor shapes — only the values in the tensors change.
+order, same tensor shapes, only the values in the tensors change.
 
 So record the launch sequence once and replay it:
 
@@ -81,17 +81,17 @@ cannot pass fresh tensors.
 > `gpu_model_runner.py`.
 
 **No data-dependent control flow.** `if token == eos: break` inside the captured
-region doesn't work — the branch was fixed at capture time. Sampling and stopping
+region doesn't work: the branch was fixed at capture time. Sampling and stopping
 logic stay outside the graph.
 
 **Prefill usually isn't captured.** Variable prompt lengths mean variable shapes.
 Prefill is compute-bound anyway, so launch overhead is a much smaller fraction of
-it — the payoff is concentrated in decode.
+it: the payoff is concentrated in decode.
 
 ### `torch.compile` is the other half
 
 Different mechanism, complementary result. Where CUDA graphs remove *launch*
-overhead, `torch.compile` reduces the *number* of kernels through fusion — three
+overhead, `torch.compile` reduces the *number* of kernels through fusion, three
 elementwise ops become one.
 
 Fewer kernels also means fewer launches, so the two compound. Modern vLLM uses
@@ -114,12 +114,12 @@ print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
 ```
 
 **Large CPU time with low GPU time means launch-bound.** If you're not, this
-lecture won't help you much — and knowing that is itself the point.
+lecture won't help you much, and knowing that is itself the point.
 
 2. Capture a graph for your decode step at a fixed batch size.
 3. Capture at several batch sizes; pad to the nearest.
 4. `uv run pytest tests/test_13_graphs.py -v` on a CUDA box.
-5. Measure at batch 1, 8, 32, 128 — **the win should shrink as batch grows.**
+5. Measure at batch 1, 8, 32, 128, **the win should shrink as batch grows.**
 6. Separately, try `torch.compile(model)` and measure it alone, then together.
 
 ---
@@ -131,7 +131,7 @@ lecture won't help you much — and knowing that is itself the point.
 **Diminishing gains as batch grows.** More compute per launch means overhead
 matters less proportionally.
 
-**Nothing for prefill.** Expected — it's compute-bound.
+**Nothing for prefill.** Expected: it's compute-bound.
 
 **Higher memory use.** Each captured graph holds its static buffers. Capturing
 many batch sizes costs real VRAM, which competes with your KV cache.
@@ -145,13 +145,13 @@ rather than a free win.
 ## Go deeper
 
 - **[NVIDIA: Getting Started with CUDA Graphs](https://developer.nvidia.com/blog/cuda-graphs/)**
-  — the mechanism, with launch-overhead measurements.
+ : the mechanism, with launch-overhead measurements.
 - **[PyTorch CUDA Graphs](https://pytorch.org/docs/stable/notes/cuda.html#cuda-graphs)**
   — `torch.cuda.graph` and the memory-pool constraints.
 - **vLLM `vllm/v1/worker/gpu_model_runner.py`** — search for `capture`. Note the
   list of captured batch sizes and the padding logic.
 - **nano-vllm `nanovllm/engine/model_runner.py`** — ~12KB, the readable version.
-- **Kiely §4.1.3** (p.100) — kernel fusion and reducing memory accesses.
+- **Kiely §4.1.3** (p.100), kernel fusion and reducing memory accesses.
 
 ---
 
@@ -173,7 +173,7 @@ rather than a free win.
 thing.
 
 **Nothing to implement.** This is the capstone: Gordić's *Inside vLLM*, then
-nano-vllm file by file, then four targeted vLLM files — each diffed against what
+nano-vllm file by file, then four targeted vLLM files, each diffed against what
 you wrote.
 
 Read it *now* and not earlier. Before you'd built a scheduler it would have

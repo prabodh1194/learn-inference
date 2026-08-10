@@ -1,7 +1,7 @@
 # 24 — Serving
 
 **Build:** `serve/api.py` · **Test:** `tests/test_24_serving.py`
-**Moves:** nothing about the engine — everything about whether it's usable
+**Moves:** nothing about the engine, everything about whether it's usable
 **Prereq:** [23 — MoE and expert parallelism](23-moe-and-expert-parallelism.md)
 
 ---
@@ -23,7 +23,7 @@ None of that is engine work. All of it determines whether the engine is usable.
 ### Speak OpenAI's API
 
 Not because it's well-designed, but because it's the de facto standard. Implement
-`/v1/chat/completions` and every existing client works unmodified — that's real
+`/v1/chat/completions` and every existing client works unmodified: that's real
 leverage for free.
 
 ```
@@ -75,7 +75,7 @@ high request rates it will eat your scheduler's time if it shares the loop.
 
 ### Cancellation
 
-Clients disconnect — closed tabs, timeouts, abandoned agent runs. If you don't
+Clients disconnect, closed tabs, timeouts, abandoned agent runs. If you don't
 detect it you keep generating tokens nobody will read, burning GPU on nothing.
 
 Under load this is not a rounding error. Check for disconnection each step and
@@ -99,7 +99,7 @@ you're optimizing a number nobody experiences.
 1. FastAPI app in `serve/api.py` with `/v1/chat/completions` (streaming and
    non-streaming) and `/v1/models`.
 2. Run the engine loop in a **separate process**, communicating over queues.
-3. Apply the model's chat template — `tokenizer.apply_chat_template`. Getting this
+3. Apply the model's chat template, `tokenizer.apply_chat_template`. Getting this
    wrong produces subtly worse output that looks like a model problem.
 4. Handle disconnection; free the sequence promptly.
 5. `uv run pytest tests/test_24_serving.py -v`
@@ -113,7 +113,7 @@ curl -N localhost:8000/v1/chat/completions \
 Then try the `openai` Python client against your server. It should just work.
 
 7. **Measure client-observed TTFT** and compare to your engine-internal TTFT. The
-   gap is your serving overhead — and it's the number your users actually feel.
+   gap is your serving overhead, and it's the number your users actually feel.
 
 ---
 
@@ -126,15 +126,15 @@ serialization. Small is fine; large means something is wrong.
 performance is a real thing.
 
 **Throughput drops if the API server shares the engine's event loop.** Try it
-deliberately — it's a convincing demonstration.
+deliberately: it's a convincing demonstration.
 
 ---
 
 ## Go deeper
 
-- **Kiely §7.5–7.5.3** (p.204–207) — client overhead, async inference, streaming
+- **Kiely §7.5–7.5.3** (p.204–207), client overhead, async inference, streaming
   protocols.
-- **Kiely §7.1** (p.179) — containerization and dependency management.
+- **Kiely §7.1** (p.179), containerization and dependency management.
 - **vLLM `vllm/entrypoints/openai/api_server.py`** — the production surface. Note
   how much is spec compatibility rather than inference.
 - **[OpenAI API reference](https://platform.openai.com/docs/api-reference/chat)** —

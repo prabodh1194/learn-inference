@@ -1,7 +1,7 @@
 # 12 — Speculative decoding
 
 **Build:** `engine/speculative.py::NgramSpeculator`, `verify`
-**Test:** `tests/test_12_speculative.py` · **Moves:** tok/s per user — and only on the right workload
+**Test:** `tests/test_12_speculative.py` · **Moves:** tok/s per user, and only on the right workload
 **Prereq:** [11 — Chunked prefill](11-chunked-prefill.md)
 
 ---
@@ -15,7 +15,7 @@ It's still **sequential**. Token N+1 needs token N. One token per forward pass,
 and each pass drags all 840 MiB of weights through memory to produce ~2 bytes of
 output.
 
-Batching fixed this for *aggregate* throughput — but a single user still waits one
+Batching fixed this for *aggregate* throughput, but a single user still waits one
 full forward pass per token. If you want that one user to go faster, batching
 doesn't help at all.
 
@@ -28,20 +28,20 @@ The observation that makes this possible:
 > Verifying N tokens costs **the same forward pass** as generating 1.
 
 The model is memory-bound. Feed it 5 candidate tokens instead of 1 and it does 5×
-the arithmetic on the *same* weight load — nearly free, exactly like batching.
+the arithmetic on the *same* weight load, nearly free, exactly like batching.
 
 So:
 
-1. **Draft** — cheaply guess the next few tokens.
-2. **Verify** — run the real model once over all of them.
+1. **Draft**, cheaply guess the next few tokens.
+2. **Verify**, run the real model once over all of them.
 3. **Accept** the longest correct prefix; discard the rest.
 
 Guess 5 and get 4 right, and you produced 4 tokens for one forward pass. Guess
-badly and you produced 1 — the same as before, plus the drafting cost.
+badly and you produced 1: the same as before, plus the drafting cost.
 
 **Crucially, the output is identical to normal decoding.** You accept a draft
 token only when it matches what the model would have produced anyway. This isn't
-an approximation — done correctly it's exact, which is why it's safe to run in
+an approximation, done correctly it's exact, which is why it's safe to run in
 production.
 
 ### Where drafts come from
@@ -72,8 +72,8 @@ it alongside tok/s, always. Without it you can't tell these apart:
 
 More speculation is *not* more speed. Rejected drafts cost real compute, and past
 a point you lose. From the [field notes](field-notes.md), an operator running
-2×3090 found the documented 3 draft tokens beaten by 5 — measured via mean
-acceptance length — and above 5, performance got measurably **worse**.
+2×3090 found the documented 3 draft tokens beaten by 5, measured via mean
+acceptance length, and above 5, performance got measurably **worse**.
 
 ### The workload decides everything
 
@@ -141,7 +141,7 @@ def verify(target_logits, draft_tokens):
 Two subtleties worth stating plainly:
 
 **A rejection still yields a token.** When draft `i` is wrong, the model's own
-prediction at that position is correct by definition — keep it. Miss this and
+prediction at that position is correct by definition, keep it. Miss this and
 speculation can be *slower* than not speculating, because a full rejection would
 produce nothing.
 
@@ -162,7 +162,7 @@ it, so it's invalid regardless of what it says.
 
 1. Implement `NgramSpeculator.propose` and `verify` in `engine/speculative.py`.
 2. Wire draft → verify → accept into your decode loop.
-3. `uv run pytest tests/test_12_speculative.py -v` — **speculative greedy output
+3. `uv run pytest tests/test_12_speculative.py -v`, **speculative greedy output
    must exactly match non-speculative greedy.** Not "similar." Identical.
 4. Measure the contrast:
 
@@ -194,13 +194,13 @@ verify tokens that get thrown away.
 ## Go deeper
 
 - **[Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192)**
-  (Leviathan et al., 2022) — the original. §2.3's rejection-sampling proof is what
+  (Leviathan et al., 2022): the original. §2.3's rejection-sampling proof is what
   makes this exact rather than approximate; read it before claiming distributional
   equivalence.
 - **[EAGLE](https://arxiv.org/abs/2401.15077)** — feature-level drafting, the
   current practical default.
 - **[Medusa](https://arxiv.org/abs/2401.10774)** — multiple decoding heads.
-- **Kiely §5.2–5.2.4** (p.129–136) — all four approaches compared, including the
+- **Kiely §5.2–5.2.4** (p.129–136), all four approaches compared, including the
   n-gram/lookahead variant you built.
 - **[Field notes](field-notes.md)** — docs said 3 draft tokens, measurement said 5,
   and >5 was worse. Tune on *your* workload.
@@ -226,5 +226,5 @@ That last one has no honest single answer, which is the point.
 out, not just how fast: guided decoding, tool calling, LoRA.
 
 Lighter on implementation than the last few. The one thing to build is a
-**logit-processor hook** in `engine/sampling.py` — the extension point all three
+**logit-processor hook** in `engine/sampling.py`: the extension point all three
 features hang off.

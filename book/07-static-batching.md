@@ -10,7 +10,7 @@
 
 You can serve one request efficiently. Now serve thirty-two.
 
-The naive approach — one at a time — leaves the GPU almost entirely idle. Lecture
+The naive approach (one at a time) leaves the GPU almost entirely idle. Lecture
 01 showed why: decode reloads all 840 MiB of weights to generate one token. Those
 same weights could have served 32 sequences for the same memory traffic.
 
@@ -39,7 +39,7 @@ But sequences have different lengths, and a tensor is rectangular. So you pad:
 "Write a function that ..."   -> [1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888]
 ```
 
-Padding is computed and discarded — an attention mask keeps it from affecting
+Padding is computed and discarded, an attention mask keeps it from affecting
 results, but the GPU does the work regardless.
 
 ### The part that actually hurts
@@ -50,7 +50,7 @@ Padding waste is the obvious cost. The expensive one is subtler:
 > complete early hold their slots, doing nothing, until the whole batch retires.
 
 Ask for 8 tokens while someone else asks for 512, and your slot is idle for 504
-steps. It cannot be reused, because the batch is fixed for its lifetime — that's
+steps. It cannot be reused, because the batch is fixed for its lifetime: that's
 what "static" means.
 
 ---
@@ -133,19 +133,19 @@ def generate_batched(model, tokenizer, prompts, max_tokens=128, on_token=None):
 
 **`padding_side="left"`** is not optional for decode. With right-padding, the last
 position of a short sequence is a pad token, so `logits[:, -1]` predicts from
-padding — garbage. Left-padding puts every sequence's real final token at
+padding, garbage. Left-padding puts every sequence's real final token at
 position −1. This bug produces plausible-looking wrong output, which is the worst
 kind.
 
 **The `finished` mask** stops a completed sequence from contributing new tokens.
-Its slot is still computed — that's the waste we're measuring.
+Its slot is still computed: that's the waste we're measuring.
 
 ---
 
 ## Build it
 
 1. Implement `generate_batched` in `engine/generate.py`.
-2. `uv run pytest tests/test_07_batching.py -v` — **batched greedy output must
+2. `uv run pytest tests/test_07_batching.py -v`, **batched greedy output must
    match single-sequence greedy exactly.** Batching is an optimization; it must
    not change results. Padding leaking through the mask is the usual culprit
    when this fails.
@@ -178,12 +178,12 @@ so. That gap is the next lecture.
 
 ## Go deeper
 
-- **Kiely §7.2.1** (p.186) — concurrency and batch sizing as a production knob.
+- **Kiely §7.2.1** (p.186), concurrency and batch sizing as a production knob.
 - **[Field notes](field-notes.md)** — a 2×3090 setup: **~100 tok/s for one user,
   585 tok/s across 8**. Aggregate up ~6×, per-user roughly flat. Exactly this
   trade, measured in the wild.
 - **[Orca: A Distributed Serving System for Transformer-Based Generative Models](https://www.usenix.org/conference/osdi22/presentation/yu)**
-  (Yu et al., OSDI '22) — introduced continuous batching. **Read §2–3 now**: it
+  (Yu et al., OSDI '22), introduced continuous batching. **Read §2–3 now**: it
   motivates the problem you just measured. Save the rest for Lecture 08.
 
 ---

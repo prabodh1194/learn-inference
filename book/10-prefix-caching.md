@@ -1,7 +1,7 @@
 # 10 — Prefix caching
 
 **Build:** `BlockManager.match_prefix`, content hashing, LRU eviction
-**Test:** `tests/test_10_prefix.py` · **Moves:** TTFT on shared-prefix traffic — often dramatically
+**Test:** `tests/test_10_prefix.py` · **Moves:** TTFT on shared-prefix traffic, often dramatically
 **Prereq:** [09 — Paged attention](09-paged-attention.md)
 
 ---
@@ -49,7 +49,7 @@ tokens 0–399. Two blocks with identical tokens but different histories produce
 different K/V and must not be shared. Chaining the parent hash into each block's
 identity encodes "same tokens *and* same history."
 
-Get this wrong and you produce subtly wrong output on cache hits — which is
+Get this wrong and you produce subtly wrong output on cache hits, which is
 brutal to debug, because it only manifests under specific traffic.
 
 ### Reference counting
@@ -60,7 +60,7 @@ You built the hook in Lecture 09. Now it earns its keep:
 block 42 (system prompt, tokens 0-15)   ref_count = 3
 ```
 
-Three sequences use it. When one finishes, decrement to 2 — **don't free.** Only
+Three sequences use it. When one finishes, decrement to 2, **don't free.** Only
 at zero does the block become reclaimable.
 
 ### Eviction
@@ -92,14 +92,14 @@ B: "SF weather today?"  vs  "NYC weather today?"  -> shares NOTHING
 ```
 
 In case B every token after the first differs *positionally*, so nothing is
-reusable — despite the prompts being nearly identical to a human reader.
+reusable, despite the prompts being nearly identical to a human reader.
 
 **Practical consequence:** put stable content first and novel content last. System
 prompt, then retrieved documents, then conversation history, then the user's new
 message. Reorder those and you can lose the entire cache benefit while changing
 nothing a user would notice.
 
-This is why pay-per-token APIs bill "cache hits" cheaper — and why prompt
+This is why pay-per-token APIs bill "cache hits" cheaper, and why prompt
 *ordering* is a real engineering lever, not a style preference.
 
 `bench/workloads.py` ships `shared_prefix` and `late_divergence` precisely to make
@@ -158,8 +158,8 @@ Those `n_hit` tokens never touch the GPU. That's the whole win.
 1. Add content hashing with parent chaining to `BlockManager`.
 2. Implement `match_prefix`, refcount increments on hit, and LRU eviction over
    refcount-0 blocks.
-3. Wire it into admission — set `num_prefilled` so prefill skips the hit region.
-4. `uv run pytest tests/test_10_prefix.py -v` — **cache hits must not change
+3. Wire it into admission, set `num_prefilled` so prefill skips the hit region.
+4. `uv run pytest tests/test_10_prefix.py -v`, **cache hits must not change
    output.** Same tokens either way.
 5. Measure the contrast that teaches the lesson:
 
@@ -190,11 +190,11 @@ completely different results.
 ## Go deeper
 
 - **[Efficient Memory Management ... PagedAttention](https://arxiv.org/abs/2309.06180)**
-  §4.3 — copy-on-write and sharing, which you just built.
+  §4.3, copy-on-write and sharing, which you just built.
 - **[SGLang / RadixAttention](https://arxiv.org/abs/2312.07104)** (Zheng et al.) —
   a radix tree instead of a flat hash map, so prefixes share *structurally*.
   Better for branching conversation trees.
-- **Kiely §5.3.1** (p.136–138) — the ordering rule, with the SF/NYC example this
+- **Kiely §5.3.1** (p.136–138): the ordering rule, with the SF/NYC example this
   lecture borrows.
 - **vLLM `vllm/v1/core/kv_cache_utils.py`** — production block hashing. Note how
   much care goes into what's included in the hash (LoRA id, multimodal inputs) —
@@ -225,5 +225,5 @@ caused.
 uv run python book/code/chunked_bench.py
 ```
 
-**Judge this one on p99, not the mean.** The mean barely moves — if that's all
+**Judge this one on p99, not the mean.** The mean barely moves, if that's all
 you watch, you'll conclude the lecture did nothing.

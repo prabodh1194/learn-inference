@@ -18,7 +18,7 @@ Predates GPUs in this role and still the clearest statement of compute- vs.
 memory-bound.
 
 **[GQA: Training Generalized Multi-Query Transformer Models](https://arxiv.org/abs/2305.13245)** · Ainslie et al., 2023 · **L05**
-Why Qwen3 has 16 query heads and 8 KV heads — a 2× cut in the thing that
+Why Qwen3 has 16 query heads and 8 KV heads, a 2× cut in the thing that
 bottlenecks decode.
 
 ---
@@ -40,7 +40,7 @@ caching. The OS analogy is drawn explicitly.
 The follow-up, with stall-free scheduling.
 
 **[SGLang: Efficient Execution of Structured LM Programs](https://arxiv.org/abs/2312.07104)** · Zheng et al., 2023 · **L10, L27**
-RadixAttention — a radix tree rather than a hash map for prefix sharing. Better
+RadixAttention, a radix tree rather than a hash map for prefix sharing. Better
 for branching conversations.
 
 ---
@@ -49,7 +49,7 @@ for branching conversations.
 
 **[Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192)** · Leviathan et al., 2022 · **L12**
 The original. §2.3's rejection-sampling proof is what makes it exact rather than
-approximate — required before you claim distributional equivalence under sampling.
+approximate, required before you claim distributional equivalence under sampling.
 
 **[Medusa](https://arxiv.org/abs/2401.10774)** · Cai et al., 2024 · **L12**
 Extra decoding heads instead of a draft model.
@@ -89,7 +89,7 @@ access patterns dominate.
 Layer-wise second-order quantization.
 
 **[AWQ](https://arxiv.org/abs/2306.00978)** · Lin et al., 2023 · **L19**
-Not all weights matter equally — protect the salient ~1%. §3 is the argument.
+Not all weights matter equally, protect the salient ~1%. §3 is the argument.
 
 **[SmoothQuant](https://arxiv.org/abs/2211.10438)** · Xiao et al., 2022 · **L19**
 Shifting outlier difficulty from activations into weights.

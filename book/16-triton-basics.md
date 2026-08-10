@@ -2,7 +2,7 @@
 
 **Build:** `kernels/triton/softmax.py`, `kernels/triton/rmsnorm.py`
 **Test:** `tests/test_16_triton.py` (cuda) · **Moves:** fewer memory round-trips on elementwise ops
-**Prereq:** [15 — Profiling](15-profiling.md) — with your kernel ranking in hand
+**Prereq:** [15 — Profiling](15-profiling.md), with your kernel ranking in hand
 
 > **NVIDIA GPU required.** Triton is CUDA-only in practice.
 
@@ -10,7 +10,7 @@
 
 ## The problem
 
-Your profile shows a long tail of small kernels — normalization, RoPE, activation,
+Your profile shows a long tail of small kernels, normalization, RoPE, activation,
 residual adds. Individually trivial. Collectively 5–15% of decode.
 
 They're slow for a reason you can now predict. Take RMSNorm in PyTorch:
@@ -88,12 +88,12 @@ entire win.
 ### 1. Vector add
 
 The "hello world". Get the launch grid and masking right; the kernel is trivial.
-Won't beat PyTorch — it's already one fused kernel — but it teaches the mechanics.
+Won't beat PyTorch (it's already one fused kernel) but it teaches the mechanics.
 
 ### 2. Fused softmax
 
 The first real one. Numerically stable softmax needs max, subtract, exp, sum,
-divide — four passes over the row in PyTorch, one in Triton.
+divide, four passes over the row in PyTorch, one in Triton.
 
 **Subtract the max before exponentiating.** `exp(x - max)` instead of `exp(x)`;
 otherwise large logits overflow to `inf`. This is the same trick that becomes
@@ -101,13 +101,13 @@ otherwise large logits overflow to `inf`. This is the same trick that becomes
 
 ### 3. RMSNorm
 
-What Qwen3 actually uses. No mean subtraction, unlike LayerNorm — just
+What Qwen3 actually uses. No mean subtraction, unlike LayerNorm, just
 root-mean-square scaling. Straight from your profile's tail.
 
 ### Benchmark all three
 
 Against the PyTorch built-in, at realistic sizes (`hidden=1024`, batch × seq
-matching your workload). Report **achieved bandwidth as a fraction of peak** — the
+matching your workload). Report **achieved bandwidth as a fraction of peak**, the
 Lecture 15 metric. A fused elementwise kernel should approach peak; if it doesn't,
 your block size or launch grid is wrong.
 
@@ -122,7 +122,7 @@ your block size or launch grid is wrong.
 ```
 
 Triton benchmarks the configurations and caches the winner per `key`. Cheap to
-add, and the optimum genuinely varies by GPU — which is a small lesson in itself
+add, and the optimum genuinely varies by GPU, which is a small lesson in itself
 about portable performance.
 
 ---
@@ -132,14 +132,14 @@ about portable performance.
 1. Vector add → softmax → RMSNorm, in that order.
 2. `uv run pytest tests/test_16_triton.py -v` on a CUDA box.
    **`torch.allclose` against the PyTorch version is non-negotiable.** A kernel
-   that's fast and wrong is worthless, and numerics bugs here are subtle — they
+   that's fast and wrong is worthless, and numerics bugs here are subtle, they
    show up as slightly worse output quality, not crashes.
 3. Benchmark each against PyTorch. Record speedup **and** achieved bandwidth.
 4. Swap RMSNorm into your engine. **Re-run the end-to-end benchmark.**
 
 Step 4 is the point. Predict the end-to-end gain from your Lecture 15 profile
 first: if RMSNorm was 4% of runtime and you make it 2× faster, you get 2%. Check
-whether reality agrees — if it doesn't, your profile or your measurement is wrong,
+whether reality agrees, if it doesn't, your profile or your measurement is wrong,
 and finding out which is worth more than the 2%.
 
 ---
@@ -162,8 +162,8 @@ ones.
   02 (fused softmax) and 05 (layer norm) are directly this lecture. Work them.
 - **[Triton: An Intermediate Language and Compiler for Tiled Neural Network
   Computations](https://dl.acm.org/doi/10.1145/3315508.3329973)** (Tillet et al.)
-  — the design rationale for block-level programming.
-- **Kiely §4.1.3** (p.100) — kernel fusion and reducing memory accesses.
+ : the design rationale for block-level programming.
+- **Kiely §4.1.3** (p.100), kernel fusion and reducing memory accesses.
 - **vLLM `vllm/model_executor/layers/layernorm.py`** — production fused norms.
 
 ---
@@ -185,5 +185,5 @@ ones.
 matters, and the deepest idea in Part III.
 
 Two things to hold onto: it is **exact**, not an approximation; and it does
-*more* arithmetic to move *less* data — which is the right trade on a
+*more* arithmetic to move *less* data, which is the right trade on a
 memory-bound operation, and the whole lesson of the roofline.

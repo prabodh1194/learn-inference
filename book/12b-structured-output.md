@@ -1,7 +1,7 @@
 # 12b — Structured output and adapters
 
 **Build:** a logit-processor hook in `engine/sampling.py` · **Test:** `tests/test_12b_structured.py`
-**Moves:** output *validity* — and reveals a scheduling cost most people miss
+**Moves:** output *validity*, and reveals a scheduling cost most people miss
 **Prereq:** [12 — Speculative decoding](12-speculative-decoding.md)
 
 ---
@@ -11,7 +11,7 @@
 Everything so far has optimized *how fast* tokens come out. Production serving
 also cares about *what* comes out, and about serving many models from one engine.
 
-Three features you'll meet immediately in any real deployment — all first-class in
+Three features you'll meet immediately in any real deployment, all first-class in
 vLLM, none of them free:
 
 - **Structured output** — force valid JSON, or a schema, or a grammar
@@ -44,7 +44,7 @@ state = grammar_fsm.advance(state, token)
 Invalid output becomes **impossible**, not unlikely. That's a much stronger
 guarantee than prompting, and it composes with any sampling parameters.
 
-This is your Lecture 06 sampler with one hook added — which is why it lands here.
+This is your Lecture 06 sampler with one hook added, which is why it lands here.
 
 ### Where it gets expensive
 
@@ -56,7 +56,7 @@ the GPU.
 Real implementations attack this with:
 
 - **Precompiled FSMs.** Compile the schema once, cache it, reuse across requests
-  with the same schema — which is most of them, since an app has a handful of
+  with the same schema, which is most of them, since an app has a handful of
   tools.
 - **Token-level tries.** Precompute vocabulary-to-grammar transitions rather than
   testing tokens one at a time.
@@ -65,7 +65,7 @@ Real implementations attack this with:
   running the model at all.** Free tokens.
 
 That last one is worth pausing on: it's the same insight as speculative decoding —
-tokens you can predict with certainty don't need a forward pass — arrived at from
+tokens you can predict with certainty don't need a forward pass, arrived at from
 a completely different direction.
 
 The libraries: **XGrammar** (vLLM's default), **Outlines**, **llguidance**.
@@ -75,10 +75,10 @@ The libraries: **XGrammar** (vLLM's default), **Outlines**, **llguidance**.
 Grammar state is **per sequence**, and it must survive everything your scheduler
 does:
 
-- **Preemption** (L09) — a swapped-out sequence must restore its FSM state
-- **Prefix caching** (L10) — two requests sharing a prefix may have *different*
+- **Preemption** (L09), a swapped-out sequence must restore its FSM state
+- **Prefix caching** (L10), two requests sharing a prefix may have *different*
   schemas, so grammar state cannot be shared along with the blocks
-- **Speculative decoding** (L12) — drafted tokens must be checked against the
+- **Speculative decoding** (L12), drafted tokens must be checked against the
   grammar, not just against the target model
 
 vLLM's compatibility matrix documents exactly which of these combinations work
@@ -105,7 +105,7 @@ malformed calls.
 
 **Interaction with speculation.** The [field notes](field-notes.md) record a real
 case of this: an operator found tool calling was **inaccurate when MTP
-(speculative decoding) was enabled** — a genuine bug in the parser interaction,
+(speculative decoding) was enabled**, a genuine bug in the parser interaction,
 which they fixed by cherry-picking a PR. Features that are individually correct
 can be jointly wrong.
 
@@ -128,7 +128,7 @@ base weights (840 MiB)  shared by every request
 
 **Multi-LoRA batching** takes this further: requests using *different* adapters in
 the *same* batch, with a fused kernel applying the right adapter per sequence.
-That preserves the continuous batching you built in Lecture 08 — otherwise you'd
+That preserves the continuous batching you built in Lecture 08, otherwise you'd
 have to group requests by adapter and lose the scheduling freedom entirely.
 
 The cost is real but modest: extra kernels per layer, and adapter weights
@@ -137,18 +137,18 @@ competing with the KV cache for memory (Lecture 09's budget again).
 **And a correctness note that connects to Lecture 10:** adapter identity *must* be
 part of the prefix cache's block hash. The same tokens under a different adapter
 produce different K/V. This is precisely why vLLM's `kv_cache_utils.py` includes
-LoRA id in the hash — the scar tissue Lecture 14 pointed you at.
+LoRA id in the hash: the scar tissue Lecture 14 pointed you at.
 
 ---
 
 ## Build it
 
-This lecture is deliberately lighter on implementation — the ideas matter more
+This lecture is deliberately lighter on implementation: the ideas matter more
 than a toy version.
 
 1. Add a **logit-processor hook** to `engine/sampling.py`: a callable that can
    mask logits before sampling. That's the extension point everything above uses.
-2. Implement a **minimal JSON grammar** — enough to force balanced braces and
+2. Implement a **minimal JSON grammar**, enough to force balanced braces and
    quoted keys. Not a full schema engine; enough to feel the mechanism.
 3. `uv run pytest tests/test_12b_structured.py -v`
 4. **Measure the overhead.** Generate with and without the mask, and report the
@@ -162,15 +162,15 @@ than a toy version.
 
 - **[XGrammar](https://arxiv.org/abs/2411.15100)** — vLLM's default backend;
   explains the token-trie and jump-ahead optimizations.
-- **[Outlines](https://arxiv.org/abs/2307.09702)** (Willard & Louf) — regex and
+- **[Outlines](https://arxiv.org/abs/2307.09702)** (Willard & Louf), regex and
   grammar-guided generation via FSM indexing. The clearest statement of the core
   idea.
 - **[S-LoRA](https://arxiv.org/abs/2311.03285)** — serving thousands of LoRA
   adapters concurrently; unified paging for adapters and KV cache.
 - **[Punica](https://arxiv.org/abs/2310.18547)** — the multi-LoRA batching kernel.
 - **[vLLM feature compatibility matrix](https://docs.vllm.ai/en/latest/features/)**
-  — which combinations work. Genuinely useful as a research map.
-- **Gordić, *Inside vLLM*** — has a guided-decoding (FSM) section. Another reason
+ , which combinations work. Genuinely useful as a research map.
+- **Gordić, *Inside vLLM***, has a guided-decoding (FSM) section. Another reason
   Lecture 14 is where it belongs.
 
 ---

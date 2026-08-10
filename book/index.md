@@ -1,6 +1,6 @@
 # Inference Zero-to-Hero
 
-*Building an LLM inference engine from scratch — measuring everything.*
+*Building an LLM inference engine from scratch, measuring everything.*
 
 You build KV caching, continuous batching, paged attention, prefix caching and
 speculative decoding, then read vLLM and understand why it's built the way it is.
@@ -75,7 +75,7 @@ what makes the fix feel inevitable rather than arbitrary.
 
 ## Field notes
 
-[**field-notes.md**](field-notes.md) collects what practitioners report — real
+[**field-notes.md**](field-notes.md) collects what practitioners report, real
 magnitudes from real deployments, and the places where an optimization
 disappointed someone. Books give you the mechanism; these give you the scale.
 
@@ -87,9 +87,9 @@ Use them to sanity-check your own results, and add your own entries as you go.
 
 This book indexes two excellent sources rather than duplicating them:
 
-- **Philip Kiely, *Inference Engineering*** (Baseten, 2026) — the breadth-first
+- **Philip Kiely, *Inference Engineering*** (Baseten, 2026): the breadth-first
   survey. Lectures cite it by section; read those sections when pointed at them.
-- **Aleksa Gordić, [*Inside vLLM*](https://www.aleksagordic.com/blog/vllm)** — a
+- **Aleksa Gordić, [*Inside vLLM*](https://www.aleksagordic.com/blog/vllm)**, a
   top-down read of vLLM V1. **Save it for Lecture 14.** Read before you've built
   a scheduler and it teaches vocabulary; read after and it teaches judgment.
 

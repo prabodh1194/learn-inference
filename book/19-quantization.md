@@ -1,7 +1,7 @@
 # 19 — Quantization
 
 **Build:** `kernels/triton/quant_matmul.py`, `kernels/quality_eval.py`
-**Test:** `tests/test_19_quantization.py` (cuda) · **Moves:** memory, throughput — **and quality**
+**Test:** `tests/test_19_quantization.py` (cuda) · **Moves:** memory, throughput, **and quality**
 **Prereq:** [18 — A paged attention kernel](18-paged-attention-kernel.md)
 
 ---
@@ -12,7 +12,7 @@ Everything so far has moved bytes more cleverly. Quantization asks a blunter
 question: **why are the bytes so big?**
 
 Decode is memory-bound (Lecture 02, 0.75 ops:byte). Time is proportional to bytes
-loaded. So halve the bytes and you nearly halve the time — no algorithmic
+loaded. So halve the bytes and you nearly halve the time, no algorithmic
 cleverness required.
 
 FP16 → INT8 is 2× fewer bytes. INT4 is 4×. That's a bigger decode win than
@@ -20,7 +20,7 @@ anything in Lectures 16–18.
 
 There is a catch, and it's the whole reason this lecture is structured the way it
 is: **quantization is the only optimization in this book that can make your model
-worse.** Every other technique is exact — same tokens, less time. This one trades
+worse.** Every other technique is exact, same tokens, less time. This one trades
 quality for speed, and the trade is invisible unless you go looking.
 
 ---
@@ -81,7 +81,7 @@ because **3090s accelerate INT4 in hardware**. FP8 needs Ada/Hopper or newer; a
 3090 (Ampere) doesn't have it.
 
 The same operator kept **linear attention layers at full precision** while
-quantizing the rest — because those layers quantize poorly. "Quantize the model"
+quantizing the rest, because those layers quantize poorly. "Quantize the model"
 is rarely the actual operation; mixed precision across layer types is normal.
 
 **So: your format is chosen by your silicon, not by a leaderboard.**
@@ -101,7 +101,7 @@ community comparison across BF16 → Q8 → Q6 → Q5 → Q4 → IQ3. Two princi
 
 **Grade a task with a verifiable answer.** Theirs: given a chess PGN, track the
 board state and render it as SVG. Degradation appeared as *wrong piece placement*
-and *wrong board orientation* — structured-reasoning failures a perplexity number
+and *wrong board orientation*, structured-reasoning failures a perplexity number
 would never surface.
 
 **Use out-of-distribution inputs.** They chose deliberately terrible chess moves
@@ -118,7 +118,7 @@ shipping a regression you can't see.
 
 1. Implement per-channel INT8 weight quantization and a Triton dequant-matmul in
    `kernels/triton/quant_matmul.py`.
-2. `uv run pytest tests/test_19_quantization.py -v` — numerics within tolerance
+2. `uv run pytest tests/test_19_quantization.py -v`, numerics within tolerance
    against FP16.
 3. **Build `kernels/quality_eval.py` before you benchmark speed.** A task with a
    gradeable answer, on inputs the model can't have memorized. Format-following
@@ -142,7 +142,7 @@ your measurement match, and if not, what else is now the bottleneck?
 
 **Memory roughly halves at INT8.** Predictable.
 
-**Speedup below 2×.** You quantized weights, not everything — activations, KV
+**Speedup below 2×.** You quantized weights, not everything, activations, KV
 cache, and overhead are unchanged. Amdahl again.
 
 **INT8 quality nearly indistinguishable** on most tasks. This is why W8A16 is
@@ -155,13 +155,13 @@ whether it's acceptable, which is precisely why you built it first.
 
 ## Go deeper
 
-- **[AWQ](https://arxiv.org/abs/2306.00978)** (Lin et al.) — the salient-weight
+- **[AWQ](https://arxiv.org/abs/2306.00978)** (Lin et al.): the salient-weight
   argument; §3 is the core.
-- **[GPTQ](https://arxiv.org/abs/2210.17323)** (Frantar et al.) — layer-wise
+- **[GPTQ](https://arxiv.org/abs/2210.17323)** (Frantar et al.), layer-wise
   second-order quantization.
-- **[SmoothQuant](https://arxiv.org/abs/2211.10438)** (Xiao et al.) — moving
+- **[SmoothQuant](https://arxiv.org/abs/2211.10438)** (Xiao et al.), moving
   outlier difficulty from activations to weights.
-- **Kiely §5.1–5.1.3** (p.120–128) — number formats, approaches, and §5.1.3
+- **Kiely §5.1–5.1.3** (p.120–128), number formats, approaches, and §5.1.3
   specifically on measuring quality impact.
 - **[Field notes](field-notes.md)** — hardware-specific format choice, mixed
   precision across layer types, and the task-based eval methodology above.

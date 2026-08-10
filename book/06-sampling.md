@@ -1,14 +1,14 @@
 # 06 — Sampling
 
 **Build:** `engine/sampling.py::sample` · **Test:** `tests/test_06_sampling.py`
-**Moves:** nothing — this is correctness infrastructure · **Prereq:** [05](05-kv-cache.md)
+**Moves:** nothing: this is correctness infrastructure · **Prereq:** [05](05-kv-cache.md)
 
 ---
 
 ## The problem
 
 Every generation so far has been greedy: take the highest-logit token, always.
-Real serving isn't — users send `temperature`, `top_p`, `top_k`, and expect them
+Real serving isn't, users send `temperature`, `top_p`, `top_k`, and expect them
 to mean something.
 
 Sampling is cheap to implement and easy to get subtly wrong. The bugs don't
@@ -22,7 +22,7 @@ Short lecture. It's here because the rest of the book depends on it.
 
 ## The idea
 
-The model gives you **logits** — one unnormalized score per vocabulary token.
+The model gives you **logits**, one unnormalized score per vocabulary token.
 Sampling turns that vector into one chosen token. Four knobs, applied in a
 specific order.
 
@@ -34,14 +34,14 @@ Divide the logits before softmax:
 logits = logits / temperature
 ```
 
-- `T < 1` sharpens the distribution — more confident, more repetitive.
-- `T > 1` flattens it — more diverse, more likely to be incoherent.
+- `T < 1` sharpens the distribution, more confident, more repetitive.
+- `T > 1` flattens it, more diverse, more likely to be incoherent.
 - `T = 0` is a special case: it means **argmax**, not division by zero. Guard it.
 
 ### Top-k
 
 Keep the `k` highest-probability tokens, zero the rest, renormalize. Blunt but
-effective — the tail of a 150k-token vocabulary is mostly garbage that
+effective: the tail of a 150k-token vocabulary is mostly garbage that
 collectively holds non-trivial probability mass.
 
 ### Top-p (nucleus)
@@ -58,7 +58,7 @@ This is the single most common top-p bug.
 
 Divide (or multiply) the logits of already-generated tokens to discourage loops.
 Note the asymmetry: for a positive logit you divide, for a negative one you
-multiply — otherwise the "penalty" *increases* the score of negative-logit
+multiply, otherwise the "penalty" *increases* the score of negative-logit
 tokens. Another classic bug.
 
 ### Order matters
@@ -119,7 +119,7 @@ Two lines deserve attention.
 token that *crosses* the threshold. Otherwise with `top_p=0.9` and a top token at
 0.95, you'd remove everything.
 
-`remove[0] = False` is the guard. Belt and braces — with the shifted comparison
+`remove[0] = False` is the guard. Belt and braces, with the shifted comparison
 it's redundant, but this is exactly the code that gets refactored later by someone
 who doesn't know why the shift is there.
 
@@ -131,8 +131,8 @@ The reason this lecture sits before the scheduler:
 
 > **Greedy decoding is deterministic. That makes it a test oracle.**
 
-Every optimization from here — batching, paging, prefix caching, speculative
-decoding — must not change the output. With `temperature=0` you can assert
+Every optimization from here, batching, paging, prefix caching, speculative
+decoding, must not change the output. With `temperature=0` you can assert
 *exact* token equality and know that any difference is a bug.
 
 Lose determinism and you lose the ability to distinguish "my paged attention has
@@ -148,7 +148,7 @@ greedy path as a bug**, not as noise to average away.
 
 1. Implement `sample()` and `SamplingParams` in `engine/sampling.py`.
 2. `uv run pytest tests/test_06_sampling.py -v`
-3. Wire it into `generate_cached` — greedy when `temperature=0`, sampled
+3. Wire it into `generate_cached`, greedy when `temperature=0`, sampled
    otherwise. Every existing test must still pass, because they all use greedy.
 4. Sanity check by hand: generate the same prompt at `T=0`, `T=0.7`, `T=2.0`.
    Read the outputs. `T=2.0` should be visibly unhinged.
@@ -158,12 +158,12 @@ greedy path as a bug**, not as noise to average away.
 ## Go deeper
 
 - **[The Curious Case of Neural Text Degeneration](https://arxiv.org/abs/1904.09751)**
-  (Holtzman et al., 2019) — introduced nucleus sampling. The figures showing why
+  (Holtzman et al., 2019), introduced nucleus sampling. The figures showing why
   pure likelihood maximization produces repetitive text are worth the read.
 - **vLLM `vllm/sampling_params.py`** — the production surface area. Note how many
   parameters exist beyond these four, and that they're applied in a defined order
   for the same reason.
-- **Kiely §1.3.1** (p.31) — evaluation, and why sampling settings make
+- **Kiely §1.3.1** (p.31), evaluation, and why sampling settings make
   benchmarking harder than it looks.
 
 ---
@@ -188,4 +188,4 @@ uv run python book/code/batching_waste.py    # run before reading
 ```
 
 Same code, 0% waste on one workload and 61% on another. **Record the padding
-waste, not just throughput** — that number is what L08 eliminates.
+waste, not just throughput**, that number is what L08 eliminates.

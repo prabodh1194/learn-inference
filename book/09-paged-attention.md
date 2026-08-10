@@ -2,7 +2,7 @@
 
 **Build:** `engine/block_manager.py::BlockManager`, `engine/cache.py::PagedKVCache`
 **Test:** `tests/test_09_paged.py` · **Demo:** `book/code/fragmentation.py`
-**Moves:** concurrent sequences before OOM — the biggest single win in Part II
+**Moves:** concurrent sequences before OOM: the biggest single win in Part II
 **Prereq:** [08 — Continuous batching](08-continuous-batching.md)
 
 > **From here you want a real NVIDIA GPU.** The logic is testable on a laptop —
@@ -13,7 +13,7 @@
 
 ## The problem
 
-Your scheduler wants to admit more requests. Memory says no — long before the GPU
+Your scheduler wants to admit more requests. Memory says no, long before the GPU
 is actually full.
 
 The culprit is in `KVCache` from Lecture 05:
@@ -57,7 +57,7 @@ On a 24GB 3090 with realistic mixed traffic:
 ```
 
 Note the shape of the table: the longer the context you *support*, the worse
-contiguous allocation gets — while paged stays flat at 84. Contiguous is punished
+contiguous allocation gets, while paged stays flat at 84. Contiguous is punished
 for capability you're not even using.
 
 ---
@@ -72,7 +72,7 @@ physical ones. Processes see a clean contiguous space; physically it's scattered
 
 PagedAttention (Kwon et al., 2023) applies this to the KV cache:
 
-- Carve VRAM into fixed-size **blocks** — say 16 tokens each.
+- Carve VRAM into fixed-size **blocks**, say 16 tokens each.
 - Give each sequence a **block table**: logical position → physical block.
 - Allocate a new block only when the sequence actually needs one.
 
@@ -92,7 +92,7 @@ Blocks need not be adjacent. Attention gathers them through the table.
 ### What this changes
 
 **Waste becomes bounded.** Contiguous allocation wastes `max_seq_len - actual`
-per sequence — unbounded, and growing with the context you advertise. Paging
+per sequence, unbounded, and growing with the context you advertise. Paging
 wastes at most `block_size - 1` tokens: *internal fragmentation only*.
 
 **Growth is incremental.** A sequence gets one more block when it crosses a
@@ -116,7 +116,7 @@ From the demo:
 ```
 
 Read the columns, not the row order. Block sizes 1 and 16 fit the *same* 84
-sequences — the memory saved by finer blocks is already negligible by 16. What
+sequences: the memory saved by finer blocks is already negligible by 16. What
 differs is the block table: **2062 entries per sequence at block 1, versus 129 at
 16**, every one an indirection on the hottest path in the system.
 
@@ -127,7 +127,7 @@ nothing and the table is still short.
 ### The part that isn't free
 
 Attention can no longer read a contiguous span. Every step it must gather K/V
-through the block table — an indirection on the hottest path in the system.
+through the block table, an indirection on the hottest path in the system.
 
 This is why PagedAttention needs a **custom kernel**. You can prototype it with
 gathers in PyTorch (do that now), but the production version is hand-written
@@ -175,7 +175,7 @@ class BlockManager:
         seq.block_table.clear()
 ```
 
-**Reference counting from the start.** You don't need it yet — every block has
+**Reference counting from the start.** You don't need it yet, every block has
 exactly one owner. Lecture 10 makes blocks shared, and retrofitting refcounts
 into a design that assumed sole ownership is unpleasant. Build the hook now.
 
@@ -190,7 +190,7 @@ def gather_kv(cache, block_table, seq_len, block_size):
     return flat[:seq_len]                          # trim the partial last block
 ```
 
-Correct and slow — it materializes the whole sequence. Fine for now; Lecture 18
+Correct and slow, it materializes the whole sequence. Fine for now; Lecture 18
 fuses it into the attention kernel so nothing is materialized at all.
 
 ### Preemption
@@ -211,7 +211,7 @@ recompute; long ones are cheaper to swap.
 1. Implement `BlockManager` in `engine/block_manager.py`.
 2. Implement `PagedKVCache` in `engine/cache.py`.
 3. Wire `can_allocate` into the scheduler's admission check from Lecture 08.
-4. `uv run pytest tests/test_09_paged.py -v` — **paged output must match
+4. `uv run pytest tests/test_09_paged.py -v`, **paged output must match
    contiguous exactly.** This is a storage change; the model must not notice.
 5. Measure the number that matters:
 
@@ -240,13 +240,13 @@ Lecture 18 wins most of it back.
 ## Go deeper
 
 - **[Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180)**
-  (Kwon et al., SOSP '23) — the vLLM paper. **Read it now**, having just built
+  (Kwon et al., SOSP '23): the vLLM paper. **Read it now**, having just built
   the thing. §4 is the memory manager; the OS analogy is drawn explicitly.
-- **vLLM `vllm/v1/core/block_pool.py`** and **`kv_cache_manager.py`** — the
+- **vLLM `vllm/v1/core/block_pool.py`** and **`kv_cache_manager.py`**, the
   production version of what you wrote.
 - **nano-vllm `nanovllm/engine/block_manager.py`** — ~4.3KB, much closer to yours.
 - **Kiely §2.5** (p.68) — PagedAttention in context.
-- **Kiely §5.3.2** (p.139) — the G1–G4 storage hierarchy; where swapped blocks go.
+- **Kiely §5.3.2** (p.139): the G1–G4 storage hierarchy; where swapped blocks go.
 
 ---
 
@@ -275,6 +275,6 @@ savings are larger than you'd guess.
 uv run python book/code/prefix_bench.py
 ```
 
-It runs `shared_prefix` and `late_divergence` back to back — near-identical
+It runs `shared_prefix` and `late_divergence` back to back, near-identical
 token counts, opposite cache behaviour. **Predict the TTFT for each before you
 run it.**

@@ -1,7 +1,7 @@
 # 02 — Arithmetic intensity
 
 **Demo:** `book/code/roofline.py` · **Test:** `tests/test_02_roofline.py`
-**Moves:** nothing — this is how you *predict* what will move · **Prereq:** [01](01-the-two-phases.md)
+**Moves:** nothing: this is how you *predict* what will move · **Prereq:** [01](01-the-two-phases.md)
 
 ---
 
@@ -24,7 +24,7 @@ Two numbers describe a GPU:
 - **Peak compute** — floating-point operations per second.
 - **Peak bandwidth** — bytes per second from memory.
 
-Divide them and you get the **ops:byte ratio** — how much arithmetic the machine
+Divide them and you get the **ops:byte ratio**, how much arithmetic the machine
 must do per byte loaded to keep its compute units busy. For an H100: 989 TFLOPS ÷
 3.35 TB/s ≈ **295 operations per byte**. Fetch a byte, do fewer than 295
 operations with it, and you've wasted the trip.
@@ -57,7 +57,7 @@ Compare the two and you have your answer:
 ### The roofline
 
 Plot those two facts together and you get the chart the lecture is named after.
-It's called a roofline because of its shape — a diagonal rising into a flat,
+It's called a roofline because of its shape, a diagonal rising into a flat,
 like a roof:
 
 ```
@@ -103,7 +103,7 @@ That's the entire tool. One number (your intensity), one comparison (against the
 ridge), and you know which half of the hardware you're wasting.
 
 **Why this book is organized around it:** decode lands at **0.75 ops:byte**
-against a ridge of 295 — roughly 400× to the left, using about a quarter of one
+against a ridge of 295, roughly 400× to the left, using about a quarter of one
 percent of the GPU's arithmetic. Prefill lands at ~510, on the other side. Same
 weights, same kernels, opposite ceilings.
 
@@ -113,7 +113,7 @@ caching, quantization, and speculative decoding are four different answers, and
 the roofline is what tells you they're all the same idea.
 
 !!! tip "You are not meant to memorize any of this"
-    Do the arithmetic once, here, to build the intuition — then let
+    Do the arithmetic once, here, to build the intuition, then let
     `book/code/roofline.py` do it forever after. Practitioners don't carry these
     figures around.
 
@@ -125,7 +125,7 @@ the roofline is what tells you they're all the same idea.
 
 ### Doing it for attention
 
-Take unoptimized attention — `S = QK^T`, `P = softmax(S)`, `O = PV` — with
+Take unoptimized attention (`S = QK^T`, `P = softmax(S)`, `O = PV`) with
 sequence length `N`, head dim `d`, FP16 (2 bytes/value). Each step reads from
 memory, computes, writes back. Add it up:
 
@@ -138,7 +138,7 @@ At N=4096, d=128, that's **62 ops:byte**. Against an H100's 295, attention is
 memory-bound by nearly 5×.
 
 Notice *why*: those `N²` terms are the score matrix, written to memory and
-immediately read back — 32 MiB at this size, round-tripped for nothing. Deleting
+immediately read back, 32 MiB at this size, round-tripped for nothing. Deleting
 that round-trip is exactly what FlashAttention does (Lecture 17).
 
 ---
@@ -180,7 +180,7 @@ same claim.
 ## Build it
 
 1. Run the demo. Check 62.4 against Kiely Fig 2.18 (p.66).
-2. Run `uv run pytest tests/test_02_roofline.py -v` — these pass today. Read
+2. Run `uv run pytest tests/test_02_roofline.py -v`, these pass today. Read
    them; they encode the claims above as assertions.
 3. **Fill in your own hardware.** The `Device` entries are nominal spec-sheet
    figures. Find your laptop's real numbers and add them.
@@ -200,11 +200,11 @@ Record the answers in `notes/00-baseline/README.md`.
 
 ## Go deeper
 
-- **Kiely §2.4–2.4.2** (p.61–66) — the derivation this lecture reproduces.
-- **Kiely §2.5** (p.67–70) — how FlashAttention and PagedAttention each attack
+- **Kiely §2.4–2.4.2** (p.61–66): the derivation this lecture reproduces.
+- **Kiely §2.5** (p.67–70), how FlashAttention and PagedAttention each attack
   the numbers you just computed.
 - **[Roofline: An Insightful Visual Performance Model](https://dl.acm.org/doi/10.1145/1498765.1498785)**
-  (Williams et al., 2009) — the original. Predates GPUs in this role and still
+  (Williams et al., 2009): the original. Predates GPUs in this role and still
   the clearest statement of the idea.
 - **[FlashAttention](https://arxiv.org/abs/2205.14135)** (Dao et al., 2022) —
   §2 has the memory-traffic analysis. Skim now, implement in Lecture 17.
@@ -219,7 +219,7 @@ Answer from your own output:
    FLOPS, how much faster does decode get?
 2. Attention intensity rises with N (32 at N=128, 62 at N=4096) but never passes
    the ridge. What does that tell you about attention at *any* sequence length?
-3. Your predicted batch-size ceiling from the sizing exercise — what runs out
+3. Your predicted batch-size ceiling from the sizing exercise, what runs out
    first, and what would you change to raise it? *(Lectures 09 and 19.)*
 
 ---

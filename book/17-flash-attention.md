@@ -1,7 +1,7 @@
 # 17 — FlashAttention
 
 **Build:** `kernels/triton/flash_attention.py` · **Test:** `tests/test_17_flash.py` (cuda)
-**Moves:** attention time, and peak memory — from O(N²) to O(N)
+**Moves:** attention time, and peak memory, from O(N²) to O(N)
 **Prereq:** [16 — Triton basics](16-triton-basics.md)
 
 ---
@@ -16,9 +16,9 @@ compute = 4N²d + 3N² ops
 intensity = 62 ops:byte     (vs. an H100's ridge of 295)
 ```
 
-Memory-bound by nearly 5× on an H100 — though on the 3090 you're actually
+Memory-bound by nearly 5× on an H100, though on the 3090 you're actually
 renting (ridge 76) it's memory-bound by only 1.2×, so temper your speedup
-expectations accordingly. And the `N²` terms dominate — that's the score matrix
+expectations accordingly. And the `N²` terms dominate: that's the score matrix
 `S = QK^T`, written to HBM and immediately read back, twice:
 
 ```
@@ -41,7 +41,7 @@ scratch space, which is what makes long context expensive.
 FlashAttention (Dao et al., 2022) never materializes `S`.
 
 The obstacle is softmax: it needs a sum over the whole row, so you seemingly can't
-process K/V in pieces. The trick is that you can — if you're willing to **fix up
+process K/V in pieces. The trick is that you can, if you're willing to **fix up
 your answer as you go**.
 
 ### Online softmax
@@ -53,7 +53,7 @@ softmax(x)_i = exp(x_i - max(x)) / Σ exp(x_j - max(x))
 ```
 
 Process a tile of K/V and you only know the max **so far**. When a later tile has a
-larger value, everything computed already used the wrong max — but it's fixable:
+larger value, everything computed already used the wrong max, but it's fixable:
 
 ```
 m_new = max(m_old, m_tile)
@@ -67,7 +67,7 @@ Keep a running max `m`, a running sum `l`, and a running output accumulator `acc
 Each new tile rescales the accumulator by `exp(m_old - m_new)`. At the end, divide
 by `l`.
 
-**The result is exact.** Not an approximation — algebraically identical to standard
+**The result is exact.** Not an approximation, algebraically identical to standard
 attention, computed in a different order. That's what makes FlashAttention safe to
 use everywhere.
 
@@ -81,7 +81,7 @@ BEFORE:  read Q,K -> write S -> read S -> write P -> read P,V -> write O
 AFTER:   read Q,K,V (in tiles) -> write O
 ```
 
-Memory traffic drops from O(N²) to **O(N)**. Arithmetic is unchanged — slightly
+Memory traffic drops from O(N²) to **O(N)**. Arithmetic is unchanged, slightly
 increased, in fact, by the rescaling. **You do more math to move less data**, which
 is exactly the right trade on a memory-bound operation.
 
@@ -124,12 +124,12 @@ def flash_attention_kernel(Q, K, V, Out, softmax_scale, N, ...):
 Three things that go wrong:
 
 **Forgetting to rescale `acc`.** The most common bug. Output looks approximately
-right — attention is a weighted average, so errors are subtle. It will pass a
+right, attention is a weighted average, so errors are subtle. It will pass a
 casual eyeball and fail `allclose`. Trust the test.
 
 **Causal masking at tile boundaries.** Tiles entirely above the diagonal can be
 skipped; tiles on the diagonal need element-level masking. Getting this wrong
-leaks future information — the model will look *better* at predicting, which is a
+leaks future information: the model will look *better* at predicting, which is a
 uniquely confusing bug.
 
 **Wrong scale.** `1/sqrt(head_dim)`, applied before softmax.
@@ -145,8 +145,8 @@ This one only bites on hardware, which is the worst place to find it.
 ## Build it
 
 1. Implement the forward pass in `kernels/triton/flash_attention.py`. Inference
-   only — no backward pass needed.
-2. `uv run pytest tests/test_17_flash.py -v` — **`torch.allclose` against your
+   only, no backward pass needed.
+2. `uv run pytest tests/test_17_flash.py -v`, **`torch.allclose` against your
    Part II attention**, tolerance ~1e-2 for fp16.
 3. Benchmark against PyTorch SDPA at N = 512 / 2048 / 8192. Report time **and
    peak memory**.
@@ -159,7 +159,7 @@ This one only bites on hardware, which is the worst place to find it.
 
 ## What you should see
 
-**Speedup growing with sequence length.** Small at N=512, large at N=8192 — the
+**Speedup growing with sequence length.** Small at N=512, large at N=8192, the
 `N²` term you removed only dominates when N is big.
 
 **Peak memory much lower**, and now linear in N rather than quadratic. Often this
@@ -185,14 +185,14 @@ exists is the point.
   FLOPs, is the quantity to optimize. That's Lecture 02's roofline, stated as a
   design principle.
 
-  And it proves the IO complexity is **optimal for a range of SRAM sizes** — not
+  And it proves the IO complexity is **optimal for a range of SRAM sizes**, not
   merely better, but provably the least HBM traffic possible. That's rare in
   systems work, and it's why FlashAttention became the default rather than one
   option among several.
 - **[FlashAttention-2](https://arxiv.org/abs/2307.08691)** — better work
   partitioning; explains where your version's remaining gap comes from.
 - **[Online normalizer calculation for softmax](https://arxiv.org/abs/1805.02867)**
-  (Milakov & Gimelshein) — the running-max trick in isolation. Short and clear.
+  (Milakov & Gimelshein): the running-max trick in isolation. Short and clear.
 - **Kiely §2.5** (p.67–70) — FlashAttention and PagedAttention as the two
   attention optimizations, now with your own kernel as the reference point.
 - **[Triton tutorial 06](https://triton-lang.org/main/getting-started/tutorials/06-fused-attention.html)**
@@ -221,5 +221,5 @@ with L09's block tables.
 Start from the kernel you just wrote and change **only** the K/V addressing to
 go through the block table. Nothing else about the algorithm moves.
 
-This is where paging stops costing you latency — you keep L09's memory win and
+This is where paging stops costing you latency, you keep L09's memory win and
 give back the per-step penalty.

@@ -1,6 +1,6 @@
 # 20 — Raw CUDA
 
-**Build:** `kernels/cuda/` — one kernel, by hand · **Test:** `tests/test_20_cuda.py` (cuda)
+**Build:** `kernels/cuda/`, one kernel, by hand · **Test:** `tests/test_20_cuda.py` (cuda)
 **Moves:** probably nothing. That's the lesson. · **Prereq:** [19 — Quantization](19-quantization.md)
 
 ---
@@ -10,7 +10,7 @@
 Triton has been generating your kernels. It picks thread mappings, handles memory
 coalescing, manages shared memory, and schedules loads.
 
-That's a lot of decisions you haven't made — which means a lot you can't reason
+That's a lot of decisions you haven't made, which means a lot you can't reason
 about when a kernel underperforms. This lecture drops one level so those decisions
 become visible.
 
@@ -36,7 +36,7 @@ CUDA's model is one level finer than Triton's:
 
 **Coalescing.** Threads in a warp (32 threads) should read *consecutive* addresses,
 so the hardware merges them into one transaction. Strided access can cost 32
-transactions instead of 1 — a 32× bandwidth penalty from an indexing choice that
+transactions instead of 1, a 32× bandwidth penalty from an indexing choice that
 looks innocent.
 
 **Shared memory.** ~100× faster than HBM, ~100KB per SM, explicitly managed. This
@@ -45,7 +45,7 @@ implicit, here you allocate it yourself.
 
 **Occupancy.** How many warps are resident per SM. Higher occupancy hides memory
 latency by giving the scheduler other work. Registers and shared memory per block
-bound it — use too much of either and occupancy collapses.
+bound it, use too much of either and occupancy collapses.
 
 **Warp primitives.** `__shfl_down_sync` exchanges registers between threads in a
 warp with no shared memory and no barrier. Reductions built this way are much
@@ -53,7 +53,7 @@ faster than the naive shared-memory version.
 
 ### A reduction, three ways
 
-Worth writing all three — the progression *is* the lesson:
+Worth writing all three: the progression *is* the lesson:
 
 ```cuda
 // 1. naive: every thread hits shared memory, half idle immediately
@@ -74,7 +74,7 @@ for (int offset = 16; offset > 0; offset /= 2)
 ```
 
 Version 1 to version 3 is often several×. Every step is a memory-access or
-divergence insight, not an arithmetic one — which by now should sound familiar.
+divergence insight, not an arithmetic one, which by now should sound familiar.
 
 ---
 
@@ -84,11 +84,11 @@ Pick **one** kernel. Softmax is the sane choice; paged attention is the ambitiou
 one.
 
 1. Write it in `kernels/cuda/`, bind with `torch.utils.cpp_extension.load`.
-2. `uv run pytest tests/test_20_cuda.py -v` — correctness first, as always.
+2. `uv run pytest tests/test_20_cuda.py -v`, correctness first, as always.
 3. Profile with `ncu`. Record: achieved bandwidth vs. peak, occupancy, warp
    efficiency.
 4. **Compare against your Triton version**, and against PyTorch.
-5. If Triton wins, use `ncu` to find out *why* — usually better memory pipelining
+5. If Triton wins, use `ncu` to find out *why*, usually better memory pipelining
    or a smarter thread mapping than you chose.
 
 Then do the reduction progression above and measure each stage. It's the cheapest
@@ -122,7 +122,7 @@ Not often, and it's worth being clear about when:
 
 For everything else, Triton is a better default: dramatically less code, portable
 across architectures, and usually within a small factor. FlashAttention itself is
-hand-written CUDA *and* has a Triton implementation — the fact that both exist is
+hand-written CUDA *and* has a Triton implementation: the fact that both exist is
 the honest summary of this tradeoff.
 
 ---
@@ -132,7 +132,7 @@ the honest summary of this tradeoff.
 - **[CUDA C++ Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)**
   — chapters 3 (model) and 5 (performance).
 - **[Optimizing Parallel Reduction in CUDA](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf)**
-  (Mark Harris) — the classic seven-stage walkthrough. Still the best single
+  (Mark Harris): the classic seven-stage walkthrough. Still the best single
   document on why memory access dominates.
 - **vLLM `csrc/`** — the remaining hand-written CUDA. Note that V1 moved paged
   attention itself to Triton, so `csrc/attention/` now holds mostly headers; the

@@ -1,7 +1,7 @@
 # 14 — Reading vLLM
 
 **Build:** nothing · **Test:** none · **Moves:** your ability to read production code
-**Prereq:** [13 — CUDA graphs](13-cuda-graphs.md) — and a working engine
+**Prereq:** [13 — CUDA graphs](13-cuda-graphs.md), and a working engine
 
 ---
 
@@ -45,7 +45,7 @@ haven't hit yet.
 | MultiProcExecutor | L22 (preview) |
 
 Read it in one sitting. **Keep a list of every place vLLM does something
-differently than you did**, and don't resolve them yet — just collect.
+differently than you did**, and don't resolve them yet, just collect.
 
 ### 2. nano-vllm — read the source
 
@@ -109,8 +109,8 @@ Answer these in `notes/01-engine/README.md`, citing file and function:
 Write a diff-style entry in your notes: **where does your design differ, and were
 they right?**
 
-Some will be "they handle a case I ignored" — multi-modal inputs, LoRA, preemption
-under sustained pressure. Some will be "they made a different tradeoff" — block
+Some will be "they handle a case I ignored", multi-modal inputs, LoRA, preemption
+under sustained pressure. Some will be "they made a different tradeoff", block
 size defaults, eviction policy, when to give up on speculation.
 
 And some of your choices will be *fine*. A simpler design that handles your cases
@@ -122,7 +122,7 @@ need. Recognizing which is which is the skill this lecture is for.
 ## Optional: SGLang
 
 **[github.com/sgl-project/sglang](https://github.com/sgl-project/sglang)** takes a
-different path on prefix caching — **RadixAttention**, a radix tree rather than a
+different path on prefix caching, **RadixAttention**, a radix tree rather than a
 flat hash map, so prefixes share *structurally*. Better for branching
 conversation trees where many requests share nested prefixes.
 
@@ -156,4 +156,4 @@ time actually goes.
 > is the point to rent one and work through L15–L20 in a block.
 
 Its deliverable is a **ranked kernel table**. Every optimization in L16–L20 must
-cite it — you optimize the top row, not the interesting one.
+cite it, you optimize the top row, not the interesting one.

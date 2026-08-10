@@ -1,7 +1,7 @@
 # 11 — Chunked prefill
 
 **Build:** chunked admission in `engine/scheduler.py` · **Test:** `tests/test_11_chunked.py`
-**Moves:** **p99 latency** — and barely touches the mean
+**Moves:** **p99 latency**, and barely touches the mean
 **Prereq:** [10 — Prefix caching](10-prefix-caching.md)
 
 ---
@@ -51,7 +51,7 @@ step is ever catastrophically long, so no decoding user sees a long stall.
 
 The reason it works comes straight from Lecture 01.
 
-Decode is **memory-bound** — the GPU has spare arithmetic capacity while it waits
+Decode is **memory-bound**: the GPU has spare arithmetic capacity while it waits
 on weights. Prefill is **compute-bound**. Put a slice of prefill into a decode
 step and it largely fills capacity that was going unused.
 
@@ -68,7 +68,7 @@ budget = max_batched_tokens - n_decode_tokens   # decode gets priority
 chunk = min(budget, remaining_prompt_tokens)
 ```
 
-Decode tokens are counted first — running users are protected — and prefill fills
+Decode tokens are counted first (running users are protected) and prefill fills
 whatever's left. Chunk size is the tuning dial:
 
 | Chunk size | p99 | Throughput | Why |
@@ -77,13 +77,13 @@ whatever's left. Chunk size is the tuning dial:
 | **medium (512)** | good | good | the usual sweet spot |
 | huge (8192) | bad | best | you've re-created the original problem |
 
-Chunk too small and prefill stops being efficient — its whole advantage was doing
+Chunk too small and prefill stops being efficient, its whole advantage was doing
 many tokens at once. Chunk too large and you're back to stalling.
 
 ### State this needs
 
 A partially-prefilled sequence must remember where it stopped. That's what
-`Sequence.num_prefilled` is for — already in `engine/sequence.py`:
+`Sequence.num_prefilled` is for, already in `engine/sequence.py`:
 
 ```python
 @property
@@ -133,7 +133,7 @@ memory pressure with no output, and every request's TTFT gets worse.
 
 One caveat: the *last* chunk of a prefill produces the first token, so that step
 is both a prefill and a decode for that sequence. Getting this boundary wrong
-gives you a duplicated or missing first token — check it explicitly.
+gives you a duplicated or missing first token, check it explicitly.
 
 ---
 
@@ -160,7 +160,7 @@ damage was, and `Request.tag` marks them.
 
 **p99 improves, substantially.** This is the headline.
 
-**Mean barely moves.** Total work is unchanged — you redistributed it. If you only
+**Mean barely moves.** Total work is unchanged, you redistributed it. If you only
 watch the mean you'll conclude this lecture did nothing, which is exactly the
 trap Lecture 04 warned about.
 
@@ -175,14 +175,14 @@ should see the trade directly.
 ## Go deeper
 
 - **[SARATHI: Efficient LLM Inference by Piggybacking Decodes with Chunked Prefills](https://arxiv.org/abs/2308.16369)**
-  (Agrawal et al., 2023) — the origin. "Piggybacking" is exactly the mechanism:
+  (Agrawal et al., 2023): the origin. "Piggybacking" is exactly the mechanism:
   prefill rides along in capacity decode wasn't using.
 - **[Taming Throughput-Latency Tradeoff (Sarathi-Serve)](https://arxiv.org/abs/2403.02310)**
-  — the follow-up, with stall-free scheduling.
-- **Kiely §5.3.4** (p.141) — long-context handling, where this matters most.
+ : the follow-up, with stall-free scheduling.
+- **Kiely §5.3.4** (p.141), long-context handling, where this matters most.
 - **vLLM `vllm/v1/core/sched/scheduler.py`** — chunked prefill is on by default in
   V1. Look for the token-budget accounting.
-- **Gordić, *Inside vLLM*** — has a chunked-prefill section. Still hold off until
+- **Gordić, *Inside vLLM***, has a chunked-prefill section. Still hold off until
   Lecture 14, but note it exists.
 
 ---
@@ -209,5 +209,5 @@ uv run python book/code/spec_bench.py
 ```
 
 **Report acceptance rate alongside tok/s, always.** Without it you cannot tell a
-real win from a lucky one — and the same code looks like magic on
+real win from a lucky one, and the same code looks like magic on
 `code_completion` and useless on `prose`.

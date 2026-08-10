@@ -1,6 +1,6 @@
 # 23 — MoE and expert parallelism
 
-**Build:** `jaxlm/moe.py` — routing and a small MoE layer
+**Build:** `jaxlm/moe.py`, routing and a small MoE layer
 **Test:** `tests/test_23_moe.py` · **Moves:** understanding of why frontier models are shaped this way
 **Prereq:** [22 — Tensor parallelism](22-tensor-parallelism.md)
 
@@ -9,8 +9,8 @@
 ## The problem
 
 Every model in this book so far is **dense**: every parameter participates in every
-token. Doubling parameters doubles the compute per token, and — since decode is
-memory-bound — doubles the bytes you must move per token.
+token. Doubling parameters doubles the compute per token, and, since decode is
+memory-bound, doubles the bytes you must move per token.
 
 That's a hard ceiling on capacity. Mixture of Experts breaks it.
 
@@ -50,7 +50,7 @@ Go back to Lecture 02 and re-derive it.
 
 **Memory capacity requirement stays enormous** — all weights resident.
 
-**Memory *bandwidth* per token falls** — you only read the active experts.
+**Memory *bandwidth* per token falls**, you only read the active experts.
 
 Note what this does **not** say. Arithmetic intensity is roughly *unchanged* —
 compute and bytes both fall by the same active/total factor, so you haven't moved
@@ -81,7 +81,7 @@ The tradeoff, and it's a clean one:
 | Optimizes | **latency** | **throughput** |
 | Scales to | within a node | across nodes |
 
-EP moves less data — routed tokens are smaller than full activations — which is
+EP moves less data (routed tokens are smaller than full activations) which is
 why it survives lower-bandwidth interconnects and scales multi-node where TP
 doesn't.
 
@@ -106,16 +106,16 @@ and it's why MoE serving has more variance than dense serving.
 
 ## Build it
 
-Small scale — the concepts, not a production MoE:
+Small scale: the concepts, not a production MoE:
 
 1. Implement a router (top-k over a linear projection) and a few small experts in
    `jaxlm/moe.py`.
-2. `uv run pytest tests/test_23_moe.py -v` — verify top-k selection and that the
+2. `uv run pytest tests/test_23_moe.py -v`, verify top-k selection and that the
    output matches a dense-equivalent reference for a single expert.
 3. **Measure routing distribution** on real token sequences. Plot tokens per
    expert. Even with a randomly initialized router, note how uneven it is.
 4. Shard experts across devices with `jax.sharding` and observe the all-to-all in
-   the HLO — the EP analogue of Lecture 22's all-reduce.
+   the HLO: the EP analogue of Lecture 22's all-reduce.
 5. **Compute the arithmetic intensity** of an MoE layer versus a dense layer of
    the same total parameter count. That number is the whole argument for MoE.
 

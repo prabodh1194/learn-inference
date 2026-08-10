@@ -1,7 +1,7 @@
 # 15 — Profiling
 
 **Build:** `kernels/profile_engine.py` · **Test:** `tests/test_15_profiling.py` (cuda)
-**Moves:** nothing — this decides what's *worth* moving · **Prereq:** [14 — Reading vLLM](14-reading-vllm.md)
+**Moves:** nothing; this decides what's *worth* moving · **Prereq:** [14 — Reading vLLM](14-reading-vllm.md)
 
 > **NVIDIA GPU required** for Nsight. `torch.profiler` works on MPS with reduced
 > detail, so you can practise the method on a laptop.
@@ -11,7 +11,7 @@
 ## The problem
 
 Part III is about making kernels faster. Before writing a single one, you need to
-know **which** kernel — because the honest answer is usually not the one you'd
+know **which** kernel, because the honest answer is usually not the one you'd
 guess.
 
 Optimizing without profiling is how people spend a weekend on a kernel that
@@ -41,7 +41,7 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=25))
 ```
 
 Compare `Self CPU total` against `Self CUDA total`. CPU much higher means you're
-launch-bound — go back to Lecture 13.
+launch-bound, go back to Lecture 13.
 
 ### 2. Where does GPU time actually go?
 
@@ -88,7 +88,7 @@ The discipline that makes profiling useful rather than a hobby:
 
 1. **Measure first.** Get a baseline with `bench/`.
 2. **Profile.** Rank kernels by total time.
-3. **Pick the top item.** Not the interesting one — the top one.
+3. **Pick the top item.** Not the interesting one: the top one.
 4. **Check the ceiling.** If it's at 85% of peak bandwidth, the win is small;
    move on. This step prevents most wasted effort.
 5. **Optimize.** One change.
@@ -103,7 +103,7 @@ Step 6 is the one people skip. A kernel 2× faster that was 4% of runtime buys y
 
 Same trap as Lecture 04, one level down. First iterations include CUDA context
 setup, autotuning, and lazy initialization. Always discard warmup iterations, and
-profile a **steady-state** decode loop rather than a cold start — that's what your
+profile a **steady-state** decode loop rather than a cold start: that's what your
 server actually spends its life doing.
 
 ---
@@ -113,7 +113,7 @@ server actually spends its life doing.
 1. Write `kernels/profile_engine.py`: run your engine under `torch.profiler`,
    emit a ranked kernel table.
 2. Profile **decode at batch 1** and **decode at batch 32**. The rankings will
-   differ — note how.
+   differ, note how.
 3. Profile **prefill** separately. Different phase, different bottleneck,
    different ranking (Lecture 01).
 4. Run `ncu` on your top kernel. Record achieved bandwidth vs. peak.
@@ -130,7 +130,7 @@ both down.
 
 ## What you should see
 
-**At batch 1**, launch overhead may dominate everything — the Lecture 13 signature.
+**At batch 1**, launch overhead may dominate everything: the Lecture 13 signature.
 
 **At batch 32**, real compute takes over and linear layers lead.
 
@@ -148,7 +148,7 @@ Part II. That gap is Lecture 17's target.
   with the "Speed of Light" section; it's the roofline in tool form.
 - **[PyTorch Profiler recipe](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html)**
   — including the Chrome trace export, which is easier to read than the table.
-- **Kiely §4.5.3** (p.114) — profiling in an inference context.
+- **Kiely §4.5.3** (p.114), profiling in an inference context.
 - **Kiely §4.1.1–4.1.2** (p.98) — CUDA kernels and kernel selection, useful
   vocabulary before Lecture 16.
 

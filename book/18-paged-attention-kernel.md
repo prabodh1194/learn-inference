@@ -1,7 +1,7 @@
 # 18 — A paged attention kernel
 
 **Build:** `kernels/triton/paged_attention.py` · **Test:** `tests/test_18_paged_kernel.py` (cuda)
-**Moves:** decode attention latency — recovers what Lecture 09 cost you
+**Moves:** decode attention latency, recovers what Lecture 09 cost you
 **Prereq:** [17 — FlashAttention](17-flash-attention.md), [09 — Paged attention](09-paged-attention.md)
 
 ---
@@ -18,7 +18,7 @@ return flat[:seq_len]                           # and trim
 ```
 
 That reassembles the entire logical K/V sequence in HBM before attention even
-starts — reintroducing exactly the round-trip Lecture 17 just eliminated. You
+starts, reintroducing exactly the round-trip Lecture 17 just eliminated. You
 have FlashAttention and paging, and they're fighting each other.
 
 The fix is to teach the kernel to read block tables directly.
@@ -45,7 +45,7 @@ block_id = tl.load(block_table_ptr + block_idx)      # where does this tile live
 k_tile = tl.load(K_cache + block_id * block_stride + offsets)
 ```
 
-One extra load — the block table lookup — per tile. The block table is tiny and
+One extra load (the block table lookup) per tile. The block table is tiny and
 stays in cache, so the overhead is small. The gather disappears entirely.
 
 ### Decode is the special case
@@ -53,8 +53,8 @@ stays in cache, so the overhead is small. The gather disappears entirely.
 Prefill attends with many queries. **Decode has exactly one query token** attending
 over the whole cached context. That changes the shape of the problem:
 
-- No query tiling — one row.
-- No causal masking within the tile — the single query attends to everything
+- No query tiling, one row.
+- No causal masking within the tile: the single query attends to everything
   cached, all of which precedes it.
 - The whole kernel is dominated by **streaming K/V from memory**, which is
   Lecture 02's memory-bound decode, in kernel form.
@@ -88,7 +88,7 @@ attention scales down to batch 1 without wasting the GPU.
 
 1. Start from your Lecture 17 kernel. Change **only** the K/V addressing to go
    through the block table.
-2. `uv run pytest tests/test_18_paged_kernel.py -v` — must match both your
+2. `uv run pytest tests/test_18_paged_kernel.py -v`, must match both your
    contiguous FlashAttention **and** the Part II PyTorch path. Three
    implementations agreeing is strong evidence.
 3. Handle the **partial last block**: a sequence of 37 tokens with `block_size=16`
@@ -102,7 +102,7 @@ attention scales down to batch 1 without wasting the GPU.
 
 ## What you should see
 
-**Large speedup versus the gather**, growing with context length — you removed a
+**Large speedup versus the gather**, growing with context length, you removed a
 copy proportional to sequence length.
 
 **Most of Lecture 09's per-step cost recovered.** Paging becomes close to free,
@@ -115,7 +115,7 @@ remaining gap is in the linear layers.
 
 ## Go deeper
 
-- **[PagedAttention / vLLM](https://arxiv.org/abs/2309.06180)** §4 — re-read now
+- **[PagedAttention / vLLM](https://arxiv.org/abs/2309.06180)** §4, re-read now
   that you've written the kernel; the memory-manager design reads differently.
 - **[FlashDecoding](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)** —
   the context-splitting idea, explained well and short.

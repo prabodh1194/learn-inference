@@ -2,15 +2,15 @@
 
 **Build:** `engine/model.py::load`, `engine/generate.py::generate_naive`
 **Test:** `tests/test_03_generation.py` · **Demo:** `book/code/recomputation.py`
-**Moves:** your first real number — tok/s and the shape of the curve
+**Moves:** your first real number, tok/s and the shape of the curve
 **Prereq:** [02 — Arithmetic intensity](02-arithmetic-intensity.md)
 
 ---
 
 ## The problem
 
-Time to write code. You'll write the *slowest reasonable* generation loop — no
-cache, no batching — and measure exactly how badly it scales.
+Time to write code. You'll write the *slowest reasonable* generation loop, no
+cache, no batching, and measure exactly how badly it scales.
 
 This is deliberate. Everything in Part II is a fix for something you're about to
 feel. Skip this and the KV cache is a fact you memorized; do it and the KV cache
@@ -42,7 +42,7 @@ Generating 512 tokens from a 64-token prompt, with no cache:
         2048         2,227,200          136.5x
 ```
 
-16× the output, 136× the work — heading for quadratic. (Not the full 256×:
+16× the output, 136× the work, heading for quadratic. (Not the full 256×:
 the fixed 64-token prompt contributes a large linear term at these lengths.)
 
 ---
@@ -62,7 +62,7 @@ for _ in range(max_tokens):
 ```
 
 Correct, and wasteful in a specific way. On step `n` the model computes keys and
-values for all `n` tokens — but tokens `0..n-2` haven't changed since last step,
+values for all `n` tokens, but tokens `0..n-2` haven't changed since last step,
 and neither have their K/V. Attention is causal: token 5's key never depends on
 token 6. Recomputing it is pure waste.
 
@@ -97,7 +97,7 @@ def load(model_id=MODEL_ID, device=None, dtype=None):
 
 Use **float32 on MPS** to start. fp16 on Apple silicon has accuracy quirks that
 will make the correctness test fail for reasons that have nothing to do with your
-loop — fight one battle at a time.
+loop, fight one battle at a time.
 
 **2. Implement `engine/generate.py::generate_naive`** using the sketch above.
 
@@ -107,15 +107,15 @@ loop — fight one battle at a time.
 uv run pytest tests/test_03_generation.py -v
 ```
 
-On a fresh checkout these **skip** (`4 skipped`) — they need the model
+On a fresh checkout these **skip** (`4 skipped`), they need the model
 downloaded and `generate_naive` implemented. That is expected, not a failure.
 
 Your greedy output must match HuggingFace's **exactly**. Greedy is deterministic,
 so a mismatch is a bug, not noise. This test is the foundation for the rest of
-the course — from Lecture 05 on, every faster version is checked against the same
+the course, from Lecture 05 on, every faster version is checked against the same
 reference, so you find out the moment speed costs you correctness.
 
-**4. Measure — the actual point of the lecture:**
+**4. Measure: the actual point of the lecture:**
 
 ```bash
 uv run python book/code/naive_bench.py
@@ -137,7 +137,7 @@ roofline numbers you computed in Lecture 02 need updating.
 
 Per-token time climbing with position, roughly linearly.
 
-If it looks **flat at short lengths**, that's not a contradiction — it's fixed
+If it looks **flat at short lengths**, that's not a contradiction: it's fixed
 overhead (Python, kernel launches) dominating while sequences are short. The
 quadratic term wins eventually. Note where the bend happens; that crossover point
 is itself informative, and it's what Lecture 13 (CUDA graphs) attacks.
@@ -149,7 +149,7 @@ Save the plot. Lecture 05 overlays the cached version on it.
 ## Go deeper
 
 - **Kiely §2.2** (p.46–49) — LLM inference mechanics.
-- **[Attention Is All You Need](https://arxiv.org/abs/1706.03762)** §3.2.3 — the
+- **[Attention Is All You Need](https://arxiv.org/abs/1706.03762)** §3.2.3, the
   causal masking that makes caching valid at all.
 - **HuggingFace `generate()`** — `transformers/generation/utils.py`. Enormous,
   because it handles beam search, constraints, stopping criteria. Yours does one
@@ -160,7 +160,7 @@ Save the plot. Lecture 05 overlays the cached version on it.
 ## Check yourself
 
 1. Your measured curve: linear, quadratic, or flat? Does it match your
-   prediction? *(If not — write down why you were wrong. That's the valuable
+   prediction? *(If not, write down why you were wrong. That's the valuable
    part.)*
 2. The demo says 99.7% of K/V work is wasted. Your measured slowdown from 128 →
    1024 tokens is smaller than 64×. What else is the GPU spending time on?

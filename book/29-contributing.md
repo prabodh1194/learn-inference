@@ -43,7 +43,7 @@ credibly change.
 **Good first issues.** [vLLM](https://github.com/vllm-project/vllm/labels/good%20first%20issue)
 and [SGLang](https://github.com/sgl-project/sglang/labels/good%20first%20issue).
 After Parts II–III, scheduler, block-manager, and kernel issues are genuinely
-approachable — you've implemented all three.
+approachable, you've implemented all three.
 
 **Reproduce a bug report.** Underrated and very welcome. Someone reports a
 throughput regression; you reproduce it with a minimal case and post a profile.
@@ -71,7 +71,7 @@ The strongest single exercise, and you have the substrate for it:
 - **A KV-cache compression method** — measured with your L19 quality harness.
 
 Pick one, implement it against your engine, and measure. When your numbers differ
-from the paper's, work out why — that investigation is where most of the learning
+from the paper's, work out why, that investigation is where most of the learning
 is.
 
 ---
@@ -88,7 +88,7 @@ second; use them.
 *why* it wasn't done is often more informative than the idea.
 
 **Accept that some things are known and unfixed.** Maintainers juggle constraints
-you can't see — backwards compatibility, hardware coverage, release timing.
+you can't see, backwards compatibility, hardware coverage, release timing.
 
 ---
 
@@ -120,14 +120,14 @@ A benchmark without a stated workload says nothing.
 
 **Keep the failures.** The kernel that came out slower, the optimization that did
 nothing, the prediction that was wrong. Those entries in `notes/` are worth more
-than the successes — they're the record of your model of the machine being
+than the successes, they're the record of your model of the machine being
 corrected.
 
 ---
 
 ## Go deeper
 
-- **Kiely Appendix B** (p.231–256) — curated reading by topic.
+- **Kiely Appendix B** (p.231–256), curated reading by topic.
 - **vLLM `CONTRIBUTING.md`** and the RFC process for larger changes.
 - **[vLLM Slack / SGLang Discord]** — where design discussion actually happens.
 - **[Appendix B](appendix-b-reading.md)** — this book's papers, indexed to

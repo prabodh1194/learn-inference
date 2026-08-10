@@ -12,7 +12,7 @@ You measured it: static batching wastes **61% of decode slots** on realistic
 traffic, and the waste gets *worse* as batches get bigger.
 
 The cause is structural, not a tuning issue. A static batch is fixed for its
-lifetime — a sequence that finishes at step 8 holds its slot until step 512
+lifetime, a sequence that finishes at step 8 holds its slot until step 512
 because the batch cannot change shape mid-flight.
 
 So make it change shape mid-flight.
@@ -93,7 +93,7 @@ Here's the tension that Lecture 11 exists to resolve. Admitting a new request
 means running its prefill, which is expensive and *compute-bound*. Meanwhile
 every running sequence wants a cheap *memory-bound* decode step.
 
-Mix them and prefill dominates the step — every decoding user stalls. This is why
+Mix them and prefill dominates the step, every decoding user stalls. This is why
 naive continuous batching improves throughput while making **p99 latency worse**.
 
 Watch for that in your measurements. It's a real effect, and noticing it yourself
@@ -150,7 +150,7 @@ makes the slot available in the *same* step. Do it in the other order and you
 add a step of latency to every admission.
 
 **`break`, not `continue`.** When the head of the queue doesn't fit, stop. Skipping
-past it to admit a smaller request behind is head-of-line jumping — it starves
+past it to admit a smaller request behind is head-of-line jumping, it starves
 long requests indefinitely under load. Simple FIFO is fair and predictable;
 deviate deliberately, not accidentally.
 
@@ -166,8 +166,8 @@ accounting, but note the hook now.
 1. Implement `Sequence` and `Status` in `engine/sequence.py`.
 2. Implement `Scheduler.schedule()` in `engine/scheduler.py`.
 3. Restructure generation into `scheduler.schedule()` → `runner.step()` → repeat.
-   This is a real refactor, not a patch — expect to move code around.
-4. `uv run pytest tests/test_08_scheduler.py -v` — scheduler logic is tested
+   This is a real refactor, not a patch, expect to move code around.
+4. `uv run pytest tests/test_08_scheduler.py -v`, scheduler logic is tested
    **without the model**, so iterate fast on the hard part.
 5. Measure on the workload that shows it:
 
@@ -198,14 +198,14 @@ That's Lecture 11.
 ## Go deeper
 
 - **[Orca: A Distributed Serving System for Transformer-Based Generative Models](https://www.usenix.org/conference/osdi22/presentation/yu)**
-  (Yu et al., OSDI '22) — the source. "Iteration-level scheduling" is their term
+  (Yu et al., OSDI '22): the source. "Iteration-level scheduling" is their term
   for what you just built. §3 is the core.
 - **vLLM `vllm/v1/core/sched/scheduler.py`** — read `schedule()` now. It's your
   function plus chunked prefill, prefix caching, preemption, and specdec. You'll
   recognize the skeleton.
 - **nano-vllm `nanovllm/engine/scheduler.py`** — ~3.7KB, much closer to what you
   just wrote. Good for a direct diff.
-- **Kiely §7.2.1** (p.186) — concurrency and batch sizing in production.
+- **Kiely §7.2.1** (p.186), concurrency and batch sizing in production.
 - **[Field notes](field-notes.md)** — 100 tok/s single-user vs. 585 tok/s across 8.
 
 ---

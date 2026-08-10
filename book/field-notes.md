@@ -3,7 +3,7 @@
 What practitioners report, gathered from r/LocalLLaMA. Books give you the
 mechanism; these give you the magnitudes and the disappointments.
 
-Treat them as **calibration, not gospel** — hardware, model, and quant differ,
+Treat them as **calibration, not gospel**, hardware, model, and quant differ,
 and a single reported number is not a benchmark. Where a claim here contradicts
 what you measure yourself, believe your own measurement.
 
@@ -28,7 +28,7 @@ production number, and it's why TTFT and TPS get tuned separately.
 Same setup: **~100 tok/s for one user, 585 tok/s across 8 concurrent requests.**
 
 Per-user speed barely moved; aggregate went up ~6×. Exactly the prediction from
-Lecture 01's batching table — memory traffic is fixed, so extra sequences ride
+Lecture 01's batching table, memory traffic is fixed, so extra sequences ride
 along nearly free.
 
 It also shows why "tokens per second" is a near-meaningless claim without saying
@@ -41,7 +41,7 @@ Two findings that matter more than any tutorial:
 
 **Documented defaults are a starting point, not an answer.** The 2×3090 operator
 found docs recommending 3 draft tokens; measuring *mean acceptance length* showed
-5 was better for their workload — and above 5, performance got measurably
+5 was better for their workload, and above 5, performance got measurably
 **worse**. More speculation is not more speed: rejected drafts cost real compute.
 
 **The workload decides the win.** A widely-upvoted report on Gemma-class models
@@ -50,7 +50,7 @@ predictable, so drafts get accepted; prose is novel, so they don't.
 
 This is precisely why `bench/workloads.py` ships both `code_completion` and
 `prose`. If you only benchmark one, you'll conclude speculative decoding is
-either magic or useless — and you'll be wrong either way.
+either magic or useless, and you'll be wrong either way.
 
 ## Quantization interacts with your specific hardware — **L19**
 
@@ -59,7 +59,7 @@ support**, and separately noted that **linear attention layers quantize poorly**
 so they kept those at full precision while quantizing the rest to int4.
 
 Two lessons:
-1. The right quantization format depends on what your silicon accelerates — this
+1. The right quantization format depends on what your silicon accelerates, this
    is not a pure accuracy/size tradeoff.
 2. **Mixed precision across layer types** is normal in practice. "Quantize the
    model" is rarely the actual operation.
@@ -93,7 +93,7 @@ chess PGN, track the board state and render it as SVG.
 Two things worth stealing:
 
 **A task exposes what perplexity hides.** Degradation showed up as *wrong piece
-placement* and *wrong board orientation* — structured-reasoning failures that a
+placement* and *wrong board orientation*, structured-reasoning failures that a
 small perplexity delta wouldn't reveal.
 
 **Deliberately out-of-distribution inputs.** The author used nonsense chess moves
@@ -115,7 +115,7 @@ you should use pipeline parallelism instead of tensor parallelism
 guides say it shouldn't.
 
 They also found `--max-num-seqs 16` was the single knob that "controls whether it
-feels like a sports car or a fax machine" — a scheduler concurrency limit
+feels like a sports car or a fax machine", a scheduler concurrency limit
 (Lecture 08's `max_batch_size`) mattering more than the parallelism strategy.
 
 The lesson isn't "TP always wins." It's that **rules of thumb about interconnect
@@ -126,7 +126,7 @@ benchmarking beats a blog post. Measure your own scaling curve in Lecture 22.
 
 Reports circulate of projects compressing the **KV cache** rather than the
 weights, claiming 3–5× compression. Unlike the entries above, I have no specific
-source for this one — treat the number as hearsay until you measure it. Worth knowing because it attacks a different
+source for this one, treat the number as hearsay until you measure it. Worth knowing because it attacks a different
 bottleneck than weight quantization: from Lecture 05, the cache can exceed the
 model's size at long context, and from Lecture 09, cache capacity directly caps
 your batch size.

@@ -1,6 +1,6 @@
 # 04 — Measuring
 
-**Build:** nothing — read `bench/harness.py` · **Test:** `tests/test_04_measuring.py`
+**Build:** nothing, read `bench/harness.py` · **Test:** `tests/test_04_measuring.py`
 **Moves:** your confidence that any of this is real · **Prereq:** [03](03-naive-generation.md)
 
 ---
@@ -45,7 +45,7 @@ elapsed = time.perf_counter() - start
 ```
 
 `bench/harness.py::synchronize` handles this for both CUDA and MPS. **Use the
-harness rather than hand-rolling `time.perf_counter()`** — this is the single
+harness rather than hand-rolling `time.perf_counter()`**: this is the single
 most common way to fool yourself, and it fools you in the flattering direction.
 
 A related trap: **the first call is always slow.** CUDA context setup, kernel
@@ -71,7 +71,7 @@ with 4 tokens there are 3 gaps.
 The one non-negotiable reporting rule.
 
 A mean hides its tail completely. 40ms mean with a 2s p99 means one user in a
-hundred waits two seconds — and the mean cheerfully reports "40ms." Users
+hundred waits two seconds, and the mean cheerfully reports "40ms." Users
 experience the tail, not the average.
 
 The tests demonstrate this directly:
@@ -85,9 +85,9 @@ assert d.mean < 10.0         # mean hides both
 ```
 
 **A caveat about your own p99.** Percentiles interpolate between samples, so a
-p99 from 100 requests is essentially one data point — noisy and not to be
+p99 from 100 requests is essentially one data point, noisy and not to be
 trusted. Want a real p99? Thousands of requests (Lecture 25). There's a test showing the failure
-directly: with 100 samples, a single large outlier lands at p99 *below* 10 — the
+directly: with 100 samples, a single large outlier lands at p99 *below* 10, the
 estimate is biased low, not merely noisy.
 
 ### Throughput and latency trade against each other
@@ -117,7 +117,7 @@ uv run pytest tests/test_04_measuring.py -v
 
 **3. Prove the async trap to yourself.** Time a forward pass with and without
 `synchronize()`. On MPS or CUDA the unsynchronized version will look absurdly
-fast. Record both numbers in your notes — seeing the fake number yourself is
+fast. Record both numbers in your notes, seeing the fake number yourself is
 worth more than trusting this lecture.
 
 **4. Re-examine your Lecture 03 results.** Did you use the harness? Warm up? If
@@ -129,7 +129,7 @@ not, rerun. Better to redo it now than to build five lectures on bad baselines.
 
 - **Kiely §1.4–1.4.2** (p.35–37) — TTFT/TPOT and percentiles as product metrics,
   plus end-to-end measurement including network overhead.
-- **Kiely §4.5.1–4.5.2** (p.113–114) — benchmarking tooling and practical tips.
+- **Kiely §4.5.1–4.5.2** (p.113–114), benchmarking tooling and practical tips.
 - **vLLM `benchmarks/benchmark_serving.py`** — the real thing. Note how much of
   it is about *generating realistic load* rather than timing; that ratio is the
   lesson.
@@ -160,5 +160,5 @@ curve you just plotted finally flattens.
 uv run python book/code/naive_bench.py --cached
 ```
 
-Overlay it on your L03 plot. **Check the slope, not just the speedup** — a
+Overlay it on your L03 plot. **Check the slope, not just the speedup**, a
 faster number is expected; a *flat line* is the actual result.

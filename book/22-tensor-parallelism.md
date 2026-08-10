@@ -1,7 +1,7 @@
 # 22 — Tensor parallelism
 
 **Build:** `jaxlm/sharding.py`, then TP by hand in `engine/`
-**Test:** `tests/test_22_tp.py` (cuda, multi-GPU) · **Moves:** per-user latency — and reveals where scaling stops
+**Test:** `tests/test_22_tp.py` (cuda, multi-GPU) · **Moves:** per-user latency, and reveals where scaling stops
 **Prereq:** [21 — JAX and XLA](21-jax-and-xla.md)
 
 > **Two or more GPUs required.** On Vast.ai, a 2×3090 box. Sharding *logic* can be
@@ -36,7 +36,7 @@ Three ways to split a model:
 | **Expert (EP)** | MoE experts across GPUs | token routing | MoE throughput (L23) |
 
 TP is the default for single-node inference because every GPU works on *every*
-token — no pipeline bubbles, and latency genuinely drops.
+token, no pipeline bubbles, and latency genuinely drops.
 
 ### How the split works
 
@@ -67,7 +67,7 @@ per forward pass. That's the cost, and it's why interconnect matters.
 
 ### Why scaling isn't linear
 
-Compute per GPU divides by N. Communication does not shrink with it — a ring
+Compute per GPU divides by N. Communication does not shrink with it, a ring
 all-reduce moves `2(N-1)/N · S` bytes per rank, which *approaches* a constant 2S
 rather than falling like `compute/N`.
 
@@ -86,7 +86,7 @@ happens depends on interconnect:
 | **PCIe 5 ×16** | **~64 GB/s each way (~128 bidirectional)** |
 
 *(NVIDIA's published figures as of 2026; NVLink numbers are bidirectional per
-GPU. Rubin is announced, not shipping — check before planning around it.)*
+GPU. Rubin is announced, not shipping, check before planning around it.)*
 
 **Roughly an order of magnitude, in the thing that isn't parallelized** — and the
 gap has widened with each NVLink generation, not narrowed. This is why the same
@@ -102,13 +102,13 @@ Conventional guidance says: low interconnect bandwidth → use pipeline parallel
 instead of TP.
 
 The [field notes](field-notes.md) record an operator with **2× GH200 and no
-NVLink** (PCIe only — they quote 125 GB/s against NVLink's 900) who followed
+NVLink** (PCIe only, they quote 125 GB/s against NVLink's 900) who followed
 exactly that advice.
 **Pipeline parallel lost. TP2 won.** On the hardware profile where guides say it
 shouldn't.
 
-The same operator found `--max-num-seqs 16` — a scheduler concurrency limit from
-Lecture 08 — mattered more than the parallelism strategy did.
+The same operator found `--max-num-seqs 16`, a scheduler concurrency limit from
+Lecture 08, mattered more than the parallelism strategy did.
 
 Take the lesson generally: **rules of thumb about parallelism are workload- and
 model-dependent.** Measure your own scaling curve. That's the actual deliverable
@@ -153,7 +153,7 @@ class RowParallelLinear(nn.Module):
         return out
 ```
 
-Now you're placing the collective yourself — in the position XLA chose for you.
+Now you're placing the collective yourself, in the position XLA chose for you.
 Compare against nano-vllm's `layers/linear.py`, which does exactly this.
 
 ---
@@ -164,7 +164,7 @@ Compare against nano-vllm's `layers/linear.py`, which does exactly this.
 2. Find the inserted all-reduce in the HLO.
 3. Implement `ColumnParallelLinear` / `RowParallelLinear` in PyTorch with NCCL.
 4. Verify TP output matches single-GPU output exactly.
-5. **Measure the scaling curve** at 1, 2, 4 GPUs — plot with
+5. **Measure the scaling curve** at 1, 2, 4 GPUs, plot with
    `bench/plot.py::scaling`, which takes measured throughput against ideal linear.
 6. Find where it goes sublinear, and check `nvidia-smi topo -m` to see whether
    you have NVLink or PCIe.
@@ -195,7 +195,7 @@ one user faster. That's the trade, and it's the right one only sometimes.
 - **[Megatron-LM](https://arxiv.org/abs/1909.08053)** (Shoeybi et al.) — §3 has
   the column/row split you just implemented. The original.
 - **Kiely §5.4–5.4.1** (p.142–145) — TP/PP/EP compared, and TP for latency.
-- **Kiely §5.4.3** (p.146) — multi-node, where TP stops being the answer.
+- **Kiely §5.4.3** (p.146), multi-node, where TP stops being the answer.
 - **nano-vllm `nanovllm/layers/linear.py`** — a readable production TP
   implementation.
 - **[Field notes](field-notes.md)** — the GH200 case where PP lost to TP without
@@ -220,5 +220,5 @@ one user faster. That's the trade, and it's the right one only sometimes.
 different axis to split along, and how most frontier open models are now built.
 
 The distinction to get exactly right: **total vs. active parameters.**
-DeepSeek-V3 is 671B total and 37B active — and you must hold all 671B in VRAM,
+DeepSeek-V3 is 671B total and 37B active, and you must hold all 671B in VRAM,
 because the router might pick any expert.

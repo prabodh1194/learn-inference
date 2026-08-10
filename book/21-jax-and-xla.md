@@ -1,14 +1,14 @@
 # 21 — JAX and XLA
 
 **Build:** `jaxlm/model.py`, `jaxlm/decode.py` · **Test:** `tests/test_21_jax.py`
-**Moves:** nothing directly — it changes how you *think* about the next two lectures
+**Moves:** nothing directly, it changes how you *think* about the next two lectures
 **Prereq:** [20 — Raw CUDA](20-raw-cuda.md)
 
 ---
 
 ## Why JAX is in this book
 
-You've spent Part III controlling the machine directly — kernels, memory, threads.
+You've spent Part III controlling the machine directly, kernels, memory, threads.
 JAX is the opposite philosophy, and seeing both is the point.
 
 > **PyTorch:** you say *how*. Write the kernel, place the tensor, insert the
@@ -16,7 +16,7 @@ JAX is the opposite philosophy, and seeing both is the point.
 > **JAX/XLA:** you say *what*, and annotate constraints. The compiler decides how.
 
 That matters here for one specific reason: **sharding**. In Lecture 22 you'll do
-tensor parallelism twice — once declaratively in JAX, where you annotate a layout
+tensor parallelism twice, once declaratively in JAX, where you annotate a layout
 and XLA inserts the collectives, and once by hand in PyTorch with explicit
 `all_reduce` calls.
 
@@ -33,7 +33,7 @@ is increasingly expressed.
 
 ### Pure functions and explicit state
 
-JAX functions must be pure — no mutation, no hidden state. Parameters go in as
+JAX functions must be pure, no mutation, no hidden state. Parameters go in as
 arguments:
 
 ```python
@@ -58,7 +58,7 @@ def decode_step(params, token, cache):
     return forward(params, token, cache)
 ```
 
-The first call traces the function into an XLA graph and compiles it — fusing
+The first call traces the function into an XLA graph and compiles it, fusing
 operations, allocating buffers, eliminating dead code. Later calls run the
 compiled artifact.
 
@@ -67,7 +67,7 @@ Two things follow, and both should feel familiar from Lecture 13:
 **Shapes are static.** A new input shape triggers recompilation. Same constraint
 as CUDA graphs, same fix: bucket your shapes and pad.
 
-**The first call is slow.** Compilation time. Warm up before measuring — the
+**The first call is slow.** Compilation time. Warm up before measuring, the
 Lecture 04 rule, again.
 
 ### `scan` for the decode loop
@@ -87,7 +87,7 @@ def decode_body(carry, _):
 )
 ```
 
-The **carry** is loop state — your token and KV cache. This is the same structure
+The **carry** is loop state, your token and KV cache. This is the same structure
 as your PyTorch decode loop, made explicit enough for a compiler to reason about.
 
 ### Read the HLO
@@ -99,7 +99,7 @@ print(jax.jit(decode_step).lower(params, token, cache).compile()
       .as_text()[:4000])
 ```
 
-You see the actual operations XLA chose — fusions, layout assignments, buffer
+You see the actual operations XLA chose, fusions, layout assignments, buffer
 reuse. Compare against a `torch.compile` dump of the same model. **Two compilers,
 same problem, different decisions.** Where they differ is where you learn what
 compilation is actually doing.
@@ -108,7 +108,7 @@ compilation is actually doing.
 
 ## Build it
 
-1. Implement Qwen3's forward pass in `jaxlm/model.py` — pure functions, params as
+1. Implement Qwen3's forward pass in `jaxlm/model.py`, pure functions, params as
    a pytree. Load the same weights you've been using.
 2. **Verify numerically against PyTorch** (`tests/test_21_jax.py`). Same weights,
    same input, same logits within fp32 tolerance. Do this before anything else;
@@ -116,7 +116,7 @@ compilation is actually doing.
 3. Implement `scan`-based decode with the KV cache as carry.
 4. Dump and read the HLO. Find one fusion XLA performed that PyTorch eager
    wouldn't.
-5. Benchmark against your PyTorch engine — **after warmup**.
+5. Benchmark against your PyTorch engine, **after warmup**.
 
 **Fair-comparison note:** don't read too much into the headline number. Your JAX
 version has no paging, no continuous batching, no prefix caching. It's a
@@ -145,12 +145,12 @@ one fused region rather than a hundred kernel launches.
 - **[JAX: The Sharp Bits](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html)**
   — read before you debug. Purity, PRNG keys, and shape-static-ness.
 - **[`lax.scan` documentation](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.scan.html)**
-  — the carry/output split takes a moment to click.
+ : the carry/output split takes a moment to click.
 - **[XLA operation semantics](https://openxla.org/xla/operation_semantics)** —
   for reading the HLO.
 - **[MaxText](https://github.com/AI-Hypercomputer/maxtext)** — production JAX LLM
   code; useful for seeing conventions.
-- **Kiely §4.2.3** (p.104) — where compilers sit in the inference stack.
+- **Kiely §4.2.3** (p.104), where compilers sit in the inference stack.
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## The problem
 
-Every number so far came from a benchmark you controlled — fixed batches, requests
+Every number so far came from a benchmark you controlled, fixed batches, requests
 you fired all at once. Real traffic doesn't behave that way.
 
 Requests arrive **randomly**. They **queue**. Latency depends on what else is
@@ -22,7 +22,7 @@ it's a **curve**.
 ### Poisson arrivals, not a fixed loop
 
 Firing 100 requests simultaneously measures a burst. Real arrivals are random with
-some average rate, which means occasional clumps — and clumps are what create
+some average rate, which means occasional clumps, and clumps are what create
 queues, and queues are what create tail latency.
 
 `bench/workloads.py::poisson_arrivals` stamps exponentially-distributed gaps onto
@@ -71,7 +71,7 @@ latency    ^                    /
 ```
 
 Below the knee, throughput rises with load and latency is stable. Above it,
-throughput is flat — you're saturated — and **latency grows without bound** because
+throughput is flat (you're saturated) and **latency grows without bound** because
 the queue does.
 
 **The knee is your operating limit.** Run above it and latency depends on how long
@@ -92,7 +92,7 @@ and it tells you *before* the latency numbers do.
 ### Percentiles need samples
 
 Lecture 04's caveat, now load-bearing. A p99 from 100 requests interpolates
-between your two slowest samples — nearly meaningless. **Thousands of requests**
+between your two slowest samples, nearly meaningless. **Thousands of requests**
 before you quote a p99, and report the sample count alongside it.
 
 ---
@@ -106,7 +106,7 @@ before you quote a p99, and report the sample count alongside it.
 4. **Find your knee.** Record the rate, and p99 at that rate.
 5. Run the same sweep against **real vLLM** on the same hardware and workload.
    That's Lecture 26.
-6. Compare your driver against vLLM's `benchmarks/benchmark_serving.py` — a
+6. Compare your driver against vLLM's `benchmarks/benchmark_serving.py`, a
    sanity check that you're measuring the same thing.
 
 **Predict first:** what request rate do you think is your knee? Write it down.
@@ -119,7 +119,7 @@ Most people guess high.
 **A clear knee**, often at lower load than you expected.
 
 **p99 rising much faster than p50** as you approach it. The tail always goes
-first — which is why Lecture 04 insisted on percentiles.
+first, which is why Lecture 04 insisted on percentiles.
 
 **Queue depth growing without bound** past the knee. This is the unambiguous
 saturation signal.
@@ -131,15 +131,15 @@ saturation signal.
 
 ## Go deeper
 
-- **Kiely §4.5–4.5.2** (p.112–114) — benchmarking tooling and practical tips.
-- **Kiely §1.4.2** (p.37) — end-to-end metrics, including what the client sees.
+- **Kiely §4.5–4.5.2** (p.112–114), benchmarking tooling and practical tips.
+- **Kiely §1.4.2** (p.37), end-to-end metrics, including what the client sees.
 - **vLLM `benchmarks/benchmark_serving.py`** — the standard harness. Note how much
   is realistic load generation rather than timing.
 - **[Open Versus Closed: A Cautionary Tale](https://www.usenix.org/legacy/event/nsdi06/tech/schroeder.html)**
-  (Schroeder et al., NSDI '06) — why the distinction above changes your
+  (Schroeder et al., NSDI '06), why the distinction above changes your
   conclusions. Not LLM-specific and directly applicable.
 - **[Systems Performance](https://www.brendangregg.com/systems-performance-2nd-edition-book.html)**
-  (Gregg) — the USE method and latency analysis generally.
+  (Gregg): the USE method and latency analysis generally.
 
 ---
 

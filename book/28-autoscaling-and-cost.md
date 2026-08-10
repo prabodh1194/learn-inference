@@ -1,7 +1,7 @@
 # 28 — Autoscaling and cost
 
 **Build:** `serve/autoscale.py`, `bench/cost_model.py` · **Test:** `tests/test_28_cost.py`
-**Moves:** dollars per million tokens — the number that decides whether any of this matters
+**Moves:** dollars per million tokens: the number that decides whether any of this matters
 **Prereq:** [27 — Routing and disaggregation](27-routing-and-disaggregation.md)
 
 ---
@@ -17,7 +17,7 @@ The number that actually matters:
 cost per million tokens = (GPU $/hour) / (tokens/hour) × 1,000,000
 ```
 
-It's the metric that unifies everything you've built — and it exposes a cost that
+It's the metric that unifies everything you've built, and it exposes a cost that
 tokens/sec completely hides.
 
 ---
@@ -27,7 +27,7 @@ tokens/sec completely hides.
 ### Fleet utilization dominates
 
 A note on the word, because it does two jobs in this book. **Fleet utilization**
-— below — is the fraction of your paid GPU-hours that do paid work. **GPU
+— below, is the fraction of your paid GPU-hours that do paid work. **GPU
 busy-percentage** is what `nvidia-smi` reports for one card, and it's the
 misleading one (see the autoscaling signal section). They are unrelated.
 
@@ -38,7 +38,7 @@ Work an example. A 3090 at $0.25/hour sustaining 2,000 tok/s:
 $0.25 / 7.2M × 1M = $0.035 per million tokens
 ```
 
-Now at 20% utilization — which is what a real service with diurnal traffic looks
+Now at 20% utilization, which is what a real service with diurnal traffic looks
 like:
 
 ```
@@ -55,7 +55,7 @@ pulling is the skill.
 
 ### Autoscaling and its costs
 
-Scale replicas with demand — but scaling is not free.
+Scale replicas with demand, but scaling is not free.
 
 **Cold starts are brutal.** Provision a GPU node, pull a multi-gigabyte container,
 load weights, warm up CUDA graphs. **Minutes**, not seconds. Scale up reactively
@@ -68,7 +68,7 @@ Mitigations, roughly in order of usefulness:
 - **Scale to zero** for dev and spiky low-volume workloads only
 
 **Scale on the right signal.** CPU utilization is meaningless here. GPU
-busy-percentage is misleading — a memory-bound decode loop shows high utilization while doing
+busy-percentage is misleading, a memory-bound decode loop shows high utilization while doing
 little work. Scale on **queue depth** or **concurrent sequences**: queue depth
 growing is the honest saturation signal from Lecture 25.
 
@@ -77,7 +77,7 @@ growing is the honest saturation signal from Lecture 25.
 From Lecture 25: capacity isn't throughput, it's **throughput at an acceptable
 p99**. Autoscale to keep each replica *below* its knee.
 
-Running replicas past the knee to "use them fully" is the classic mistake — you get
+Running replicas past the knee to "use them fully" is the classic mistake, you get
 marginally more throughput and unbounded latency growth.
 
 ### Where the money actually goes
@@ -102,11 +102,11 @@ Both things are true.
 
 ## Build it
 
-1. `bench/cost_model.py` — takes measured throughput and GPU price, reports cost
+1. `bench/cost_model.py`, takes measured throughput and GPU price, reports cost
    per million tokens across utilization levels.
 2. Compute it for **your** engine and for **vLLM** (Lecture 26's numbers), at 20%,
    50%, and 90% utilization.
-3. `serve/autoscale.py` — scale on queue depth, with a configurable target and
+3. `serve/autoscale.py`, scale on queue depth, with a configurable target and
    cooldown.
 4. **Measure your cold start.** Time from "scale up" to "serving traffic." Be
    honest about it; it's usually worse than people assume.
@@ -114,8 +114,8 @@ Both things are true.
    autoscaled. Report cost *and* p99.
 
 **Predict first:** what's your cost per million tokens at 50% utilization? Compare
-to the published price of a hosted API for a similar model. The gap — in either
-direction — is informative.
+to the published price of a hosted API for a similar model. The gap, in either
+direction, is informative.
 
 ---
 
@@ -137,11 +137,11 @@ reverse.
 
 ## Go deeper
 
-- **Kiely §7.2–7.2.5** (p.183–192) — autoscaling, cold starts, routing, scale to
+- **Kiely §7.2–7.2.5** (p.183–192), autoscaling, cold starts, routing, scale to
   zero, independent component scaling.
-- **Kiely §7.4.2** (p.201) — cost estimation.
-- **Kiely §7.3** (p.193) — multi-cloud capacity, GPU procurement, reliability.
-- **Kiely §7.4.3** (p.203) — observability: what to actually monitor.
+- **Kiely §7.4.2** (p.201), cost estimation.
+- **Kiely §7.3** (p.193), multi-cloud capacity, GPU procurement, reliability.
+- **Kiely §7.4.3** (p.203), observability: what to actually monitor.
 - **[Field notes](field-notes.md)** — the €9k GH200 bought "to save $1.27 on Claude
   Code." Funny, and a real lesson about amortization at low volume.
 
