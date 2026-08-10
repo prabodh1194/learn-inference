@@ -42,6 +42,32 @@ decode          225.5 GF       232960 MiB        0.92
 
 Decode does *half* the compute of prefill and moves **277× more memory**.
 
+That 232,960 is worth deriving rather than accepting, because it's the whole
+argument of this lecture in one number. The demo prints the breakdown:
+
+```
+  weights, re-read once per token      840 MiB x 256 =    215,040 MiB
+  KV cache, re-read and growing                          17,920 MiB
+                                  total      232,960 MiB
+```
+
+**The first line is 92% of it, and it's one multiplication:** 840 MiB of weights,
+re-read to produce *each* of the 256 tokens. Prefill reads the same 840 MiB
+*once*, for all 512 prompt tokens.
+
+The second line is the KV cache, re-read every step and growing as you go
+(context runs 512 → 768, averaging ~640 tokens × 112 KiB × 256 steps). Ignorable
+here at 8%; it takes over past ~8k context, which is a different problem.
+
+**The shape to remember is `weights × tokens generated`.** Not the number.
+
+??? note "Sanity-check it against the hardware"
+    228 GiB ÷ 936 GB/s ≈ **0.26 s**, so ~980 tok/s is the *ceiling* for a single
+    stream on a 3090, set purely by bandwidth. Real engines land well under it,
+    and if you ever measure above it, your measurement is wrong.
+
+    More in the [Q&A](qa.md#where-does-232960-mib-come-from).
+
 **Second**, the per-token table. A generated token costs hundreds to thousands of
 times the memory traffic of a prompt token, and the ratio **widens** as prompts
 get longer, from 34× at a 32-token prompt to 2596× at 2048.

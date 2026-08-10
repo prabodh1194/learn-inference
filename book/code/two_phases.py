@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from book.code.roofline import ModelDims, model_params
 
+# Verified against TechPowerUp; see roofline.py's Device docstring.
+RTX_3090_BANDWIDTH = 936.2e9  # bytes/sec
+
 
 def phase_work(d: ModelDims, prompt_tokens: int, output_tokens: int) -> dict:
     params = model_params(d)
@@ -61,8 +64,29 @@ def main() -> None:
     print(f"\nSame model. Decode moves {ratio:.0f}x more memory than prefill")
     print(f"and does only {w['decode_flops']/w['prefill_flops']:.1f}x the compute.")
 
+    # Break the decode figure down, so it is never a bare number on screen.
+    n_out = 256
+    wb = w["weight_bytes"]
+    weight_total = wb * n_out
+    kv_total = w["decode_bytes"] - weight_total
+    print("\nWhere decode's memory traffic comes from:")
+    print(f"  weights, re-read once per token   "
+          f"{wb/1024**2:6.0f} MiB x {n_out} = {weight_total/1024**2:10,.0f} MiB")
+    print(f"  KV cache, re-read and growing     "
+          f"{'':6}     {'':3}   {kv_total/1024**2:10,.0f} MiB")
+    print(f"  {'':32}total   {w['decode_bytes']/1024**2:10,.0f} MiB")
+
+    # Bandwidth floor for a single stream. Real engines land well under this.
+    seconds = w["decode_bytes"] / RTX_3090_BANDWIDTH
+    print(f"\n  ~= {w['decode_bytes']/1024**3:.0f} GiB to produce {n_out} tokens.")
+    print(f"  At {RTX_3090_BANDWIDTH/1e9:.0f} GB/s that is {seconds:.2f}s minimum,"
+          f" i.e. ~{n_out/seconds:.0f} tok/s")
+    print("  for a single stream on a 3090. That is a CEILING, not a target --")
+    print("  measure above it and your measurement is wrong.")
+
     print("\nWhy: prefill loads the weights ONCE for all 512 tokens.")
     print("Decode reloads all of them for EVERY ONE of the 256 tokens.")
+    print("The shape to remember: decode traffic ~= weights x tokens generated.")
 
     print("\n\nCost PER TOKEN -- the honest comparison")
     print("=" * 62)

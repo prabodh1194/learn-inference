@@ -259,3 +259,50 @@ pass**:
     If weights genuinely crossed PCIe each step you'd be ~15× slower again. That
     case exists: it's called **offloading**, and it's a last resort for models
     that don't fit.
+
+---
+
+## Where does 232,960 MiB come from?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md)
+
+The demo's decode row, for a 512-token prompt and **256 tokens out**. Almost all
+of it is one multiplication:
+
+```
+840 MiB   all the weights, re-read to produce ONE token
+x 256     tokens generated
+= 215,040 MiB
+```
+
+Plus the KV cache, which each step also re-reads, and which grows as you go:
+
+```
+context starts at 512, ends at 768, averages ~640 tokens
+640 x 112 KiB x 256 steps ~= 17,920 MiB
+```
+
+Total **~232,960 MiB**, about 228 GiB moved to produce 256 tokens. Against
+prefill's 840 MiB that is **277x the traffic for half the arithmetic**, because
+prefill reads the weights once for 512 tokens while decode reads them 256 times
+for 256 tokens.
+
+??? note "Sanity-check it against the hardware"
+    This is exactly why decode is slow, and it predicts the speed:
+
+    ```
+    232,960 MiB / 936 GB/s = 0.26 s  ->  ~980 tokens/sec
+    ```
+
+    That is a single stream's theoretical ceiling on a 3090, set purely by
+    bandwidth. Real engines land well under it. If you ever measure *above* it,
+    something is wrong with your measurement.
+
+!!! tip "What to actually remember"
+    Not 232,960. The shape:
+
+    **decode traffic ~= weights x tokens generated**
+
+    The KV term is ~8% here and ignorable at short context. Past ~8k tokens it
+    takes over, which is a different engineering problem (see
+    [the long-context note](#why-do-prefill-and-decode-have-different-weight-requirements)).
