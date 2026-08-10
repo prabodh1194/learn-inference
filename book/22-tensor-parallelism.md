@@ -214,5 +214,11 @@ one user faster. That's the trade, and it's the right one only sometimes.
 
 ---
 
-**Next:** [23 — MoE and expert parallelism](23-moe-and-expert-parallelism.md) — a
-different axis to split along.
+## Next
+
+**[23 — MoE and expert parallelism](23-moe-and-expert-parallelism.md)** — a
+different axis to split along, and how most frontier open models are now built.
+
+The distinction to get exactly right: **total vs. active parameters.**
+DeepSeek-V3 is 671B total and 37B active — and you must hold all 671B in VRAM,
+because the router might pick any expert.

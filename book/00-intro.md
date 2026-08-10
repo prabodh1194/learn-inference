@@ -267,4 +267,17 @@ worth getting exactly right before you go on.
 
 ---
 
-**Next:** [01 — The two phases](01-the-two-phases.md)
+## Next
+
+**[01 — The two phases](01-the-two-phases.md)** — prefill and decode are
+different problems.
+
+Do these in order:
+
+```bash
+uv run python scripts/fetch_model.py     # start this now; ~1.1 GiB, needed at L03
+uv run python book/code/two_phases.py    # L01's demo -- run it BEFORE reading
+```
+
+Then read L01. **Run the demo first** — every lecture is written so the numbers
+land before the explanation does. That ordering is the method, not a suggestion.

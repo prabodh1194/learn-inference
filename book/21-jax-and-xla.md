@@ -165,5 +165,14 @@ one fused region rather than a hundred kernel launches.
 
 ---
 
-**Next:** [22 — Tensor parallelism](22-tensor-parallelism.md) — the payoff:
-sharding declared, then sharding by hand.
+## Next
+
+**[22 — Tensor parallelism](22-tensor-parallelism.md)** — the payoff: sharding
+declared, then sharding by hand.
+
+> **Needs 2+ GPUs** for the scaling curve. The sharding *arithmetic* is testable
+> on one device (`pytest tests/test_22_tp.py -m "not cuda"`), so you can do the
+> logic anywhere and rent only for the measurement.
+
+The moment to look for: find the `all-reduce` **XLA inserted that you never
+wrote**, then write it yourself in the same position.

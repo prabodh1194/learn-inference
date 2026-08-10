@@ -153,5 +153,13 @@ deliberately — it's a convincing demonstration.
 
 ---
 
-**Next:** [25 — Load testing](25-load-testing.md) — find out what your service
-actually does under pressure.
+## Next
+
+**[25 — Load testing](25-load-testing.md)** — find out what your service actually
+does under pressure.
+
+**Use an open loop.** A closed-loop test — N clients each waiting for a response
+— self-limits, so it literally cannot show you overload. Sweep the arrival rate
+and find your knee.
+
+**Predict your knee before measuring.** Most people guess high.

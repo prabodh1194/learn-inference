@@ -213,5 +213,17 @@ Answer from your own output:
 
 ---
 
-**Next:** [03 — Naive generation](03-naive-generation.md) — stop predicting,
-start measuring.
+## Next
+
+**[03 — Naive generation](03-naive-generation.md)** — stop predicting, start
+measuring. **This is where you first write code.**
+
+```bash
+uv run python book/code/recomputation.py    # the 99.7% waste figure
+```
+
+Then: read L03, write your prediction in `notes/`, implement
+`engine/model.py::load` and `generate_naive` (~30 lines), and run
+`pytest tests/test_03_generation.py`.
+
+Budget an hour. Everything before this was setup.

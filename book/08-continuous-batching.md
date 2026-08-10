@@ -223,5 +223,16 @@ That's Lecture 11.
 
 ---
 
-**Next:** [09 — Paged attention](09-paged-attention.md) — the scheduler can now
-admit requests, but memory says no. Time to fix how the cache is stored.
+## Next
+
+**[09 — Paged attention](09-paged-attention.md)** — your scheduler now wants to
+admit more requests, and memory says no.
+
+```bash
+uv run python book/code/fragmentation.py    # run before reading
+```
+
+> **This is where a GPU starts to matter.** The block logic is testable on a
+> laptop and the tests are written that way — but the payoff is a capacity
+> number you can only see with real VRAM. See [00 — Introduction](00-intro.md)
+> for rental notes.

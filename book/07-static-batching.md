@@ -203,5 +203,16 @@ That last one is the next lecture.
 
 ---
 
-**Next:** [08 — Continuous batching](08-continuous-batching.md) — the first real
+## Next
+
+**[08 — Continuous batching](08-continuous-batching.md)** — the first real
 architectural change, and the one that makes this an engine.
+
+**Budget more time for this one.** `generate()` turns inside out into a
+scheduler plus a model runner; it's a genuine refactor, not a patch.
+
+The good news: its 10 tests need no model, so you can iterate in milliseconds.
+
+```bash
+uv run pytest tests/test_08_scheduler.py -v
+```

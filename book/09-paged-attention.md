@@ -266,5 +266,15 @@ That last one is the next lecture.
 
 ---
 
-**Next:** [10 — Prefix caching](10-prefix-caching.md) — blocks can be shared, and
-the savings are larger than you'd guess.
+## Next
+
+**[10 — Prefix caching](10-prefix-caching.md)** — blocks can be shared, and the
+savings are larger than you'd guess.
+
+```bash
+uv run python book/code/prefix_bench.py
+```
+
+It runs `shared_prefix` and `late_divergence` back to back — near-identical
+token counts, opposite cache behaviour. **Predict the TTFT for each before you
+run it.**

@@ -150,5 +150,15 @@ not, rerun. Better to redo it now than to build five lectures on bad baselines.
 **Part I complete.** You can predict a bottleneck from arithmetic, generate text,
 and measure it honestly.
 
-**Next:** [05 — The KV cache](05-kv-cache.md) — the first optimization, and the
-curve finally flattens.
+## Next
+
+**[05 — The KV cache](05-kv-cache.md)** — the first real optimization, and the
+curve you just plotted finally flattens.
+
+```bash
+# after implementing generate_cached:
+uv run python book/code/naive_bench.py --cached
+```
+
+Overlay it on your L03 plot. **Check the slope, not just the speedup** — a
+faster number is expected; a *flat line* is the actual result.

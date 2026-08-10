@@ -232,5 +232,10 @@ That last one is Lecture 09.
 
 ---
 
-**Next:** [06 — Sampling](06-sampling.md) — a short one, and it gives you the
-determinism your tests depend on.
+## Next
+
+**[06 — Sampling](06-sampling.md)** — short, and load-bearing: it's what makes
+every later test trustworthy.
+
+Implement `engine/sampling.py::sample`, then `pytest tests/test_06_sampling.py`.
+The tests pin the two classic bugs directly, so read them when they fail.

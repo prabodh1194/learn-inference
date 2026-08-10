@@ -147,5 +147,13 @@ If (4) feels reachable, Part II worked.
 
 **Part II complete.** You have an engine, and the real ones are no longer opaque.
 
-**Next:** [15 — Profiling](15-profiling.md) — Part III goes down a level, to where
-the time actually goes.
+## Next
+
+**[15 — Profiling](15-profiling.md)** — Part III goes down a level, to where the
+time actually goes.
+
+> **Part III needs an NVIDIA GPU for every lecture.** Nsight is CUDA-only. This
+> is the point to rent one and work through L15–L20 in a block.
+
+Its deliverable is a **ranked kernel table**. Every optimization in L16–L20 must
+cite it — you optimize the top row, not the interesting one.

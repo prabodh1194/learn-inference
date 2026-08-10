@@ -199,5 +199,15 @@ should see the trade directly.
 
 ---
 
-**Next:** [12 — Speculative decoding](12-speculative-decoding.md) — attack the
+## Next
+
+**[12 — Speculative decoding](12-speculative-decoding.md)** — attack the
 sequential nature of decode itself.
+
+```bash
+uv run python book/code/spec_bench.py
+```
+
+**Report acceptance rate alongside tok/s, always.** Without it you cannot tell a
+real win from a lucky one — and the same code looks like magic on
+`code_completion` and useless on `prose`.

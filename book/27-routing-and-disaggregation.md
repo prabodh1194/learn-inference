@@ -160,5 +160,14 @@ whether you're actually transferring the cache.
 
 ---
 
-**Next:** [28 — Autoscaling and cost](28-autoscaling-and-cost.md) — the number the
-whole industry optimizes.
+## Next
+
+**[28 — Autoscaling and cost](28-autoscaling-and-cost.md)** — the number the whole
+industry actually optimizes.
+
+```bash
+uv run python bench/cost_model.py
+```
+
+Run it before reading. Idling at 20% utilization costs **more than doubling your
+batch size saves** — which reframes most of Part III.

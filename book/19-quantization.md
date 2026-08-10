@@ -179,5 +179,11 @@ whether it's acceptable, which is precisely why you built it first.
 
 ---
 
-**Next:** [20 — Raw CUDA](20-raw-cuda.md) — one level lower, to see what Triton
-was doing for you.
+## Next
+
+**[20 — Raw CUDA](20-raw-cuda.md)** — one level lower, to see what Triton was
+doing on your behalf.
+
+**You will probably not beat Triton, and that's the point.** Pick one kernel,
+write it by hand, then use `ncu` to find out exactly where Triton wins. The
+durable outcome is being able to read vLLM's CUDA, not a faster kernel.

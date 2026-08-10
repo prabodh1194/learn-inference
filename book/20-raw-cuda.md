@@ -159,5 +159,11 @@ the honest summary of this tradeoff.
 FlashAttention and paged attention, quantized with a real quality bar, and gone
 down to raw CUDA.
 
-**Next:** [21 — JAX and XLA](21-jax-and-xla.md) — a different way to think about
-all of this.
+## Next
+
+**[21 — JAX and XLA](21-jax-and-xla.md)** — a different way to think about all
+of this: you declare *what*, the compiler decides *how*.
+
+Verify your JAX forward pass against PyTorch **before** moving on. A silent
+transcription bug in RoPE or attention will cost you hours in L22, where you'd
+also be debugging sharding.

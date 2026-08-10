@@ -216,5 +216,14 @@ completely different results.
 
 ---
 
-**Next:** [11 — Chunked prefill](11-chunked-prefill.md) — fixing the p99 damage
-that continuous batching caused.
+## Next
+
+**[11 — Chunked prefill](11-chunked-prefill.md)** — fixing the p99 damage L08
+caused.
+
+```bash
+uv run python book/code/chunked_bench.py
+```
+
+**Judge this one on p99, not the mean.** The mean barely moves — if that's all
+you watch, you'll conclude the lecture did nothing.

@@ -178,5 +178,14 @@ greedy path as a bug**, not as noise to average away.
 
 ---
 
-**Next:** [07 — Static batching](07-static-batching.md) — serve more than one
-request, and meet a new kind of waste.
+## Next
+
+**[07 — Static batching](07-static-batching.md)** — serve more than one request,
+and meet a new kind of waste.
+
+```bash
+uv run python book/code/batching_waste.py    # run before reading
+```
+
+Same code, 0% waste on one workload and 61% on another. **Record the padding
+waste, not just throughput** — that number is what L08 eliminates.

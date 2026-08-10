@@ -167,4 +167,16 @@ Write that prediction down. Lecture 20 checks it.
 
 ---
 
-**Next:** [16 — Triton basics](16-triton-basics.md) — write your first kernel.
+## Next
+
+**[16 — Triton basics](16-triton-basics.md)** — write your first kernel.
+
+Before you start, use your L15 table to **predict the end-to-end gain**:
+
+```bash
+uv run python -c "from kernels.profile_engine import amdahl_speedup; \
+  print(amdahl_speedup(share=0.04, speedup=2.0))"
+```
+
+A 4% kernel made 2× faster buys 2.0%. Small is the *correct* answer here — L17
+and L18 are where the big numbers live.

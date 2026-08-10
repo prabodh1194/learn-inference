@@ -220,5 +220,11 @@ That last one has no honest single answer, which is the point.
 
 ---
 
-**Next:** [12b — Structured output and adapters](12b-structured-output.md) — what
-comes out, not just how fast.
+## Next
+
+**[12b — Structured output and adapters](12b-structured-output.md)** — what comes
+out, not just how fast: guided decoding, tool calling, LoRA.
+
+Lighter on implementation than the last few. The one thing to build is a
+**logit-processor hook** in `engine/sampling.py` — the extension point all three
+features hang off.

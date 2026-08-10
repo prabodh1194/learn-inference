@@ -165,4 +165,13 @@ communication pattern with different scaling behaviour.
 **Part IV complete.** You've seen sharding declared and derived, then written by
 hand, and understood the two axes models are split along.
 
-**Next:** [24 — Serving](24-serving.md) — Part V turns the engine into a service.
+## Next
+
+**[24 — Serving](24-serving.md)** — Part V turns your engine into a service.
+
+Back to the laptop: most of Part V is systems work rather than kernels, and the
+tests fake the engine so they run without a GPU.
+
+The architectural point of L24 is why vLLM runs its API server in a **separate
+process** — HTTP handling and tokenization on the engine loop steal time from
+the scheduler.

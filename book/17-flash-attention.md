@@ -213,5 +213,13 @@ exists is the point.
 
 ---
 
-**Next:** [18 — A paged attention kernel](18-paged-attention-kernel.md) — combine
-this with Lecture 09's block tables.
+## Next
+
+**[18 — A paged attention kernel](18-paged-attention-kernel.md)** — combine this
+with L09's block tables.
+
+Start from the kernel you just wrote and change **only** the K/V addressing to
+go through the block table. Nothing else about the algorithm moves.
+
+This is where paging stops costing you latency — you keep L09's memory win and
+give back the per-step penalty.

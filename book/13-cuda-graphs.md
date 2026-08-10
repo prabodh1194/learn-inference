@@ -167,5 +167,14 @@ rather than a free win.
 
 ---
 
-**Next:** [14 — Reading vLLM](14-reading-vllm.md) — you've built it. Now read the
-real thing.
+## Next
+
+**[14 — Reading vLLM](14-reading-vllm.md)** — you've built it. Now read the real
+thing.
+
+**Nothing to implement.** This is the capstone: Gordić's *Inside vLLM*, then
+nano-vllm file by file, then four targeted vLLM files — each diffed against what
+you wrote.
+
+Read it *now* and not earlier. Before you'd built a scheduler it would have
+taught you vocabulary; here it teaches judgment.

@@ -179,5 +179,11 @@ ones.
 
 ---
 
-**Next:** [17 — FlashAttention](17-flash-attention.md) — the kernel that actually
-matters.
+## Next
+
+**[17 — FlashAttention](17-flash-attention.md)** — the kernel that actually
+matters, and the deepest idea in Part III.
+
+Two things to hold onto: it is **exact**, not an approximation; and it does
+*more* arithmetic to move *less* data — which is the right trade on a
+memory-bound operation, and the whole lesson of the roofline.

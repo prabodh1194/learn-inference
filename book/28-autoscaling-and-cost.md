@@ -162,4 +162,12 @@ reverse.
 **Part V complete.** You've built an engine, made it fast, made it a service,
 measured it honestly, and priced it.
 
-**Next:** [29 — Contributing](29-contributing.md) — go work on the real thing.
+## Next
+
+**[29 — Contributing](29-contributing.md)** — go work on the real thing.
+
+Nothing left to build here. The remaining gap between you and someone who does
+this professionally is **context**: which problems are open, which tradeoffs are
+contested. You get that by participating.
+
+The one habit that makes a contribution land: **bring a measurement.**

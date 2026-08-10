@@ -148,5 +148,14 @@ Nothing to build yet. Do this instead — it takes five minutes and it matters:
 
 ---
 
-**Next:** [02 — Arithmetic intensity](02-arithmetic-intensity.md) — make this
-precise with numbers you compute yourself.
+## Next
+
+**[02 — Arithmetic intensity](02-arithmetic-intensity.md)** — make this precise
+with numbers you compute yourself.
+
+```bash
+uv run python book/code/roofline.py
+```
+
+Run it, then read. L02 also has the **KV cache sizing exercise** — the most
+practically useful ten minutes in Part I. Don't skip it.

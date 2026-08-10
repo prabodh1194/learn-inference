@@ -188,4 +188,11 @@ than a toy version.
 
 ---
 
-**Next:** [13 — CUDA graphs](13-cuda-graphs.md) — back to raw speed.
+## Next
+
+**[13 — CUDA graphs](13-cuda-graphs.md)** — back to raw speed, and the first
+lecture where the GPU *isn't* the bottleneck.
+
+> **NVIDIA GPU required** — no equivalent exists on MPS, and the tests are
+> marked `cuda` so they skip cleanly on a laptop. If you're still local, read it
+> and move to L14; come back when you rent.

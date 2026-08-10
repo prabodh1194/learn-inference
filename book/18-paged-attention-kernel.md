@@ -142,5 +142,11 @@ remaining gap is in the linear layers.
 
 ---
 
-**Next:** [19 — Quantization](19-quantization.md) — make the bytes smaller, and
-learn to measure what it costs you.
+## Next
+
+**[19 — Quantization](19-quantization.md)** — make the bytes smaller, and learn
+to measure what it costs you.
+
+> **Build the quality harness BEFORE you benchmark speed.** This is the only
+> optimization in the book that can make your model *worse*, and the damage is
+> invisible unless you go looking for it. That ordering is the lecture.

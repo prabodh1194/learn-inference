@@ -169,5 +169,10 @@ Save the plot. Lecture 05 overlays the cached version on it.
 
 ---
 
-**Next:** [04 — Measuring](04-measuring.md) — make sure the numbers you just took
-are real.
+## Next
+
+**[04 — Measuring](04-measuring.md)** — make sure the numbers you just took are
+real. Short lecture, and it decides whether everything downstream is trustworthy.
+
+Its one exercise: time a forward pass **with and without** `synchronize()`.
+Seeing a fake 100× speedup yourself is worth more than being told it happens.
