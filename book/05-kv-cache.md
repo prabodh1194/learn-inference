@@ -9,7 +9,7 @@
 ## The problem
 
 You measured it in Lecture 03: per-token latency climbs with position, and the
-demo counted the waste at **99.7%**. Generating 512 tokens computed 163,584 K/V
+demo counted the waste at **99.6%**. Generating 512 tokens computed 163,584 K/V
 vectors to use 512 of them.
 
 Now fix it.
@@ -38,7 +38,7 @@ step n, with cache: run 1 token, attend over n cached   O(1) for K/V projection
 
 Total generation cost drops from **O(N²)** to **O(N)**, for the projections. The
 attention itself still reads all N cached entries per step, so decode remains
-memory-bound (Lecture 02's 0.75 ops:byte). You haven't fixed the bottleneck; you
+memory-bound (Lecture 02's 0.79 ops:byte). You haven't fixed the bottleneck; you
 have stopped doing avoidable work on top of it.
 
 ### The two phases fall out naturally
@@ -232,7 +232,7 @@ workload choice determines what you can even see.
 
 1. Your speedup at 1024 tokens was larger than at 128. Why?
 2. The cache made decode faster but its arithmetic intensity is *unchanged* at
-   ~0.75 ops:byte. Explain why both are true.
+   ~0.79 ops:byte. Explain why both are true.
 3. Batch 32 sequences at 8k context with Qwen3-0.6B. How much KV cache? Now
    Llama-70B-scale (80 layers, 8 KV heads, 128 head dim). What breaks first?
 4. `KVCache` reserves `max_seq_len` per sequence. A request that generates 10

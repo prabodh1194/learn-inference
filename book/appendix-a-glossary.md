@@ -31,7 +31,7 @@ algorithm. *(L02)*
 **ridge point** of the roofline. H100 ≈ 295, RTX 3090 ≈ 76. *(L02)*
 
 **Memory-bound**: intensity below the ridge; the GPU waits on memory. Decode, at
-~0.75 ops:byte. *(L01, L02)*
+~0.79 ops:byte. *(L01, L02)*
 
 **Compute-bound**: intensity above the ridge; arithmetic units are the limit.
 Prefill. *(L01, L02)*
@@ -43,7 +43,7 @@ can't exceed the arithmetic units; height = peak FLOPS). Named for the shape.
 
 The corner where they meet (the **ridge point**) sits at the ops:byte ratio.
 Plot your algorithm's arithmetic intensity on the x-axis: left of the ridge is
-memory-bound, right is compute-bound. Decode sits at 0.75 against an H100's 295.
+memory-bound, right is compute-bound. Decode sits at 0.79 against an H100's 295.
 *(L02)*
 
 ---

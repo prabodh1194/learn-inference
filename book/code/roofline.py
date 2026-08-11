@@ -170,7 +170,7 @@ def decode_step_intensity(m: ModelDims, seq_len: int) -> float:
     a matrix-VECTOR product. Tiny compute, huge memory traffic. This is the
     number that makes decode memory-bound.
     """
-    params = 12 * m.n_layers * m.hidden**2  # rough: attn + MLP projections
+    params = model_params(m)          # the real count, not the 12*L*H^2 shortcut
     weight_bytes = params * m.bytes_per_value
     kv_bytes = m.kv_bytes_per_token() * seq_len
     flops = 2 * params  # one matvec pass over the weights
@@ -183,7 +183,7 @@ def prefill_intensity(m: ModelDims, n_tokens: int) -> float:
     Weights are loaded once and reused across the whole prompt, so intensity
     scales with N. This is why prefill is compute-bound.
     """
-    params = 12 * m.n_layers * m.hidden**2
+    params = model_params(m)          # the real count, not the 12*L*H^2 shortcut
     weight_bytes = params * m.bytes_per_value
     act_bytes = 2 * n_tokens * m.hidden * m.bytes_per_value
     flops = 2 * params * n_tokens

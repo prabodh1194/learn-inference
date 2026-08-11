@@ -25,8 +25,12 @@ def acceptance_rate(workload, n_draft: int) -> float:
 
     spec = NgramSpeculator(n=3, max_draft_tokens=n_draft)
     hits = total = 0
+    # Map words -> stable ids. Python's hash() is salted per process, so using
+    # it here would give a different "predictability" number on every run --
+    # in a tool whose whole job is reproducible measurement.
+    vocab: dict[str, int] = {}
     for req in workload:
-        toks = [abs(hash(w)) % 50000 for w in req.prompt.split()]
+        toks = [vocab.setdefault(w, len(vocab)) for w in req.prompt.split()]
         for i in range(4, len(toks)):
             total += 1
             if spec.propose(toks[:i]):

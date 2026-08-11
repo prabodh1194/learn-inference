@@ -81,7 +81,7 @@ matrix-*vector* multiply for a single token does almost none.
 
     [Q&A: does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
-Qwen3-0.6B decode runs at **0.75 operations per byte**, against an H100 that
+Qwen3-0.6B decode runs at **0.79 operations per byte**, against an H100 that
 needs 295 to keep its arithmetic units busy. That's roughly 0.25%, and the
 conclusion isn't hardware-specific: the same calculation puts decode far to the
 memory-bound side on an A100, a 3090, and an M1 alike.
@@ -208,7 +208,7 @@ version, so the output isn't opaque:
 > memory. The roofline compares them, and tells you which one an operation is
 > actually stuck against.
 
-The number to look for in that output is **0.75 ops:byte** for decode, against a
+The number to look for in that output is **0.79 ops:byte** for decode, against a
 ceiling that only stops mattering above ~295. That gap is the reason this book
 exists.
 

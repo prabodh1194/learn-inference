@@ -29,11 +29,11 @@ Generating 512 tokens from a 64-token prompt, with no cache:
 ```
   K/V vectors computed : 163,584
   actually needed      :     512
-  thrown away          : 163,072  (99.7%)
-  wasted compute       : 19.2 TFLOP
+  thrown away          : 163,009  (99.6%)
+  wasted compute       : 19.1 TFLOP
 ```
 
-**99.7% waste.** And the scaling table:
+**99.6% waste.** And the scaling table:
 
 ```
   output len    total K/V work   vs 128 tokens
@@ -162,9 +162,9 @@ Save the plot. Lecture 05 overlays the cached version on it.
 1. Your measured curve: linear, quadratic, or flat? Does it match your
    prediction? *(If not, write down why you were wrong. That's the valuable
    part.)*
-2. The demo says 99.7% of K/V work is wasted. Your measured slowdown from 128 →
+2. The demo says 99.6% of K/V work is wasted. Your measured slowdown from 128 →
    1024 tokens is smaller than 64×. What else is the GPU spending time on?
-3. Prefill was 512 ops:byte and decode 0.75. In your measurement, what fraction
+3. Prefill was 512 ops:byte and decode 0.79. In your measurement, what fraction
    of wall time went to prefill? Compare to your Lecture 01 prediction.
 
 ---

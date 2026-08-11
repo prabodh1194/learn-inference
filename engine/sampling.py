@@ -30,6 +30,11 @@ class SamplingParams:
         return self.temperature == 0.0
 
 
-def sample(logits, params: SamplingParams, prev_tokens=None):
-    """Apply penalties, then temperature, then top-k/top-p; return token ids."""
+def sample(logits, params: SamplingParams, prev_tokens=None) -> int:
+    """Pick one token from a 1-D logit vector. Returns a single token id (int).
+
+    Order matters: repetition penalty (on raw logits) -> temperature -> top-k
+    -> top-p -> sample. Applying top-p before temperature is a different
+    algorithm from what those parameter names mean to users.
+    """
     raise NotImplementedError("M1.2")

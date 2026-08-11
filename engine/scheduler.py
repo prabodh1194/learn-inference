@@ -32,11 +32,28 @@ class Scheduler:
 
     def __init__(self, max_batch_size: int = 32, max_batched_tokens: int = 8192,
                  chunked_prefill: bool = False, chunk_size: int = 512):
+        # Your __init__ must expose two queues the tests read directly:
+        #   self.waiting  -- admitted but not yet running (a deque)
+        #   self.running  -- in the batch this step (a list)
         raise NotImplementedError("M1.4")
 
     def add(self, request) -> None:
+        """Enqueue a Sequence. FIFO -- see the fairness note in schedule()."""
         raise NotImplementedError("M1.4")
 
-    def schedule(self) -> list:
-        """Pick this step's batch. Must handle admission, preemption, completion."""
+    def schedule(self) -> tuple[list, list]:
+        """Pick this step's batch. Returns **(to_prefill, to_decode)**.
+
+        Two lists, not one: they are different work. A prefill of 4,000 tokens
+        and a decode of 1 token cost wildly different amounts, and the runner
+        needs to tell them apart.
+
+        Must handle, in this order:
+          1. retire finished sequences (frees the slot in the SAME step)
+          2. give every running sequence a decode step
+          3. admit from `waiting` into whatever budget is left
+
+        Stop at the queue head when it doesn't fit -- skipping past it to admit
+        something smaller starves long requests under load.
+        """
         raise NotImplementedError("M1.4")

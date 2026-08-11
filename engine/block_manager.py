@@ -20,9 +20,31 @@ class BlockManager:
 
     def __init__(self, n_blocks: int, block_size: int = 16,
                  enable_prefix_caching: bool = False):
+        # Your __init__ must expose `free_blocks` (the pool -- tests read
+        # len(self.free_blocks)) and `ref_counts` (needed from M1.6 on).
+        raise NotImplementedError("M1.5")
+
+    def blocks_needed(self, n_tokens: int) -> int:
+        """M1.5. Ceiling division: how many blocks hold n_tokens."""
+        raise NotImplementedError("M1.5")
+
+    def can_allocate(self, sequence) -> bool:
+        """M1.5. Can this sequence be admitted right now?
+
+        Count only the blocks it still NEEDS -- a sequence arriving with a
+        prefix-cache hit (M1.6) already holds some.
+        """
         raise NotImplementedError("M1.5")
 
     def allocate(self, sequence) -> list[int]:
+        raise NotImplementedError("M1.5")
+
+    def append_token(self, sequence) -> None:
+        """M1.5. Called every decode step; usually a no-op.
+
+        Only one step in `block_size` crosses a boundary and needs a new block.
+        Allocating every step would exhaust the pool immediately.
+        """
         raise NotImplementedError("M1.5")
 
     def free(self, sequence) -> None:

@@ -102,7 +102,7 @@ Now locate your algorithm on the x-axis by its arithmetic intensity:
 That's the entire tool. One number (your intensity), one comparison (against the
 ridge), and you know which half of the hardware you're wasting.
 
-**Why this book is organized around it:** decode lands at **0.75 ops:byte**
+**Why this book is organized around it:** decode lands at **0.79 ops:byte**
 against a ridge of 295, roughly 400× to the left, using about a quarter of one
 percent of the GPU's arithmetic. Prefill lands at ~510, on the other side. Same
 weights, same kernels, opposite ceilings.
@@ -158,11 +158,11 @@ intensity     62.4 ops:byte   (book says ~62)
 Then the number that matters:
 
 ```
-decode  (1 token)          0.75 ops:byte
+decode  (1 token)          0.79 ops:byte
 prefill ( 512 tokens)    510.48 ops:byte
 ```
 
-**0.75 against a ridge of 295.** Decode uses roughly a quarter of one percent of
+**0.79 against a ridge of 295.** Decode uses roughly a quarter of one percent of
 the arithmetic the machine can do. It is not a little memory-bound; it is almost
 entirely memory-bound.
 
@@ -214,7 +214,7 @@ Record the answers in `notes/00-baseline/README.md`.
 
 Answer from your own output:
 
-1. Decode is 0.75 ops:byte and the H100's ridge is 295. If you doubled that GPU's
+1. Decode is 0.79 ops:byte and the H100's ridge is 295. If you doubled that GPU's
    FLOPS, how much faster does decode get?
 2. Attention intensity rises with N (32 at N=128, 62 at N=4096) but never passes
    the ridge. What does that tell you about attention at *any* sequence length?
@@ -229,7 +229,7 @@ Answer from your own output:
 measuring. **This is where you first write code.**
 
 ```bash
-uv run python book/code/recomputation.py    # the 99.7% waste figure
+uv run python book/code/recomputation.py    # the 99.6% waste figure
 ```
 
 Then: read L03, write your prediction in `notes/`, implement

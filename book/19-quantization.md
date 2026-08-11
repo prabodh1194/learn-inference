@@ -11,7 +11,7 @@
 Everything so far has moved bytes more cleverly. Quantization asks a blunter
 question: **why are the bytes so big?**
 
-Decode is memory-bound (Lecture 02, 0.75 ops:byte). Time is proportional to bytes
+Decode is memory-bound (Lecture 02, 0.79 ops:byte). Time is proportional to bytes
 loaded. So halve the bytes and you nearly halve the time, no algorithmic
 cleverness required.
 

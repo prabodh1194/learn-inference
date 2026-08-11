@@ -37,15 +37,18 @@ def main() -> None:
     total_kv = wasted_kv = 0
     for step in (1, 2, 8, 64, 256, 512):
         seq = prompt + step - 1
-        computed = seq          # all of them, every step
-        new = 1                 # only the newest token is unknown
+        computed = seq
+        # Step 1 is the first forward pass, so ALL of the prompt's K/V are
+        # genuinely new. From step 2 on, only the newest token is unknown and
+        # everything before it is a recomputation.
+        new = seq if step == 1 else 1
         print(f"{step:>6}{seq:>10}{computed:>15}{new:>14}"
               f"{100*(computed-new)/computed:>8.1f}%")
 
     for step in range(1, out + 1):
         seq = prompt + step - 1
         total_kv += seq
-        wasted_kv += seq - 1
+        wasted_kv += 0 if step == 1 else seq - 1
 
     print(f"\nOver all {out} steps:")
     print(f"  K/V vectors computed : {total_kv:,}")

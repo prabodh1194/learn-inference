@@ -71,6 +71,13 @@ def peak_memory_bytes(device: str | None = None) -> int:
 
 
 def reset_peak_memory(device: str | None = None) -> None:
+    """Zero the peak-memory counter.
+
+    Call this AFTER loading the model if you want to measure what a run
+    allocates on top of the weights; skip it to measure total footprint.
+    Whichever you choose, be consistent -- two results labelled "peak mem" that
+    mean different things are worse than no measurement at all.
+    """
     torch = _torch()
     device = device or detect_device()
     if device == "cuda":
@@ -79,12 +86,25 @@ def reset_peak_memory(device: str | None = None) -> None:
 
 @contextmanager
 def timer(device: str | None = None) -> Iterator[Callable[[], float]]:
-    """Wall-clock timer that synchronizes on both ends. Yields elapsed-seconds getter."""
+    """Wall-clock timer that synchronizes on both ends.
+
+    Yields a getter for elapsed seconds. The value is only known once the block
+    EXITS, so calling it early raises rather than silently returning NaN:
+
+        with timer() as elapsed:
+            run()
+        print(elapsed())          # <- after the block, not inside it
+    """
     synchronize(device)
     start = time.perf_counter()
+    done = False
     elapsed = float("nan")
 
     def get() -> float:
+        if not done:
+            raise RuntimeError(
+                "timer() result is only available after the with-block exits"
+            )
         return elapsed
 
     try:
@@ -92,6 +112,7 @@ def timer(device: str | None = None) -> Iterator[Callable[[], float]]:
     finally:
         synchronize(device)
         elapsed = time.perf_counter() - start
+        done = True
 
 
 # --------------------------------------------------------------------------
@@ -236,6 +257,9 @@ class BenchResult:
     peak_memory_bytes: int
     device: str
     env: dict[str, Any]
+    # True when the peak counter was zeroed after model load, so the figure is
+    # allocation ON TOP OF the weights rather than total footprint.
+    peak_excludes_weights: bool = False
 
     @property
     def output_throughput(self) -> float:
@@ -276,7 +300,9 @@ class BenchResult:
                 f"p90 {self.tpot.p90 * 1000:.2f}ms  p99 {self.tpot.p99 * 1000:.2f}ms",
                 f"  latency p50 {self.latency.p50:.2f}s  "
                 f"p90 {self.latency.p90:.2f}s  p99 {self.latency.p99:.2f}s",
-                f"  peak mem      {mb:.1f} MiB",
+                f"  peak mem      {mb:.1f} MiB"
+                + ("  (excl. weights)" if self.peak_excludes_weights
+                   else "  (incl. weights)"),
             ]
         )
 
@@ -306,6 +332,7 @@ def summarize(
     wall_time: float,
     config: dict[str, Any] | None = None,
     device: str | None = None,
+    peak_excludes_weights: bool = False,
 ) -> BenchResult:
     """Collapse per-request records into a BenchResult."""
     device = device or detect_device()
@@ -328,6 +355,7 @@ def summarize(
         peak_memory_bytes=peak_memory_bytes(device),
         device=device,
         env=environment(),
+        peak_excludes_weights=peak_excludes_weights,
     )
 
 
@@ -355,7 +383,7 @@ def benchmark(
         wall = time.perf_counter() - t0
         result = summarize(
             records, name=name, milestone=milestone, wall_time=wall,
-            config=config, device=device,
+            config=config, device=device, peak_excludes_weights=True,
         )
         print(result.summary())
         print(f"  saved -> {result.save()}")

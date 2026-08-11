@@ -55,14 +55,18 @@ def model_and_tokenizer():
     the suite still runs on a fresh clone.
     """
     pytest.importorskip("transformers")
-    try:
-        from engine.model import load
+    from engine.model import load
 
+    try:
         return load()
     except NotImplementedError:
         pytest.skip("engine/model.py::load not implemented yet (Lecture 03)")
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"could not load model: {exc}")
+    except (OSError, FileNotFoundError) as exc:
+        # The model isn't downloaded (or the network is down). Not your bug.
+        pytest.skip(f"model not available -- run scripts/fetch_model.py ({exc})")
+    # Everything else FAILS rather than skips. A wrong dtype, an OOM, or a bad
+    # device is a bug in your load(), and skipping it would quietly disable
+    # every model-backed test in the suite while progress.py reported green.
 
 
 @pytest.fixture(scope="session")
