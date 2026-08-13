@@ -119,6 +119,14 @@ So:
 - **Decode is memory-bound.** The GPU is idle, waiting on memory. Making it do
   arithmetic faster wouldn't help at all.
 
+??? question "Then why doesn't a faster GPU make decode faster?"
+    TPS is set by arithmetic intensity, not peak FLOPS: decode moves
+    bytes/bandwidth, and bandwidth is what you'd have to raise. Doubling FLOPS
+    halves TTFT (prefill is compute-bound) and leaves TPS flat — unless the
+    extra FLOPS come from batching, which raises intensity instead.
+
+    [Q&A: what happens to TTFT and TPS?](qa.md#you-double-the-flops-but-keep-the-bandwidth-what-happens-to-ttft-and-tps)
+
 **This distinction is the single most useful thing in the book.** Nearly every
 optimization ahead is "make decode less memory-bound":
 
@@ -132,6 +140,15 @@ optimization ahead is "make decode less memory-bound":
 That third table in the demo is the key. Memory traffic is **fixed**; you were
 going to load those weights regardless. Batching gets the extra work for free.
 That's not a minor optimization; it's why serving engines exist.
+
+??? question "So is a bigger batch always better?"
+    No — it saturates, it never reverses. Past the crossover, throughput
+    plateaus at roughly peak_FLOPS / (2 × params) while latency keeps climbing.
+    And for this model on a 3090, the crossover only exists for contexts under
+    ~100 tokens: realistic decode is memory-bound at every batch size. What
+    breaks first is KV capacity, not FLOPS.
+
+    [Q&A: what happens when the batch gets too big?](qa.md#what-happens-when-the-batch-gets-too-big)
 
 ### Where it shows up in practice
 
@@ -182,6 +199,10 @@ Nothing to build yet. Do this instead, it takes five minutes and it matters:
 3. Batching 32 requests costs nearly the same memory traffic as batching 1. Where
    does the extra work go, and what eventually breaks if you keep raising the
    batch size? *(Lecture 09 answers the second half.)*
+
+Answers: [Q1](qa.md#where-does-232960-mib-come-from) ·
+[Q2](qa.md#you-double-the-flops-but-keep-the-bandwidth-what-happens-to-ttft-and-tps) ·
+[Q3](qa.md#what-happens-when-the-batch-gets-too-big)
 
 ---
 

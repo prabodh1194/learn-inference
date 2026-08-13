@@ -159,6 +159,80 @@ The question usually comes from conflating two different things:
 
 ---
 
+## You double the FLOPS but keep the bandwidth: what happens to TTFT and TPS?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md) · [02. Arithmetic intensity](02-arithmetic-intensity.md)
+
+**Wrong intuition:** "TPS is a compute number, so more compute must speed it up."
+It isn't. TPS (1/TPOT) is set by decode, and decode is memory-bound: one token's
+time is *bytes moved / bandwidth*, and FLOPS appears nowhere in that ratio.
+
+| | double FLOPS | double bandwidth |
+|---|---|---|
+| **TTFT** — prefill, compute-bound | roughly **halves** | unchanged* |
+| **TPS** — decode, memory-bound | **unchanged** | roughly **doubles** |
+
+TTFT is dominated by prefill, which is compute-bound:
+
+```
+TTFT ≈ 2 × params × prompt_tokens / achieved_FLOPS
+```
+
+Double the FLOPS, halve the prefill time. Two caveats:
+
+- "achieved", not the spec sheet's peak — and only while prefill is genuinely
+  compute-bound. Short prompts are launch- and tokenizer-bound, and TTFT also
+  includes queue wait, so tiny prompts won't halve.
+- The same change leaves decode exactly where it was. The GPU loads the same
+  bytes per token; how fast it could multiply them is irrelevant.
+
+The rule that generalizes: **TPS moves only when arithmetic intensity moves** —
+more tokens sharing one weight load (batching, longer prompts, prefix reuse).
+Peak FLOPS is not on that list. *Renting a faster GPU fixes TTFT; it does not
+fix decode.*
+
+\* Double the bandwidth and prefill barely moves: at a 512-token prompt its
+intensity is ~511 ops:byte, far above the 3090's ridge of ~76, so it stays
+compute-bound. Bandwidth only starts to matter there at very short prompts.
+
+---
+
+## What happens when the batch gets too big?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md) · [07. Static batching](07-static-batching.md)
+
+**Wrong intuition:** "A big enough batch hits the FLOPS limit and then starts
+getting *slower*."
+
+It saturates; it doesn't reverse. While decode is memory-bound, the per-step
+cost is the weight load, which is fixed — batch 32 costs almost the same as
+batch 1. Once compute takes over, per-step time grows linearly with batch, so
+throughput (batch ÷ step time) plateaus at roughly `peak_FLOPS / (2 × params)`.
+More batch after that buys nothing and adds latency to every request in it.
+
+The crossover is computable, and for this model it mostly doesn't exist. Per
+step, weight bytes are fixed at `2 × params`; KV bytes are
+`kv_per_token × context × batch`:
+
+```
+intensity(B) = 2·params·B / (2·params + kv_per_token·C·B)   →   ~7,700/C ops:byte
+```
+
+As batch grows, intensity approaches a ceiling of about **7,700 ÷ context** for
+Qwen3-0.6B (attention FLOPS add a small +2). Against the 3090's ridge of ~76:
+
+- context 768 (typical chat): ceiling ≈ 12 — memory-bound at **every** batch.
+- context 64: ceiling ≈ 122 — compute-bound only past roughly B≈200.
+
+So the FLOPS wall is a short-context curiosity here. What breaks first is the
+KV cache: at a few thousand tokens of context, a 24 GB card runs out of blocks
+before decode ever runs out of arithmetic. That is why [Lecture 09](09-paged-attention.md)
+answers "what eventually breaks" with *memory*, not FLOPS.
+
+[Also: can batches be larger than the sequence length?](#can-batches-be-larger-than-the-sequence-length)
+
+---
+
 ## Does prefill build a matrix of growing prefixes?
 
 **Lecture:** [01. The two phases](01-the-two-phases.md)

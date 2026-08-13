@@ -60,6 +60,15 @@ answer contradicts the book, **fix the book too** and say so in the commit.
 
 Then rebuild: `uv run mkdocs build --strict` (must be warning-free).
 
+## Book math — derive everything, condense nothing
+
+**Standing rule: every math step in the book gets its full derivation, always.**
+Do not skip, collapse, or "leave as an exercise" any intermediate step. A
+formula like `8N² + 8Nd` is the *conclusion* of a derivation, not a fact to
+state. Show the traffic per operation, the term-by-term substitution, the
+factorisation, and the numbers plugged in. Condensed math is the fastest way to
+lose the reader the lecture was written for.
+
 ## Notes
 
 `notes/` is the deliverable, not an afterthought — prose and runnable code

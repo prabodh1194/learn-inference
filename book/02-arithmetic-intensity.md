@@ -126,20 +126,117 @@ the roofline is what tells you they're all the same idea.
 ### Doing it for attention
 
 Take unoptimized attention (`S = QK^T`, `P = softmax(S)`, `O = PV`) with
-sequence length `N`, head dim `d`, FP16 (2 bytes/value). Each step reads from
-memory, computes, writes back. Add it up:
+sequence length `N`, head dim `d`, FP16 (2 bytes/value), per head, batch 1.
+Three matrices get materialized in memory:
+
+| tensor | shape | values | bytes (fp16) |
+|---|---|---|---|
+| Q, K, V | N × d | Nd each | 2Nd each |
+| S, P | N × N | N² each | 2N² each |
+
+Each step reads its inputs from memory, computes, and writes its output back.
+Add the traffic up step by step.
+
+**Step 1 — `S = QK^T`.** Reads the two small matrices, writes the big one:
 
 ```
-memory  = 8N² + 8Nd   bytes
+read  Q     Nd values    ->  2Nd bytes
+read  K     Nd values    ->  2Nd bytes
+write S     N² values    ->  2N² bytes
+---------------------------------------------
+step 1 total                  4Nd + 2N²  bytes
+```
+
+**Step 2 — `P = softmax(S)`.** The score matrix must come back from memory,
+get softmaxed element-wise, and the result written out again:
+
+```
+read  S     N² values    ->  2N² bytes
+write P     N² values    ->  2N² bytes
+---------------------------------------------
+step 2 total                   4N²  bytes
+```
+
+**Step 3 — `O = PV`.** P comes back a second time; V and O are the small ones:
+
+```
+read  P     N² values    ->  2N² bytes
+read  V     Nd values    ->  2Nd bytes
+write O     Nd values    ->  2Nd bytes
+---------------------------------------------
+step 3 total                  2N² + 4Nd  bytes
+```
+
+Sum the three steps:
+
+```
+memory  = (4Nd + 2N²) + (4N²) + (2N² + 4Nd)
+        = 8N² + 8Nd   bytes
+```
+
+**Compute.** Two matmuls — `S = QK^T` multiplies (N,d) × (d,N) and
+`O = PV` multiplies (N,N) × (N,d), each a multiply-accumulate per output
+element: `2N²d` ops. Softmax is a per-element pass over the N² matrix —
+subtract the row max, take exp, divide by the row sum — counted as 3 ops per
+element (the max and sum reductions are cheaper passes, folded into those):
+
+```
+S = QK^T     2N²d  ops
+softmax(S)   3N²   ops
+O = PV       2N²d  ops
+---------------------------------------
 compute = 4N²d + 3N²  ops
 ```
 
-At N=4096, d=128, that's **62 ops:byte**. Against an H100's 295, attention is
-memory-bound by nearly 5×.
+Intensity, with a quick factorisation so the N-scaling is visible:
 
-Notice *why*: those `N²` terms are the score matrix, written to memory and
-immediately read back, 32 MiB at this size, round-tripped for nothing. Deleting
-that round-trip is exactly what FlashAttention does (Lecture 17).
+```
+          compute      4N²d + 3N²      N²(4d + 3)      N(4d + 3)
+intensity = -------  =  ----------  =  ----------  =  ----------
+          memory        8N² + 8Nd      8N(N + d)       8(N + d)
+```
+
+Now plug in N=4096, d=128, term by term:
+
+```
+memory:
+  8N² = 8 · 16,777,216         = 134,217,728 bytes   (score-matrix round-trips)
+  8Nd = 8 · 4096 · 128         =   4,194,304 bytes   (Q, K, V, O themselves)
+                                 ---------------
+                              = 138,412,032 bytes   (~132 MiB)
+
+compute:
+  4N²d = 4 · 16,777,216 · 128  = 8,589,934,592 ops
+  3N²  = 3 · 16,777,216        =    50,331,648 ops
+                                 ---------------
+                              = 8,640,266,240 ops
+
+intensity = 8.64G ops / 138.4M bytes = 62.4 ops:byte
+```
+
+Against an H100's 295, attention is memory-bound by nearly 5×.
+
+**Read that memory breakdown before moving on — it is the whole lesson.** The
+useful data (Q, K, V, O) is `8Nd` = 4 MiB. The score matrices are `8N²` =
+128 MiB — **32× more, and every byte of it is written to memory only to be
+read straight back**: S is stored so softmax can re-read it, P is stored so the
+output can re-read it. S alone is 32 MiB at this size, round-tripped for
+nothing. Deleting that round-trip is exactly what FlashAttention does
+(Lecture 17): tile S and P so they live in on-chip SRAM and never touch memory.
+
+One more thing the formula gives for free. As N grows, the `Nd` terms vanish
+and the intensity approaches a ceiling:
+
+```
+          N(4d + 3)       4d + 3
+lim       ----------  =   -------  ≈ d/2        (d = 128  ->  ~64)
+N → ∞     8(N + d)          8
+```
+
+Attention intensity rises with N but can never exceed ~d/2 — for d=128 that's
+64, still 4.5× below the H100's ridge of 295. **Attention is memory-bound at
+every sequence length, on every device in the table.** (That's check-yourself
+Q2, answered in advance.)
 
 ---
 
