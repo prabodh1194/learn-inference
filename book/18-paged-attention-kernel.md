@@ -92,8 +92,8 @@ attention scales down to batch 1 without wasting the GPU.
    contiguous FlashAttention **and** the Part II PyTorch path. Three
    implementations agreeing is strong evidence.
 3. Handle the **partial last block**: a sequence of 37 tokens with `block_size=16`
-   has 5 valid tokens in its third block. Mask the rest to `-inf` before softmax,
-   or they contribute garbage weights.
+   has `37 − 2×16 = 5` valid tokens in its third block. Mask the rest to `-inf`
+   before softmax, or they contribute garbage weights.
 4. Add context-splitting for batch-1 decode.
 5. Benchmark against the PyTorch gather at several context lengths, and re-run
    end-to-end.

@@ -49,8 +49,15 @@ nearly everything in this book:
 
 ??? question "Wait, if the weights are already on the GPU, why is anything slow?"
     Because "on the GPU" means *in VRAM*, and VRAM isn't where arithmetic
-    happens. On-chip SRAM is ~6 MB against 840 MiB of weights, off by 140×, so
-    a weight streams in, gets used once, and is evicted before it can be reused.
+    happens. On-chip SRAM (L1 + L2 on the 3090) is ~6 MB; the weights are
+    840 MiB = 880.8 MB. That's off by
+
+    ```
+    880.8 MB / 6 MB  =  ~147×
+    ```
+
+    so a weight streams in, gets used once, and is evicted before it can be
+    reused.
 
     Longer answer: [Q&A: why is decode memory-bound if the weights are already
     on the GPU?](qa.md#why-is-decode-memory-bound-if-the-weights-are-already-on-the-gpu)
@@ -65,9 +72,16 @@ there is nowhere near enough on-chip memory to hold 840 MiB of weights.
 | **VRAM → on-chip** | ~936 GB/s | **every step**; the bottleneck |
 | CPU RAM → VRAM (PCIe) | ~64 GB/s | once at load time |
 
-If weights crossed PCIe every step you'd be another ~15× slower. When that
-*does* happen it's called offloading, and it's what you resort to when a model
-doesn't fit, not how normal serving works.
+If weights crossed PCIe every step you'd be another ~15× slower:
+
+```
+VRAM → on-chip    ~936 GB/s        (what decode actually does, every step)
+CPU → VRAM (PCIe) ~64 GB/s         (done once, at load time)
+936.2 / 64  =  14.6× ≈ 15×
+```
+
+When that *does* happen it's called offloading, and it's what you resort to
+when a model doesn't fit, not how normal serving works.
 
 A matrix-*matrix* multiply over a batch does lots of work per byte loaded. A
 matrix-*vector* multiply for a single token does almost none.
@@ -82,9 +96,15 @@ matrix-*vector* multiply for a single token does almost none.
     [Q&A: does prefill build a matrix of growing prefixes?](qa.md#does-prefill-build-a-matrix-of-growing-prefixes) Same weights, same
 kernel, wildly different efficiency. In Lecture 02 you'll compute this exactly:
 Qwen3-0.6B decode runs at **0.79 operations per byte**, against an H100 that
-needs 295 to keep its arithmetic units busy. That's roughly 0.25%, and the
-conclusion isn't hardware-specific: the same calculation puts decode far to the
-memory-bound side on an A100, a 3090, and an M1 alike.
+needs 295 to keep its arithmetic units busy:
+
+```
+0.79 / 295  =  0.27% of the arithmetic the GPU can do
+```
+
+Roughly a quarter of one percent, and the conclusion isn't hardware-specific:
+the same calculation puts decode far to the memory-bound side on an A100, a
+3090, and an M1 alike.
 
 Most of Part II answers one question: *"how do we get more work out of each byte
 we were going to load anyway?"*
@@ -220,9 +240,18 @@ all visible there.
 
 **On 8GB it is tight but workable.** Qwen3-0.6B is 2.2 GiB in float32 (which
 Lecture 03 recommends on MPS, because fp16 has accuracy quirks there) against
-8GB of *unified* memory shared with the OS. If you hit memory pressure, switch
-to bfloat16 (halving the weights to 1.1 GiB) and re-check the Lecture 03
-correctness test still passes before trusting any later numbers.
+8GB of *unified* memory shared with the OS. Where that figure comes from — note
+it counts the **tied embedding**, so the base differs from the 840 MiB used
+everywhere else (which is the 440.4M *non-embedding* params in fp16):
+
+```
+596.0M params (incl. tied embedding) × 4 bytes (fp32)  =  2.38 GB  =  2.2 GiB
+596.0M × 2 bytes (bf16)                                 =  1.19 GB  =  1.1 GiB
+```
+
+If you hit memory pressure, switch to bfloat16 (halving the weights to 1.1 GiB)
+and re-check the Lecture 03 correctness test still passes before trusting any
+later numbers.
 
 From Lecture 09 you want a real NVIDIA GPU, paged attention and CUDA graphs are
 CUDA-specific, and Part III's profiling requires Nsight.

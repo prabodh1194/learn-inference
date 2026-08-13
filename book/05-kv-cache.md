@@ -26,6 +26,16 @@ Attention is causal, each token attends only to what came before. So when the
 model computes `K` and `V` for token 5 at step 5, those tensors are **final**.
 They don't change at step 6, or 400. Recomputing them is pure waste.
 
+??? question "Wait — I thought K, Q, V were pre-calculated, and we only load them during inference?"
+    Only the **weight matrices** are pre-calculated (trained once, fixed). The
+    K/V *vectors* are activations, computed at runtime per token by multiplying
+    the token's hidden state against those weights: `K = X·W_K`. The cache
+    stores each token's K/V the first time it's computed — after that it's a
+    load, but something has to compute them once. If they were only loaded,
+    prefill would have nothing to fill the cache with.
+
+    [Full answer in the Q&A](qa.md#arent-q-k-and-v-pre-calculated-arent-we-just-loading-them-during-inference)
+
 So don't. Store them.
 
 That turns each step from "process the whole sequence" into "process one token,
@@ -71,8 +81,26 @@ serving:
 cache_bytes = 2 × n_layers × n_kv_heads × head_dim × dtype_bytes × seq_len × batch
 ```
 
-For Qwen3-0.6B: 2 × 28 × 8 × 128 × 2 = **112 KiB per token**. At 32k context
-that's 3.5 GiB for a *single* sequence, on a model whose weights are 840 MiB.
+Where 112 KiB per token comes from, one factor at a time (every column of the
+cache is an fp16 K or V vector — 2 bytes per element):
+
+```
+per layer, per token:
+   2 (K and V)  ×  8 KV heads  ×  128 head_dim  ×  2 bytes   =   4 KiB
+per token, all 28 layers:  4 KiB × 28  =  114,688 B  =  112 KiB
+```
+
+So each row of the table is `seq_len × 112 KiB`:
+
+```
+512    × 112 KiB  =  57,344 KiB  =  56 MiB
+2,048  × 112 KiB  =  229,376 KiB =  224 MiB
+8,192  × 112 KiB  =  917,504 KiB =  896 MiB
+32,768 × 112 KiB  =  3,670,016 KiB =  3.5 GiB
+```
+
+At 32k context that's 3.5 GiB for a *single* sequence, on a model whose weights
+are 840 MiB — the cache is **4.3× the model** (3,670,016 KiB ÷ 860,160 KiB).
 
 **The cache outgrows the model.** This is why Lectures 09 (paging) and 10 (prefix
 sharing) exist: once you have a cache, the entire game becomes spending that

@@ -11,7 +11,8 @@
 ## The problem
 
 Your profile shows a long tail of small kernels, normalization, RoPE, activation,
-residual adds. Individually trivial. Collectively 5–15% of decode.
+residual adds. Individually trivial. Collectively 5–15% of decode (Lecture 15's
+profile table — the "Norms, RoPE, elementwise" row).
 
 They're slow for a reason you can now predict. Take RMSNorm in PyTorch:
 

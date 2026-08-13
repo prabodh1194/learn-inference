@@ -89,8 +89,15 @@ Two ceilings, because the machine has two limits:
   peak FLOPS.
 
 The corner where they meet is the **ridge point**, and it sits at exactly the
-ops:byte ratio (295 for an H100, 76 for a 3090). That's the whole reason the
-ratio matters: it's the intensity at which the two ceilings cross.
+ops:byte ratio (295 for an H100, 76 for a 3090 — both are the same division):
+
+```
+H100   989 TFLOPS  / 3.35 TB/s  =  295.2 ops:byte
+3090    71 TFLOPS  / 936.2 GB/s  =   75.8 ops:byte
+```
+
+That's the whole reason the ratio matters: it's the intensity at which the two
+ceilings cross.
 
 Now locate your algorithm on the x-axis by its arithmetic intensity:
 
@@ -104,8 +111,17 @@ ridge), and you know which half of the hardware you're wasting.
 
 **Why this book is organized around it:** decode lands at **0.79 ops:byte**
 against a ridge of 295, roughly 400× to the left, using about a quarter of one
-percent of the GPU's arithmetic. Prefill lands at ~510, on the other side. Same
-weights, same kernels, opposite ceilings.
+percent of the GPU's arithmetic:
+
+```
+295 / 0.79  =  373× to the left of the ridge
+0.79 / 295  =  0.27% of the arithmetic used
+```
+
+Prefill lands at ~510, on the other side. Same weights, same kernels, opposite
+ceilings. (Where 510 comes from: prefill loads the weights once and does
+`2 × params × N` FLOPs with them, so intensity ≈ `2·params·N / weight_bytes` —
+derived in full in the "See it" section below.)
 
 Every technique in Parts II and III is an answer to the same question: *how do I
 get more arithmetic out of bytes I was going to load anyway?* Batching, KV
@@ -214,7 +230,11 @@ compute:
 intensity = 8.64G ops / 138.4M bytes = 62.4 ops:byte
 ```
 
-Against an H100's 295, attention is memory-bound by nearly 5×.
+Against an H100's 295, attention is memory-bound by nearly 5×:
+
+```
+295 / 62.4  =  4.73× below the ridge
+```
 
 **Read that memory breakdown before moving on — it is the whole lesson.** The
 useful data (Q, K, V, O) is `8Nd` = 4 MiB. The score matrices are `8N²` =
@@ -225,18 +245,31 @@ nothing. Deleting that round-trip is exactly what FlashAttention does
 (Lecture 17): tile S and P so they live in on-chip SRAM and never touch memory.
 
 One more thing the formula gives for free. As N grows, the `Nd` terms vanish
-and the intensity approaches a ceiling:
+and the intensity approaches a ceiling. Take the limit step by step — divide
+numerator and denominator by N:
 
 ```
-          N(4d + 3)       4d + 3
-lim       ----------  =   -------  ≈ d/2        (d = 128  ->  ~64)
-N → ∞     8(N + d)          8
+            N(4d + 3)          N(4d + 3)          (4d + 3)        4d + 3
+intensity = ---------  =  ------------------  =  ----------  ->  -------
+            8(N + d)        8N(1 + d/N)          8(1 + d/N)         8
+                                              (d/N -> 0 as N -> ∞)
 ```
 
-Attention intensity rises with N but can never exceed ~d/2 — for d=128 that's
-64, still 4.5× below the H100's ridge of 295. **Attention is memory-bound at
-every sequence length, on every device in the table.** (That's check-yourself
-Q2, answered in advance.)
+That is `(4d + 3)/8 = d/2 + 3/8`. For d = 128:
+
+```
+64 + 0.375  =  64.4 ops:byte
+```
+
+Attention intensity rises with N but can never exceed d/2 + 3/8 — for d=128
+that's 64.4, still 4.6× below the H100's ridge of 295:
+
+```
+295 / 64.4  =  4.58× below the ridge, forever
+```
+
+**Attention is memory-bound at every sequence length, on every device in the
+table.** (That's check-yourself Q2, answered in advance.)
 
 ---
 
@@ -252,11 +285,43 @@ Confirm the book's worked example first:
 intensity     62.4 ops:byte   (book says ~62)
 ```
 
-Then the number that matters:
+Then the number that matters — and where it comes from, so it's never a bare
+figure. Decode at sequence length 2048: one step moves all the weights plus the
+2048 tokens of KV already stored, and does one multiply-accumulate per weight:
 
 ```
-decode  (1 token)          0.79 ops:byte
-prefill ( 512 tokens)    510.48 ops:byte
+compute  =  2 × 440.4M params                = 880.8 MFLOP
+memory   =  880.8 MB weights  +  114,688 B/token × 2048 tokens
+           = 880.8 MB + 234.9 MB             = 1115.7 MB
+intensity = 880.8 / 1115.7                   = 0.79 ops:byte
+```
+
+(114,688 B/token = 2 × 28 layers × 8 KV heads × 128 head_dim × 2 bytes, the KV
+cache size from Lecture 05.) At 512 prompt tokens prefill amortizes that same
+weight load over all of them:
+
+```
+compute  =  2 × 440.4M × 512   = 451.0 GFLOP
+memory   =  880.8 MB + 2 × 512 × 1024 × 2 B   (activations, one pass)
+         =  880.8 MB + 2.1 MB                 = 882.9 MB
+intensity = 451.0e9 / 882.9e6                 = 510.5 ops:byte
+```
+
+```
+decode  (1 token, 2048 ctx)   0.79 ops:byte
+prefill (512 tokens)        510.78 ops:byte
+```
+
+Two notes so the numbers stay honest. **0.79 is instantaneous at 2048 context**
+— it's the intensity of *one* decode step. Lecture 01's 0.92 was the whole
+generation averaged, including the KV cache growing from 512 to 768 tokens;
+same algorithm, different windows. And both sit far below the ridge either way.
+Second, **the ridge table**, same division for every card:
+
+```
+A100   312 TFLOPS  / 2.039 TB/s  =  153.0
+3090    71 TFLOPS  / 936.2 GB/s  =   75.8
+M1       2.6 TFLOPS / 68.25 GB/s =   38.1
 ```
 
 **0.79 against a ridge of 295.** Decode uses roughly a quarter of one percent of
@@ -264,8 +329,8 @@ the arithmetic the machine can do. It is not a little memory-bound; it is almost
 entirely memory-bound.
 
 And the verdict table shows this holds on *every* device, H100 (ridge 295), A100
-(153), 3090 (76), M1 (38). A conclusion that survives an 8× range of ridge points is a
-property of the algorithm, not a quirk of one GPU.
+(153), 3090 (76), M1 (38). A conclusion that survives an 8× range of ridge points
+(295/38 = 7.8×) is a property of the algorithm, not a quirk of one GPU.
 
 One aside worth noticing: the **3090's ridge is 76, the H100's is 295.** The
 cheaper card has proportionally *more* bandwidth per FLOP, making it relatively

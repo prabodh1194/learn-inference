@@ -40,19 +40,24 @@ $0.25 / 7.2M × 1M = $0.035 per million tokens
 ```
 
 Now at 20% utilization, which is what a real service with diurnal traffic looks
-like:
+like. Every number above gets multiplied by the utilization:
 
 ```
-1.44M tokens/hour  ->  $0.174 per million tokens
+7.2M × 0.20 = 1.44M tokens/hour
+$0.25 / 1.44M × 1M = $0.174 per million tokens
+
+ratio vs full utilization:  $0.174 / $0.035  =  4.97x
 ```
 
 **5× more expensive than the same engine at 100% utilization, and the engine
-didn't change.** (Against a more realistic 80% baseline it's 4×.)
+didn't change.** (Against a more realistic 80% baseline: 7.2M × 0.8 = 5.76M/hr,
+$0.25 / 5.76M × 1M = $0.043/M, and $0.174 / $0.043 = 4.0× — 4× more.)
 
 This is the punchline of Part V: **at low utilization, utilization dominates every
-kernel optimization in Part III.** A 30% faster attention kernel is worth far less
-than raising average utilization from 20% to 50%. Knowing which lever you're
-pulling is the skill.
+kernel optimization in Part III.** Put numbers on it: raising utilization from
+20% to 50% multiplies tokens per GPU-hour by `50/20 = 2.5×`. A 30% faster
+attention kernel, at roughly 20% of decode runtime (Lecture 15's table), buys
+`30% × 20% = 6%` end-to-end. Knowing which lever you're pulling is the skill.
 
 ### Autoscaling and its costs
 

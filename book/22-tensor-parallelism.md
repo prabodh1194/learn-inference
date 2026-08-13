@@ -13,7 +13,8 @@
 
 Two reasons to use more than one GPU:
 
-**The model doesn't fit.** 70B in FP16 is 140GB. No single GPU holds it.
+**The model doesn't fit.** 70B in FP16 is 140GB: `70 × 10⁹ params × 2 bytes
+(fp16) = 140 GB`. No single GPU holds it.
 
 **One GPU is too slow for one user.** Decode is memory-bound (Lecture 02), so a
 single user's tokens/sec is capped by *one* GPU's bandwidth. Batching raises

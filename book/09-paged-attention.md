@@ -23,7 +23,13 @@ shape = (max_seqs, max_seq_len, n_kv_heads, head_dim)
 ```
 
 Every sequence reserves `max_seq_len` **up front**. Support 32k context and a
-128-token chat request still reserves 32k. It uses 0.4% of what it holds.
+128-token chat request still reserves 32k:
+
+```
+128 / 32,768  =  0.39% of the reservation actually used
+```
+
+It uses 0.4% of what it holds.
 
 You can't do better with contiguous storage: a tensor needs one unbroken span,
 and it can't grow into memory another sequence might claim. So you reserve the
@@ -47,14 +53,26 @@ On a 24GB 3090 with realistic mixed traffic:
         32768            6        84    14.0x
 ```
 
-**Six sequences at 32k context. Six.** And where that memory goes:
+The gain column is one division each — how many more sequences paging fits into
+the same KV budget:
+
+```
+121 / 96  =  1.26x      84 / 48  =  1.75x
+ 84 / 24  =  3.5x       84 / 6   =  14.0x
+```
+
+**Six sequences at 32k context. Six.** And where that memory goes (this block
+is `max_seq_len=8192`):
 
 ```
   sequences fitted     24
-  tokens reserved      196,608
+  tokens reserved      196,608        = 24 sequences x 8192 max tokens
   tokens actually used  58,249
   WASTED               70.4%
 ```
+
+The waste fraction: `(196,608 − 58,249) / 196,608 = 138,359 / 196,608 = 70.4%`.
+More than two-thirds of the reservation is empty space.
 
 Note the shape of the table: the longer the context you *support*, the worse
 contiguous allocation gets, while paged stays flat at 84. Contiguous is punished

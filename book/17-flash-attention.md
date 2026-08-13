@@ -17,9 +17,10 @@ intensity = 62 ops:byte     (vs. an H100's ridge of 295)
 ```
 
 Memory-bound by nearly 5× on an H100, though on the 3090 you're actually
-renting (ridge 76) it's memory-bound by only 1.2×, so temper your speedup
-expectations accordingly. And the `N²` terms dominate: that's the score matrix
-`S = QK^T`, written to HBM and immediately read back, twice:
+renting (ridge 76) it's memory-bound by only 1.2× (`76 / 62.4 = 1.22`), so
+temper your speedup expectations accordingly. And the `N²` terms dominate:
+that's the score matrix `S = QK^T`, written to HBM and immediately read back,
+twice:
 
 ```
 1. S = QK^T          write S    (4096×4096 fp16 = 32 MiB)
@@ -27,9 +28,11 @@ expectations accordingly. And the `N²` terms dominate: that's the score matrix
 3. O = PV            read P
 ```
 
-**64 MiB of round-tripping to compute one attention head**, on data that is never
-needed again. It exists only because the algorithm was written as three separate
-matrix operations.
+Four touches of the 32 MiB matrix, one per step of the bullet list: write S,
+read S, write P, read P — **128 MiB of round-tripping to compute one attention
+head**, on data that is never needed again (and the same 8N² the Lecture 02
+formula counts). It exists only because the algorithm was written as three
+separate matrix operations.
 
 Worse, memory is **quadratic** in sequence length. Doubling context quadruples the
 scratch space, which is what makes long context expensive.

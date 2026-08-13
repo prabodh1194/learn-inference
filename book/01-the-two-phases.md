@@ -40,7 +40,16 @@ prefill         451.0 GF          840 MiB      512.00
 decode          225.5 GF       232960 MiB        0.92
 ```
 
-Decode does *half* the compute of prefill and moves **277× more memory**.
+Decode does *half* the compute of prefill and moves **277× more memory**. Both
+claims are two divisions:
+
+```
+compute:   2 × 440.4M params × 512 prompt tokens  = 451.0 GF    (prefill)
+           2 × 440.4M params × 256 output tokens  = 225.5 GF    (decode)
+           ratio: 225.5 / 451.0  =  0.5×
+
+memory:    232,960 / 840  =  277.3×
+```
 
 That 232,960 is worth deriving rather than accepting, because it's the whole
 argument of this lecture in one number. The demo prints the breakdown:
@@ -51,33 +60,71 @@ argument of this lecture in one number. The demo prints the breakdown:
                                   total      232,960 MiB
 ```
 
-**The first line is 92% of it, and it's one multiplication:** 840 MiB of weights,
-re-read to produce *each* of the 256 tokens. Prefill reads the same 840 MiB
-*once*, for all 512 prompt tokens.
+**The first line is 92% of it, and it's one multiplication:**
 
-The second line is the KV cache, re-read every step and growing as you go
-(context runs 512 → 768, averaging ~640 tokens × 112 KiB × 256 steps). Ignorable
-here at 8%; it takes over past ~8k context, which is a different problem.
+```
+215,040 / 232,960  =  92.3%
+```
+
+840 MiB of weights, re-read to produce *each* of the 256 tokens. Prefill reads
+the same 840 MiB *once*, for all 512 prompt tokens.
+
+The second line is the KV cache, re-read every step and growing as you go. The
+three factors, one at a time (112 KiB = 2 × 28 × 8 × 128 × 2 bytes per token,
+derived in Lecture 05):
+
+```
+context runs 512 → 768 tokens, so on average      (512 + 768) / 2 = 640 tokens
+per step, that's 640 × 112 KiB = 71,680 KiB      = 70 MiB read back
+over 256 decode steps: 70 MiB × 256              = 17,920 MiB
+```
+
+Ignorable here at 7.7% (17,920 / 232,960); it takes over past ~8k context,
+which is a different problem.
 
 **The shape to remember is `weights × tokens generated`.** Not the number.
 
 ??? note "Sanity-check it against the hardware"
-    228 GiB ÷ 936 GB/s ≈ **0.26 s**, so ~980 tok/s is the *ceiling* for a single
-    stream on a 3090, set purely by bandwidth. Real engines land well under it,
-    and if you ever measure above it, your measurement is wrong.
+    One more step, and it becomes a prediction you can falsify:
+
+    ```
+    232,960 MiB = 227.5 GiB = 2.44 × 10¹¹ bytes
+    2.44 × 10¹¹ B / 936.2 GB/s  =  0.26 s            (bandwidth floor)
+    256 tokens / 0.26 s         =  ~985 tok/s         (single-stream ceiling)
+    ```
+
+    ~980 tok/s is the *ceiling* for a single stream on a 3090, set purely by
+    bandwidth. Real engines land well under it, and if you ever measure above
+    it, your measurement is wrong.
 
     More in the [Q&A](qa.md#where-does-232960-mib-come-from).
 
 **Second**, the per-token table. A generated token costs hundreds to thousands of
 times the memory traffic of a prompt token, and the ratio **widens** as prompts
-get longer, from 34× at a 32-token prompt to 2596× at 2048.
+get longer, from 34× at a 32-token prompt to 2596× at 2048:
 
-Read the two columns separately and the reason is plain: **prefill per token
-falls** (one weight load spread over more tokens) while **decode per token stays
-flat** (every step reloads everything). That asymmetry is the hint about the fix.
+```
+ratio  =  (decode bytes per token) / (prefill bytes per token)
+
+32-token prompt,  1024 out:   900 MiB ÷ 26.3 MiB  =  34×
+2048-token prompt,   16 out:  1065 MiB ÷ 0.41 MiB  =  2596×
+```
+
+Prefill's share falls with every added prompt token (one weight load spread
+over more tokens), so the ratio compounds as the prompt grows. Read the two
+columns separately and the reason is plain: **prefill per token falls** while
+**decode per token stays flat** (every step reloads everything). That asymmetry
+is the hint about the fix.
 
 **Third**, the batching table. Batch size goes 1 → 256, memory traffic stays
-**exactly the same**, arithmetic intensity rises 256×.
+**exactly the same**, arithmetic intensity rises 256×:
+
+```
+traffic per step  =  2 × params bytes     (weights: loaded once, shared by batch)
+flops per step    =  2 × params × batch   (each of B tokens does a full matmul)
+intensity         =  2 × params × batch / (2 × params)  =  batch
+                 ->  256 / 1  =  256×
+```
 
 ---
 

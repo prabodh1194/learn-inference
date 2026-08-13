@@ -33,7 +33,29 @@ Generating 512 tokens from a 64-token prompt, with no cache:
   wasted compute       : 19.1 TFLOP
 ```
 
-**99.6% waste.** And the scaling table:
+Every number above is a sum. Step `n` runs `64 + n − 1` tokens through the
+model, and of those only 1 (the newest) is genuinely new work — on step 1 the
+whole prompt is new, so that one step is all useful. Over all 512 steps:
+
+```
+computed  = Σₙ₌₁⁵¹² (64 + n − 1)      = 512 · 63 + 511·512/2  = 163,584
+needed    = 512                        (one new K/V vector per step)
+wasted    = 163,584 − 512 − 63         = 163,009    (step 1's 63 are real work)
+share     = 163,009 / 163,584          = 99.6%
+```
+
+The 19.1 TFLOP is the same sum turned into projection FLOPs. Each K/V vector
+is a multiply-accumulate over `hidden × kv_dim` weights, in every layer — that's
+`2 × n_tokens × hidden × kv_dim × n_layers` FLOPs per token set, twice (K and
+V), so for the 163,009 wasted vectors:
+
+```
+2 · 2 · 163,009 · 1024 · 1024 · 28  =  19.1 TFLOP
+(projections only -- attention itself wastes more)
+```
+
+**99.6% waste.** And the scaling table — each row is the same sum with a
+different upper limit (`Σₙ₌₁ᴺ (64 + n − 1) = N · 63 + N(N−1)/2`):
 
 ```
   output len    total K/V work   vs 128 tokens
@@ -42,8 +64,9 @@ Generating 512 tokens from a 64-token prompt, with no cache:
         2048         2,227,200          136.5x
 ```
 
-16× the output, 136× the work, heading for quadratic. (Not the full 256×:
-the fixed 64-token prompt contributes a large linear term at these lengths.)
+The ratios: 163,584 / 16,320 = 10.0×; 2,227,200 / 16,320 = 136.5×. 16× the
+output, 136× the work, heading for quadratic. (Not the full 16² = 256×: the
+fixed 64-token prompt contributes a large linear term at these lengths.)
 
 ---
 

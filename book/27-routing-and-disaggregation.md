@@ -170,4 +170,7 @@ uv run python bench/cost_model.py
 ```
 
 Run it before reading. Idling at 20% utilization costs **more than doubling your
-batch size saves**, which reframes most of Part III.
+batch size saves**: per token, 20% utilization is 4.97× pricier than 100%
+(Lecture 28's worked example: $0.174/M vs $0.035/M), while doubling the batch
+on a memory-bound phase is at most a 2× win (Lecture 01). The penalty dwarfs
+the saving, which reframes most of Part III.

@@ -44,7 +44,8 @@ step 42: 32 decode                  step 42: 31 decode + 512 prefill
                                     step 49: 32 decode
 ```
 
-Same total prefill work, spread over 8 steps instead of concentrated in one. No
+Same total prefill work, spread over `4,000 / 512 = 7.8` → 8 steps instead of
+concentrated in one. No
 step is ever catastrophically long, so no decoding user sees a long stall.
 
 ### Why this is nearly free

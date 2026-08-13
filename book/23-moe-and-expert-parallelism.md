@@ -30,7 +30,8 @@ MoE:    token -> router -> pick top-2 of 128   -> output
 ```
 
 With 128 experts and top-2 routing you get the *capacity* of 128 MLPs at roughly
-the *compute* of 2.
+the *compute* of 2: `2 / 128 = 1.6%` of dense compute per token, at 100% of the
+memory (you must store all 128 expert weight matrices).
 
 The vocabulary that follows from this, and which trips people up:
 

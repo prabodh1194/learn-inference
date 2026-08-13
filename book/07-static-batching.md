@@ -77,6 +77,15 @@ mixed_length (realistic)
 
 **Zero waste on uniform load. 61% on realistic load.**
 
+Those two numbers are the same equation, and it's worth writing down because
+it converts every future waste figure into a speedup without a benchmark:
+
+```
+useful fraction  =  1 - waste          (0.39 at 61% waste)
+speedup vs continuous  =  1 / useful   (slots vs no idle slots)
+                      =  1 / 0.39  =  2.57x     matches the demo's 2.57x
+```
+
 And the trap in the batch-size sweep:
 
 ```
@@ -85,6 +94,8 @@ And the trap in the batch-size sweep:
       8          61.0%           2.57x
      16          65.9%           2.93x
 ```
+
+Check the last row the same way: `1 / (1 − 0.659) = 1 / 0.341 = 2.93×`.
 
 Bigger batches do more useful work per weight load **and** waste more slots,
 simultaneously. Static batching cannot escape this; the two move together.

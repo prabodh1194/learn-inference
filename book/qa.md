@@ -207,7 +207,15 @@ getting *slower*."
 It saturates; it doesn't reverse. While decode is memory-bound, the per-step
 cost is the weight load, which is fixed — batch 32 costs almost the same as
 batch 1. Once compute takes over, per-step time grows linearly with batch, so
-throughput (batch ÷ step time) plateaus at roughly `peak_FLOPS / (2 × params)`.
+throughput (batch ÷ step time) plateaus. Where? One output token costs
+`2 × params` FLOPs (one multiply-accumulate per weight), so a step of batch B
+costs `2 × params × B`, and:
+
+```
+throughput  =  B / step_time  =  B / (2 × params × B / peak_FLOPS)
+            =  peak_FLOPS / (2 × params)        <- independent of B
+```
+
 More batch after that buys nothing and adds latency to every request in it.
 
 The crossover is computable, and for this model it mostly doesn't exist. Per
@@ -322,8 +330,13 @@ pass**:
 
 ??? question "Why can't the GPU just keep the weights on-chip?"
     **SRAM is tiny.** A 3090 has ~128 KB of L1 per SM and 6 MB of L2, against
-    840 MiB of weights, off by ~140× even against L2. A weight streams in, gets
-    used once, and is evicted before reuse.
+    840 MiB (880.8 MB) of weights — off by ~147× even against L2:
+
+    ```
+    880.8 MB / 6 MB  =  ~147×
+    ```
+
+    A weight streams in, gets used once, and is evicted before reuse.
 
     That's why decode's ceiling is a *bandwidth* number, not a cache-hit-rate
     number. It's also the constraint FlashAttention exploits deliberately
@@ -380,3 +393,49 @@ for 256 tokens.
     The KV term is ~8% here and ignorable at short context. Past ~8k tokens it
     takes over, which is a different engineering problem (see
     [the long-context note](#why-do-prefill-and-decode-have-different-weight-requirements)).
+
+---
+
+## Aren't Q, K, and V pre-calculated? Aren't we just loading them during inference?
+
+**Lecture:** [05. The KV cache](05-kv-cache.md)
+
+No — and this is a load-bearing distinction. Three different things travel
+through the name "Q/K/V":
+
+1. **The weight matrices W_Q, W_K, W_V** — pre-calculated (trained once), fixed,
+   and only **loaded** during inference. Loading these is the 840 MiB of pure
+   memory traffic that makes decode memory-bound.
+2. **The per-token K/V vectors** — *not* pre-calculated. They are activations,
+   produced at runtime by multiplying each token's hidden state against the
+   weights: `K = X·W_K`. This is a matrix multiplication, real arithmetic, and
+   it happens on the GPU while the model runs.
+3. **Q** — an activation too, recomputed every step and thrown away (never
+   cached, because the query changes every step).
+
+So a decode step both **computes and loads**:
+
+```
+compute:  Q for the current token        (used once, discarded)
+          K and V for the current token  (computed once, appended to the cache)
+load:     all 840 MiB of weights         (the memory-bound part)
+          every past K/V from the cache  (grows with context)
+```
+
+The cache is a *store* for step 2's output. Each token's K/V enters the cache
+once — during prefill for prompt tokens, during decode for generated ones — and
+from then on is only loaded. The "computed once, loaded many times" pattern is
+the whole point.
+
+**The wrong intuition, and why it's wrong:** "pre-calculated" is true of the
+*weights*. The K/V vectors can't be pre-calculated because they depend on the
+input tokens, which don't exist until the request arrives. If K/V were only
+loaded, prefill would have nothing to fill the cache with, and Lecture 03's
+99.6%-waste demo (163,584 K/V vectors *computed* to use 512 of them) would be
+meaningless.
+
+The confusion is worth having explicitly, because the same sentence "we just
+load it" is correct for the weights and wrong for the cache. Decode is
+memory-bound because of the **loads** (weights + past K/V), not because it
+stopped computing the new K/V. The new token's K/V projection is a small
+matmul; the load that dominates is the one that scales with context.
