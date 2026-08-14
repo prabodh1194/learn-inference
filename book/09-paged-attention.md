@@ -16,24 +16,47 @@
 Your scheduler wants to admit more requests. Memory says no, long before the GPU
 is actually full.
 
-The culprit is in `KVCache` from Lecture 05:
+Walk through one admission. Two requests are waiting: a short chat turn that
+might produce 128 output tokens, and a long document question that could run to
+32k. The scheduler checks: does the KV cache have room for both? The answer is
+no, and the reason sits in `KVCache` from Lecture 05:
 
 ```python
 shape = (max_seqs, max_seq_len, n_kv_heads, head_dim)
 ```
 
-Every sequence reserves `max_seq_len` **up front**. Support 32k context and a
-128-token chat request still reserves 32k:
+Look at the second dimension. Every slot is sized for `max_seq_len` tokens
+**up front**, whether the sequence that lands there will use one hundred tokens
+or thirty thousand. Lecture 05's arithmetic says each cached token costs
+112 KiB on this model (2 × 28 layers × 8 KV heads × 128 head_dim × 2 bytes per
+token), so a slot that advertises 32k context reserves:
 
 ```
-128 / 32,768  =  0.39% of the reservation actually used
+32,768 tokens  ×  112 KiB  =  3,670,016 KiB  =  3.5 GiB
 ```
 
-It uses 0.4% of what it holds.
+That is the reservation, not the bill. A 128-token chat request that gets the
+slot pays the full 3.5 GiB and then uses
 
-You can't do better with contiguous storage: a tensor needs one unbroken span,
-and it can't grow into memory another sequence might claim. So you reserve the
-worst case, every time.
+```
+128 / 32,768  =  0.39% of the reservation
+```
+
+It uses 0.4% of what it holds. And the other 99.6% is not usable slack: it is a
+hole held open for a sequence that may never arrive, in a region no other
+sequence is allowed to touch.
+
+Why can't the allocation grow on demand? Because the storage is **contiguous**:
+the cache is one tensor, and a kernel reads a sequence's rows as a single
+unbroken span. A span can only extend into free memory, and the memory next to
+it belongs to another sequence's slot. Growing in place means displacing a
+neighbor, which means relocating that neighbor's entire cache and copying
+everything it holds, on the hot path. Nobody does that, so the design takes the
+other route: reserve the worst case, every time.
+
+The result is what `fragmentation.py` shows next: the scheduler's memory
+admission test fails on reserved-but-empty space, and the GPU sits partly idle
+while requests wait outside.
 
 ---
 
