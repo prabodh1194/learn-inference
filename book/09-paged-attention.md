@@ -13,50 +13,86 @@
 
 ## The problem
 
-Your scheduler wants to admit more requests. Memory says no, long before the GPU
-is actually full.
+Start with the person at the door. Every engine has a **scheduler**: it decides
+which requests get in, and in what order. Right now two requests are waiting: a
+chat that will probably reply in 128 tokens, and a long document question that
+could run to 32,000. The scheduler asks the same question before anything
+else: is there room?
 
-Walk through one admission. Two requests are waiting: a short chat turn that
-might produce 128 output tokens, and a long document question that could run to
-32k. The scheduler checks: does the KV cache have room for both? The answer is
-no, and the reason sits in `KVCache` from Lecture 05:
+To answer that you need to know what "room" means here. The model does not
+remember anything on its own. As the conversation proceeds, it writes a running
+record into the **KV cache** from Lecture 05, a scratchpad that stores what
+each token offered the tokens after it. The scratchpad has a fixed price per
+token, 112 KiB on our model (2 copies, K and V, × 28 layers × 8 heads × 128
+values × 2 bytes):
 
 ```python
 shape = (max_seqs, max_seq_len, n_kv_heads, head_dim)
+#        how many   how long     how wide each
+#        requests   a single     token's entry is
+#        fit        request may
+#                   grow to
 ```
 
-Look at the second dimension. Every slot is sized for `max_seq_len` tokens
-**up front**, whether the sequence that lands there will use one hundred tokens
-or thirty thousand. Lecture 05's arithmetic says each cached token costs
-112 KiB on this model (2 × 28 layers × 8 KV heads × 128 head_dim × 2 bytes per
-token), so a slot that advertises 32k context reserves:
+Prices are easy to underestimate: a 2,000-token chat costs 224 MiB, a 32k
+conversation costs 3.5 GiB, and that is on a model whose weights are only
+840 MiB. The cache is the bigger of the two costs on any long conversation.
+
+Now the scheduler comes to the request. How much will this chat cost? And here
+is the catch: **it cannot know.** The chat might stop in 20 tokens or keep
+talking for 30,000. The engine's rule is therefore "admit at the maximum":
+every request is booked as if it will use all 32,768 tokens, no matter what it
+actually says back.
 
 ```
-32,768 tokens  ×  112 KiB  =  3,670,016 KiB  =  3.5 GiB
+reserved, for every admitted request:   32,768 × 112 KiB  =  3.5 GiB
+used,      by the 128-token chat:          128 × 112 KiB  =  14 MiB
+the chat actually uses:        14,336 / 3,670,016  =  0.39%  of its booking
 ```
 
-That is the reservation, not the bill. A 128-token chat request that gets the
-slot pays the full 3.5 GiB and then uses
+Draw it. The cache is a grid: each row belongs to one admitted request, and
+each column is one reserved token slot. When a request arrives it is handed a
+whole row, even though it will only ever sit in a few columns:
 
 ```
-128 / 32,768  =  0.39% of the reservation
+row A = the 128-token chat (a 32,768-token row, drawn shortened)
+
+  [====][..............................................................]
+   128    32,640 columns sitting empty
+   used
+          they are empty, but no other request may touch them.
+          they belong to row A for as long as row A exists.
+
+row B = the long document request (same story)
+  [==================][.......................empty, reserved..............]
+   already used, will grow         held in case it does
 ```
 
-It uses 0.4% of what it holds. And the other 99.6% is not usable slack: it is a
-hole held open for a sequence that may never arrive, in a region no other
-sequence is allowed to touch.
+Then a third request arrives and the scheduler says: no room. The machine is
+nowhere near full: row A alone is 99.6% empty. But empty is not free. Row A's
+booking stands until the chat actually ends, and that booking is what counts
+for the memory test.
 
-Why can't the allocation grow on demand? Because the storage is **contiguous**:
-the cache is one tensor, and a kernel reads a sequence's rows as a single
-unbroken span. A span can only extend into free memory, and the memory next to
-it belongs to another sequence's slot. Growing in place means displacing a
-neighbor, which means relocating that neighbor's entire cache and copying
-everything it holds, on the hot path. Nobody does that, so the design takes the
-other route: reserve the worst case, every time.
+Why can't the chat's row just grow as the chat gets longer, borrowing columns
+from row B? Because a row is one **continuous strip** of memory, and the chip
+reads it as a single block, all in one go. A strip can only grow at its end,
+into the space immediately after it, and that space is already assigned to
+row B. The alternative is to copy row A to a bigger empty area somewhere else
+every time it grows, and copying gigabytes is far too slow to happen between
+tokens of a live conversation (each arrives in milliseconds). So the engine
+reserves the worst case up front, every time.
 
-The result is what `fragmentation.py` shows next: the scheduler's memory
-admission test fails on reserved-but-empty space, and the GPU sits partly idle
-while requests wait outside.
+> That mismatch is the whole problem of this lecture: small requests, huge
+> reservations, memory filling with empty space, and a machine that could
+> serve everyone saying no to everyone. The next section counts exactly how
+> much gets turned away.
+
+??? question "Why can't the cache just grow as the conversation grows?"
+    Because a sequence's cache must stay one continuous strip of memory: the
+    chip reads it as a single block. A strip can only extend into space right
+    after it, which belongs to the next sequence. Growing = copying everything
+    to a bigger location, too slow for live tokens. The fix is to give up on
+    contiguity entirely. [Full answer](qa.md#why-cant-the-sequences-cache-just-grow-as-it-needs-space)
 
 ---
 

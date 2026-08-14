@@ -578,3 +578,39 @@ token counts, and approximate; the real `batch_bench.py` run on the actual
 model will print different (and larger) numbers. Second, the demo is the
 *ideal* continuous batching (zero overhead, always work waiting), which is why
 the book calls 2.57× a ceiling you'll measure under.
+
+---
+
+## Why can't the sequence's cache just grow as it needs space?
+
+**Lecture:** [09. Paged attention](09-paged-attention.md)
+
+The natural reaction to the book's reservation numbers is: why book 32,768
+columns for a chat that will use 128? Why not give each conversation a small
+cache and grow it on demand, like Python lists do?
+
+The wrong intuition is that memory is a free-for-all you can carve anywhere.
+On the GPU the cache for one sequence must be one **continuous strip**: the
+attention kernel reads the whole strip as a single block in one read. A strip
+can only grow at its end, into the space immediately after it:
+
+```
+row A:  [  used, 128 tokens ][ ? ]
+                              ^
+                    if this is row B's space, row A cannot grow
+```
+
+You could give row A more room by copying the whole strip to a bigger free
+area, but that copy is gigabytes and happens between two tokens that are a
+few milliseconds apart. Copying at that rate is impossible, so the engine
+never does it. It books the worst case at admission and keeps the booking
+until the sequence ends, even if only 0.4% of it is ever used.
+
+Note the slightly killer line: it is not just that row A wastes space. Row A's
+booking is *exclusive*: the 99.6% of empty columns belong to row A and no one
+else may use them. The machine fills with empty-but-reserved space, and the
+scheduler keeps saying no. The fix this lecture sells is giving up on the
+continuous strip entirely: cut a sequence into fixed pieces (blocks), scatter
+them anywhere, and keep a little table (block table) that says which piece is
+where. The pieces need not be next to each other, so nothing has to be copied
+when the conversation grows: you just add one more piece.
