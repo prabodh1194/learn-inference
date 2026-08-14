@@ -26,11 +26,11 @@ Attention is causal, each token attends only to what came before. So when the
 model computes `K` and `V` for token 5 at step 5, those tensors are **final**.
 They don't change at step 6, or 400. Recomputing them is pure waste.
 
-??? question "Wait — I thought K, Q, V were pre-calculated, and we only load them during inference?"
+??? question "Wait, I thought K, Q, V were pre-calculated, and we only load them during inference?"
     Only the **weight matrices** are pre-calculated (trained once, fixed). The
     K/V *vectors* are activations, computed at runtime per token by multiplying
     the token's hidden state against those weights: `K = X·W_K`. The cache
-    stores each token's K/V the first time it's computed — after that it's a
+    stores each token's K/V the first time it's computed; after that it's a
     load, but something has to compute them once. If they were only loaded,
     prefill would have nothing to fill the cache with.
 
@@ -82,7 +82,7 @@ cache_bytes = 2 × n_layers × n_kv_heads × head_dim × dtype_bytes × seq_len 
 ```
 
 Where 112 KiB per token comes from, one factor at a time (every column of the
-cache is an fp16 K or V vector — 2 bytes per element):
+cache is an fp16 K or V vector (2 bytes per element):
 
 ```
 per layer, per token:
@@ -100,7 +100,7 @@ So each row of the table is `seq_len × 112 KiB`:
 ```
 
 At 32k context that's 3.5 GiB for a *single* sequence, on a model whose weights
-are 840 MiB — the cache is **4.3× the model** (3,670,016 KiB ÷ 860,160 KiB).
+are 840 MiB; the cache is **4.3× the model** (3,670,016 KiB ÷ 860,160 KiB).
 
 **The cache outgrows the model.** This is why Lectures 09 (paging) and 10 (prefix
 sharing) exist: once you have a cache, the entire game becomes spending that

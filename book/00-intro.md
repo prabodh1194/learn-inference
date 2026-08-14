@@ -240,7 +240,7 @@ all visible there.
 
 **On 8GB it is tight but workable.** Qwen3-0.6B is 2.2 GiB in float32 (which
 Lecture 03 recommends on MPS, because fp16 has accuracy quirks there) against
-8GB of *unified* memory shared with the OS. Where that figure comes from — note
+8GB of *unified* memory shared with the OS. Where that figure comes from, note
 it counts the **tied embedding**, so the base differs from the 840 MiB used
 everywhere else (which is the 440.4M *non-embedding* params in fp16):
 

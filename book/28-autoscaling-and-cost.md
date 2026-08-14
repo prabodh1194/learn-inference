@@ -51,7 +51,7 @@ ratio vs full utilization:  $0.174 / $0.035  =  4.97x
 
 **5× more expensive than the same engine at 100% utilization, and the engine
 didn't change.** (Against a more realistic 80% baseline: 7.2M × 0.8 = 5.76M/hr,
-$0.25 / 5.76M × 1M = $0.043/M, and $0.174 / $0.043 = 4.0× — 4× more.)
+$0.25 / 5.76M × 1M = $0.043/M, and $0.174 / $0.043 = 4.0×; 4× more.)
 
 This is the punchline of Part V: **at low utilization, utilization dominates every
 kernel optimization in Part III.** Put numbers on it: raising utilization from

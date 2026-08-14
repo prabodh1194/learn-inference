@@ -53,7 +53,7 @@ On a 24GB 3090 with realistic mixed traffic:
         32768            6        84    14.0x
 ```
 
-The gain column is one division each — how many more sequences paging fits into
+The gain column is one division each: how many more sequences paging fits into
 the same KV budget:
 
 ```

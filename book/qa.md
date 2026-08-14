@@ -169,8 +169,8 @@ time is *bytes moved / bandwidth*, and FLOPS appears nowhere in that ratio.
 
 | | double FLOPS | double bandwidth |
 |---|---|---|
-| **TTFT** — prefill, compute-bound | roughly **halves** | unchanged* |
-| **TPS** — decode, memory-bound | **unchanged** | roughly **doubles** |
+| **TTFT** (prefill, compute-bound) | roughly **halves** | unchanged* |
+| **TPS** (decode, memory-bound) | **unchanged** | roughly **doubles** |
 
 TTFT is dominated by prefill, which is compute-bound:
 
@@ -180,13 +180,13 @@ TTFT ≈ 2 × params × prompt_tokens / achieved_FLOPS
 
 Double the FLOPS, halve the prefill time. Two caveats:
 
-- "achieved", not the spec sheet's peak — and only while prefill is genuinely
+- "achieved", not the spec sheet's peak, and only while prefill is genuinely
   compute-bound. Short prompts are launch- and tokenizer-bound, and TTFT also
   includes queue wait, so tiny prompts won't halve.
 - The same change leaves decode exactly where it was. The GPU loads the same
   bytes per token; how fast it could multiply them is irrelevant.
 
-The rule that generalizes: **TPS moves only when arithmetic intensity moves** —
+The rule that generalizes: **TPS moves only when arithmetic intensity moves**;
 more tokens sharing one weight load (batching, longer prompts, prefix reuse).
 Peak FLOPS is not on that list. *Renting a faster GPU fixes TTFT; it does not
 fix decode.*
@@ -205,7 +205,7 @@ compute-bound. Bandwidth only starts to matter there at very short prompts.
 getting *slower*."
 
 It saturates; it doesn't reverse. While decode is memory-bound, the per-step
-cost is the weight load, which is fixed — batch 32 costs almost the same as
+cost is the weight load, which is fixed; batch 32 costs almost the same as
 batch 1. Once compute takes over, per-step time grows linearly with batch, so
 throughput (batch ÷ step time) plateaus. Where? One output token costs
 `2 × params` FLOPs (one multiply-accumulate per weight), so a step of batch B
@@ -229,8 +229,8 @@ intensity(B) = 2·params·B / (2·params + kv_per_token·C·B)   →   ~7,700/C 
 As batch grows, intensity approaches a ceiling of about **7,700 ÷ context** for
 Qwen3-0.6B (attention FLOPS add a small +2). Against the 3090's ridge of ~76:
 
-- context 768 (typical chat): ceiling ≈ 12 — memory-bound at **every** batch.
-- context 64: ceiling ≈ 122 — compute-bound only past roughly B≈200.
+- context 768 (typical chat): ceiling ≈ 12; memory-bound at **every** batch.
+- context 64: ceiling ≈ 122; compute-bound only past roughly B≈200.
 
 So the FLOPS wall is a short-context curiosity here. What breaks first is the
 KV cache: at a few thousand tokens of context, a 24 GB card runs out of blocks
@@ -330,7 +330,7 @@ pass**:
 
 ??? question "Why can't the GPU just keep the weights on-chip?"
     **SRAM is tiny.** A 3090 has ~128 KB of L1 per SM and 6 MB of L2, against
-    840 MiB (880.8 MB) of weights — off by ~147× even against L2:
+    840 MiB (880.8 MB) of weights, off by ~147× even against L2:
 
     ```
     880.8 MB / 6 MB  =  ~147×
@@ -400,17 +400,17 @@ for 256 tokens.
 
 **Lecture:** [05. The KV cache](05-kv-cache.md)
 
-No — and this is a load-bearing distinction. Three different things travel
+No, and this is a load-bearing distinction. Three different things travel
 through the name "Q/K/V":
 
-1. **The weight matrices W_Q, W_K, W_V** — pre-calculated (trained once), fixed,
+1. **The weight matrices W_Q, W_K, W_V**: pre-calculated (trained once), fixed,
    and only **loaded** during inference. Loading these is the 840 MiB of pure
    memory traffic that makes decode memory-bound.
-2. **The per-token K/V vectors** — *not* pre-calculated. They are activations,
+2. **The per-token K/V vectors**: *not* pre-calculated. They are activations,
    produced at runtime by multiplying each token's hidden state against the
    weights: `K = X·W_K`. This is a matrix multiplication, real arithmetic, and
    it happens on the GPU while the model runs.
-3. **Q** — an activation too, recomputed every step and thrown away (never
+3. **Q**: an activation too, recomputed every step and thrown away (never
    cached, because the query changes every step).
 
 So a decode step both **computes and loads**:
@@ -423,8 +423,8 @@ load:     all 840 MiB of weights         (the memory-bound part)
 ```
 
 The cache is a *store* for step 2's output. Each token's K/V enters the cache
-once — during prefill for prompt tokens, during decode for generated ones — and
-from then on is only loaded. The "computed once, loaded many times" pattern is
+once, during prefill for prompt tokens and during decode for generated ones,
+and from then on is only loaded. The "computed once, loaded many times" pattern is
 the whole point.
 
 **The wrong intuition, and why it's wrong:** "pre-calculated" is true of the

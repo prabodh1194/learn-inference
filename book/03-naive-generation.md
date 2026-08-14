@@ -34,7 +34,7 @@ Generating 512 tokens from a 64-token prompt, with no cache:
 ```
 
 Every number above is a sum. Step `n` runs `64 + n − 1` tokens through the
-model, and of those only 1 (the newest) is genuinely new work — on step 1 the
+model, and of those only 1 (the newest) is genuinely new work; on step 1 the
 whole prompt is new, so that one step is all useful. Over all 512 steps:
 
 ```
@@ -45,7 +45,7 @@ share     = 163,009 / 163,584          = 99.6%
 ```
 
 The 19.1 TFLOP is the same sum turned into projection FLOPs. Each K/V vector
-is a multiply-accumulate over `hidden × kv_dim` weights, in every layer — that's
+is a multiply-accumulate over `hidden × kv_dim` weights, in every layer; that's
 `2 × n_tokens × hidden × kv_dim × n_layers` FLOPs per token set, twice (K and
 V), so for the 163,009 wasted vectors:
 
@@ -54,7 +54,7 @@ V), so for the 163,009 wasted vectors:
 (projections only -- attention itself wastes more)
 ```
 
-**99.6% waste.** And the scaling table — each row is the same sum with a
+**99.6% waste.** And the scaling table: each row is the same sum with a
 different upper limit (`Σₙ₌₁ᴺ (64 + n − 1) = N · 63 + N(N−1)/2`):
 
 ```

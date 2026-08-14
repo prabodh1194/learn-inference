@@ -89,7 +89,7 @@ Two ceilings, because the machine has two limits:
   peak FLOPS.
 
 The corner where they meet is the **ridge point**, and it sits at exactly the
-ops:byte ratio (295 for an H100, 76 for a 3090 — both are the same division):
+ops:byte ratio (295 for an H100, 76 for a 3090; both are the same division):
 
 ```
 H100   989 TFLOPS  / 3.35 TB/s  =  295.2 ops:byte
@@ -120,7 +120,7 @@ percent of the GPU's arithmetic:
 
 Prefill lands at ~510, on the other side. Same weights, same kernels, opposite
 ceilings. (Where 510 comes from: prefill loads the weights once and does
-`2 × params × N` FLOPs with them, so intensity ≈ `2·params·N / weight_bytes` —
+`2 × params × N` FLOPs with them, so intensity ≈ `2·params·N / weight_bytes`,
 derived in full in the "See it" section below.)
 
 Every technique in Parts II and III is an answer to the same question: *how do I
@@ -153,7 +153,7 @@ Three matrices get materialized in memory:
 Each step reads its inputs from memory, computes, and writes its output back.
 Add the traffic up step by step.
 
-**Step 1 — `S = QK^T`.** Reads the two small matrices, writes the big one:
+**Step 1: `S = QK^T`.** Reads the two small matrices, writes the big one:
 
 ```
 read  Q     Nd values    ->  2Nd bytes
@@ -163,7 +163,7 @@ write S     N² values    ->  2N² bytes
 step 1 total                  4Nd + 2N²  bytes
 ```
 
-**Step 2 — `P = softmax(S)`.** The score matrix must come back from memory,
+**Step 2: `P = softmax(S)`.** The score matrix must come back from memory,
 get softmaxed element-wise, and the result written out again:
 
 ```
@@ -173,7 +173,7 @@ write P     N² values    ->  2N² bytes
 step 2 total                   4N²  bytes
 ```
 
-**Step 3 — `O = PV`.** P comes back a second time; V and O are the small ones:
+**Step 3: `O = PV`.** P comes back a second time; V and O are the small ones:
 
 ```
 read  P     N² values    ->  2N² bytes
@@ -190,10 +190,10 @@ memory  = (4Nd + 2N²) + (4N²) + (2N² + 4Nd)
         = 8N² + 8Nd   bytes
 ```
 
-**Compute.** Two matmuls — `S = QK^T` multiplies (N,d) × (d,N) and
+**Compute.** Two matmuls: `S = QK^T` multiplies (N,d) × (d,N) and
 `O = PV` multiplies (N,N) × (N,d), each a multiply-accumulate per output
-element: `2N²d` ops. Softmax is a per-element pass over the N² matrix —
-subtract the row max, take exp, divide by the row sum — counted as 3 ops per
+element: `2N²d` ops. Softmax is a per-element pass over the N² matrix
+(subtract the row max, take exp, divide by the row sum), counted as 3 ops per
 element (the max and sum reductions are cheaper passes, folded into those):
 
 ```
@@ -236,16 +236,16 @@ Against an H100's 295, attention is memory-bound by nearly 5×:
 295 / 62.4  =  4.73× below the ridge
 ```
 
-**Read that memory breakdown before moving on — it is the whole lesson.** The
+**Read that memory breakdown before moving on; it is the whole lesson.** The
 useful data (Q, K, V, O) is `8Nd` = 4 MiB. The score matrices are `8N²` =
-128 MiB — **32× more, and every byte of it is written to memory only to be
+128 MiB, **32× more, and every byte of it is written to memory only to be
 read straight back**: S is stored so softmax can re-read it, P is stored so the
 output can re-read it. S alone is 32 MiB at this size, round-tripped for
 nothing. Deleting that round-trip is exactly what FlashAttention does
 (Lecture 17): tile S and P so they live in on-chip SRAM and never touch memory.
 
 One more thing the formula gives for free. As N grows, the `Nd` terms vanish
-and the intensity approaches a ceiling. Take the limit step by step — divide
+and the intensity approaches a ceiling. Take the limit step by step: divide
 numerator and denominator by N:
 
 ```
@@ -261,7 +261,7 @@ That is `(4d + 3)/8 = d/2 + 3/8`. For d = 128:
 64 + 0.375  =  64.4 ops:byte
 ```
 
-Attention intensity rises with N but can never exceed d/2 + 3/8 — for d=128
+Attention intensity rises with N but can never exceed d/2 + 3/8; for d=128
 that's 64.4, still 4.6× below the H100's ridge of 295:
 
 ```
@@ -285,7 +285,7 @@ Confirm the book's worked example first:
 intensity     62.4 ops:byte   (book says ~62)
 ```
 
-Then the number that matters — and where it comes from, so it's never a bare
+Then the number that matters, and where it comes from so it's never a bare
 figure. Decode at sequence length 2048: one step moves all the weights plus the
 2048 tokens of KV already stored, and does one multiply-accumulate per weight:
 
@@ -312,8 +312,8 @@ decode  (1 token, 2048 ctx)   0.79 ops:byte
 prefill (512 tokens)        510.78 ops:byte
 ```
 
-Two notes so the numbers stay honest. **0.79 is instantaneous at 2048 context**
-— it's the intensity of *one* decode step. Lecture 01's 0.92 was the whole
+Two notes so the numbers stay honest. **0.79 is instantaneous at 2048 context**:
+it's the intensity of *one* decode step. Lecture 01's 0.92 was the whole
 generation averaged, including the KV cache growing from 512 to 768 tokens;
 same algorithm, different windows. And both sit far below the ridge either way.
 Second, **the ridge table**, same division for every card:

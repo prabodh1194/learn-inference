@@ -169,7 +169,7 @@ So:
 ??? question "Then why doesn't a faster GPU make decode faster?"
     TPS is set by arithmetic intensity, not peak FLOPS: decode moves
     bytes/bandwidth, and bandwidth is what you'd have to raise. Doubling FLOPS
-    halves TTFT (prefill is compute-bound) and leaves TPS flat — unless the
+    halves TTFT (prefill is compute-bound) and leaves TPS flat; unless the
     extra FLOPS come from batching, which raises intensity instead.
 
     [Q&A: what happens to TTFT and TPS?](qa.md#you-double-the-flops-but-keep-the-bandwidth-what-happens-to-ttft-and-tps)
@@ -189,7 +189,7 @@ going to load those weights regardless. Batching gets the extra work for free.
 That's not a minor optimization; it's why serving engines exist.
 
 ??? question "So is a bigger batch always better?"
-    No — it saturates, it never reverses. Past the crossover, throughput
+    No: it saturates, it never reverses. Past the crossover, throughput
     plateaus at roughly peak_FLOPS / (2 × params) while latency keeps climbing.
     And for this model on a 3090, the crossover only exists for contexts under
     ~100 tokens: realistic decode is memory-bound at every batch size. What

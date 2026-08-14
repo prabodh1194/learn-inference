@@ -31,7 +31,7 @@ algorithm. *(L02)*
 **ridge point** of the roofline. H100 ≈ 295, RTX 3090 ≈ 76. *(L02)*
 
 **Memory-bound**: intensity below the ridge; the GPU waits on memory. Decode, at
-~0.79 ops:byte. *(L01, L02 — 880.8 MFLOP ÷ 1,115.7 MB per step)*
+~0.79 ops:byte. *(L01, L02: 880.8 MFLOP ÷ 1,115.7 MB per step)*
 
 **Compute-bound**: intensity above the ridge; arithmetic units are the limit.
 Prefill. *(L01, L02)*

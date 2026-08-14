@@ -29,7 +29,7 @@ twice:
 ```
 
 Four touches of the 32 MiB matrix, one per step of the bullet list: write S,
-read S, write P, read P — **128 MiB of round-tripping to compute one attention
+read S, write P, read P: **128 MiB of round-tripping to compute one attention
 head**, on data that is never needed again (and the same 8N² the Lecture 02
 formula counts). It exists only because the algorithm was written as three
 separate matrix operations.
