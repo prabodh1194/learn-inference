@@ -1,7 +1,7 @@
 # 07. Static batching
 
 **Build:** `engine/generate.py::generate_batched` · **Test:** `tests/test_07_batching.py`
-**Demo:** `book/code/batching_waste.py` · **Moves:** aggregate throughput up several ×; per-user latency **worse**
+**Demo:** `book/code/batching_waste.py` · **Visual:** `book/code/batch_animation.py` → `assets/batch-waste.gif` · **Moves:** aggregate throughput up several ×; per-user latency **worse**
 **Prereq:** [06. Sampling](06-sampling.md)
 
 ---
@@ -116,6 +116,25 @@ Check the last row the same way: `1 / (1 − 0.659) = 1 / 0.341 = 2.93×`.
 
 Bigger batches do more useful work per weight load **and** waste more slots,
 simultaneously. Static batching cannot escape this; the two move together.
+
+> **Watch it happen.** The same seed-0 `mixed_length` run, animated one decode
+> step per frame — top panel, a finished sequence's slot sits dead until its
+> batch's longest member ends; bottom panel, the same requests stream through 8
+> slots with no idle time:
+
+![static batching holds finished slots dead; continuous batching refills them](assets/batch-waste.gif)
+
+> Regenerate it (or check the numbers) from the same counting rules:
+
+```bash
+uv run python book/code/batch_animation.py          # the on-screen run
+uv run python book/code/batch_animation.py --full   # asserts the demo's 61.0% / 0.0% / 2.57x
+```
+
+> The on-screen run shows the first 16 requests with lengths ÷8 so it fits;
+> its own counter says 63.4% — same counting rule, a smaller cut of the
+> workload. `--full` replays the untouched 32-request workload and asserts it
+> reproduces the lecture's numbers exactly.
 
 > **Note what the uniform row implies.** If you benchmark only on uniform load,
 > static batching looks as good as anything else and you'd conclude the next
