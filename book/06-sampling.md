@@ -38,6 +38,17 @@ logits = logits / temperature
 - `T > 1` flattens it, more diverse, more likely to be incoherent.
 - `T = 0` is a special case: it means **argmax**, not division by zero. Guard it.
 
+??? question "Why not just use a very small temperature instead of special-casing 0?"
+    Two reasons. First, it's a literal division by zero, logits/T gives NaN.
+    Second, any finite T is still a probability distribution: even at `T=1e-9`
+    the sampler *could* pick token #2, the probabilities are just tiny.
+    "Tiny T ≈ greedy" is never exactly deterministic, and this lecture's
+    whole reason for having greedy is the deterministic test oracle. So
+    argmax gets its own code path that is guaranteed deterministic, instead
+    of a distribution so peaked that float jitter decides.
+
+    [Full answer in the Q&A](qa.md#why-is-temperature-0-special-cased-instead-of-a-very-small-divisor)
+
 ### Top-k
 
 Keep the `k` highest-probability tokens, zero the rest, renormalize. Blunt but

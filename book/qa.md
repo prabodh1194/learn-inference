@@ -498,3 +498,34 @@ parameter promises. That's why the correct form branches on the sign, and why
 One more edge case: a logit of exactly zero is untouched by either operation
 (0/1.2 = 0×1.2 = 0), which is correct, a token the model is indifferent to
 shouldn't be moved at all by the sign convention.
+
+---
+
+## Why is temperature 0 special-cased instead of a very small divisor?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+**Wrong intuition:** "T=0.0001 is basically greedy, so why does the code branch
+to argmax?"
+
+Two reasons, one mechanical and one principled.
+
+**Mechanical.** `T=0` is division by zero. `logits / 0.0` produces NaN on CUDA,
+and `softmax` of a vector full of NaN is NaN; the sample comes back garbage.
+So the code must branch on `T == 0` regardless.
+
+**Principled.** "Basically greedy" is not greedy. With `T = 1e-9` you still
+have a proper probability distribution over the whole vocabulary; the
+second-best token's probability is not zero, it's `e^-δ/T` for the logit gap
+`δ`, which underflows to ~1e-434 at δ=1. The sampler *can't* pick token #2 in
+practice, but the path is probabilistic, and more importantly the guarantee is
+not structural: any future change (a tie between two max logits, a float
+rounding, a fused kernel) can tip it.
+
+Greedy-as-argmax is this lecture's test oracle: every later optimization
+(batching, paging, prefix caching, speculative decoding) is asserted to produce
+*exactly* the same tokens as the reference. That assertion only has teeth if
+the greedy path is deterministic by construction, not by "the odds are
+astronomically against a different token." So `T=0` becomes its own mode with
+a guarantee, which is also what makes run-to-run output differences
+unambiguous to debug (check-yourself Q3).
