@@ -77,6 +77,23 @@ mixed_length (realistic)
 
 **Zero waste on uniform load. 61% on realistic load.**
 
+Where those two numbers come from: the demo **counts slots** on a simulated
+workload, it never runs a model. `mixed_length` is 32 seeded random requests
+(prompts 16–512 words, outputs 8–512 tokens), and the counting rule is the
+definition of static batching:
+
+```
+prefill:  per batch of 8, slots = longest_prompt × 8     (padding to the longest)
+decode:   per batch of 8, slots = longest_output × 8     (slots held until the end)
+waste     =  1 - useful / slots
+```
+
+Totals over all four batches: prefill allocates 16,384 slots for 5,904 useful
+prompt tokens → **64.0%**; decode allocates 14,336 slots for 5,584 useful
+output tokens → **61.0%**. The 2.57× is the same tally as a ratio
+(14,336 / 5,584). Seeded, so it reproduces exactly — and it's a *ceiling*,
+because the real scheduler in Lecture 08 lands under it.
+
 Those two numbers are the same equation, and it's worth writing down because
 it converts every future waste figure into a speedup without a benchmark:
 

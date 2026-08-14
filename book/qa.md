@@ -529,3 +529,52 @@ the greedy path is deterministic by construction, not by "the odds are
 astronomically against a different token." So `T=0` becomes its own mode with
 a guarantee, which is also what makes run-to-run output differences
 unambiguous to debug (check-yourself Q3).
+
+---
+
+## Where do the 61% and 64% waste numbers in Lecture 07 come from?
+
+**Lecture:** [07. Static batching](07-static-batching.md)
+
+**Wrong intuition:** "Those must be measured on a GPU, or at least from real
+generation runs."
+
+They're the output of a **simulation** (`book/code/batching_waste.py`) that
+counts slots; it never runs a model. The workload is 32 requests drawn with
+`random.seed(0)`: prompts of 16–512 words, outputs of 8–512 tokens (word
+count stands in for token count). The counting rules are exactly the
+definition of static batching:
+
+```
+prefill:  each batch pads every prompt to its longest member
+          slots_per_batch  =  longest_prompt × 8
+          useful           =  the actual prompt tokens
+
+decode:   every slot stays occupied until the batch's longest output ends
+          slots_per_batch  =  longest_output × 8
+          useful           =  the actual output tokens
+```
+
+Run the tally by hand on batch 0 (prompts 128, 16, 256, 128, 32, 256, 512,
+256; outputs 16, 512, 128, 512, 8, 256, 128, 16):
+
+```
+prefill:  longest prompt = 512  ->  512 × 8 = 4,096 slots, 1,584 useful
+          waste = 1 - 1,584/4,096 = 61.3%
+decode:   longest output = 512   ->  512 × 8 = 4,096 slots, 1,576 useful
+          waste = 1 - 1,576/4,096 = 61.5%
+
+all 4 batches:  prefill 16,384 slots / 5,904 useful  =  64.0%
+                decode  14,336 slots / 5,584 useful  =  61.0%
+```
+
+So "61%": 61 out of every 100 decode slot-steps in the simulation are a
+finished request sitting in a held slot. "64%": 64 of every 100 padded prompt
+slots are filler. The 2.57× is the same tally as a ratio
+(`14,336 / 5,584 = 2.57`).
+
+Two honest caveats so the numbers stay fair. First, they're word counts, not
+token counts, and approximate; the real `batch_bench.py` run on the actual
+model will print different (and larger) numbers. Second, the demo is the
+*ideal* continuous batching (zero overhead, always work waiting), which is why
+the book calls 2.57× a ceiling you'll measure under.
