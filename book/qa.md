@@ -439,3 +439,62 @@ load it" is correct for the weights and wrong for the cache. Decode is
 memory-bound because of the **loads** (weights + past K/V), not because it
 stopped computing the new K/V. The new token's K/V projection is a small
 matmul; the load that dominates is the one that scales with context.
+
+---
+
+## Why does the repetition penalty divide positive logits but multiply negative ones?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+**Wrong intuition:** "A penalty should shrink every score, so just divide all the
+generated tokens' logits by the penalty."
+
+The flaw: dividing a **negative** number moves it **toward zero**, and closer to
+zero means *more* probable, not less. Division is a penalty for positive logits
+and a reward for negative ones.
+
+The penalty's real job is to push each penalized logit **away from zero**. A
+logit between -1 and 1 is a coin flip; the farther from zero it is, the more the
+model commits to favor (positive) or reject (negative) the token. So:
+
+```
+penalty = 1.2, token "cat" was already generated:
+
+  logit +5.0  ->  +5.0 / 1.2 = +4.17   pushed down,   less likely   ✓
+  logit -3.0  ->  -3.0 × 1.2 = -3.6    pushed down,   less likely   ✓
+  naive:      ->  -3.0 / 1.2 = -2.5    pushed UP toward zero, MORE likely  ✗
+```
+
+A concrete two-token example. After "cat" was generated, the model's raw logits
+are: cat = 1.0, dog = 0.8. Without any penalty, softmax gives:
+
+```
+P(cat) = e^1.0 / (e^1.0 + e^0.8) = 2.718 / (2.718 + 2.225)  =  55.0%
+```
+
+With penalty 1.2 applied to "cat":
+
+```
+cat  =  1.0 / 1.2  =  0.833
+P(cat) = e^0.833 / (e^0.833 + e^0.8) = 2.300 / (2.300 + 2.225)  =  50.8%
+```
+
+"cat" fell from 55% to 51%, and "dog" picked up the difference. Now flip the
+signs: cat = -1.0, dog = 0.8 (the model mildly dislikes "cat" already). The
+naive division gives cat = -0.83, which is *closer* to dog's neighborhood than
+before:
+
+```
+P(cat), penalty off:     e^-1.0 / (e^-1.0 + e^0.8)  =  0.368 / 2.594  =  14.2%
+P(cat), naive ÷1.2:      e^-0.83 / ...              =  0.436 / 2.662  =  16.4%   (up!)
+P(cat), correct ×1.2:    e^-1.2 / ...               =  0.301 / 2.527  =  11.9%   (down ✓)
+```
+
+The naive version makes a previously generated token *more* likely precisely
+when the model was already leaning against it, which is the opposite of what the
+parameter promises. That's why the correct form branches on the sign, and why
+"sign matters!" sits in the lecture's code.
+
+One more edge case: a logit of exactly zero is untouched by either operation
+(0/1.2 = 0×1.2 = 0), which is correct, a token the model is indifferent to
+shouldn't be moved at all by the sign convention.

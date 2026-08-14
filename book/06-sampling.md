@@ -57,9 +57,27 @@ This is the single most common top-p bug.
 ### Repetition penalty
 
 Divide (or multiply) the logits of already-generated tokens to discourage loops.
+The goal: a token that's already been generated should be *less* likely to be
+picked again. Since a higher logit means more likely, the penalty has to push
+every penalized logit **away from zero**:
+
+```
+positive logit, divide by penalty:   5.0 / 1.2  =  4.17   (less favorable)  ✓
+negative logit, multiply by penalty: -3.0 × 1.2  =  -3.6  (even less favorable) ✓
+zero: 0 / 1.2 = 0 × 1.2 = 0          (neutral either way)
+```
+
 Note the asymmetry: for a positive logit you divide, for a negative one you
-multiply, otherwise the "penalty" *increases* the score of negative-logit
-tokens. Another classic bug.
+multiply. A naive "divide everything" turns the penalty into a *reward* for
+negative-logit tokens: `-3.0 / 1.2 = -2.5`, which is closer to zero, hence
+more likely, the exact opposite of punishment. Another classic bug.
+
+??? question "Why multiply the negatives instead of dividing them?"
+    Softmax is monotone in the logit: closer to zero = more probable. Dividing
+    a negative number moves it toward zero, which *raises* its probability.
+    Multiplying a negative by something > 1 moves it further away, which is
+    what "penalize" actually means. [Worked example in the
+    Q&A](qa.md#why-does-the-repetition-penalty-divide-positive-logits-but-multiply-negative-ones)
 
 ### Order matters
 
