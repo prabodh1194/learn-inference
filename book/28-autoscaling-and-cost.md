@@ -86,9 +86,9 @@ B ≈ (F/BW) × (N_total / N_active)
 For a dense model (`N_active = N_total`) on the 3090 (`F/BW ≈ 76`) that is
 **B ≈ 76** — you need roughly 76 concurrent sequences before batching stops
 moving the price. For a frontier MoE in FP4, `F/BW ≈ 300` and the sparsity
-factor `N_total/N_active ≈ 8` (DeepSeek-style 256 experts, 32 active), so
-**B ≈ 2,400**. A solo user at batch 1 on that machine pays ~2,400× the
-per-token cost the provider's economics assume. Utilization and batch size are
+factor `N_total/N_active ≈ 18` (DeepSeek-V3: 671B total, 37B active, 8 of 256
+experts), so **B ≈ 5,400**. A solo user at batch 1 on that machine pays ~5,400×
+the per-token cost the provider's economics assume. Utilization and batch size are
 the two levers that dwarf everything in Part III — and batch 1 is the regime a
 personal server lives in.
 
@@ -229,6 +229,9 @@ high sustained volume the picture can reverse.
 measured it honestly, and priced it.
 
 ## Next
+
+**[28b. Reasoning and test-time compute](28b-reasoning-and-test-time-compute.md)**:
+the accuracy-is-a-cost-dial economy on top of everything here.
 
 **[29. Contributing](29-contributing.md)**: go work on the real thing.
 

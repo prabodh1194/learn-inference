@@ -111,6 +111,15 @@ are 840 MiB; the cache is **4.3× the model** (3,670,016 KiB ÷ 860,160 KiB).
 sharing) exist: once you have a cache, the entire game becomes spending that
 memory well.
 
+The `cache_bytes` formula has a second lever this book hasn't pulled yet: shrink
+the *number* of cached entries, not just the bytes each takes. The headline
+technique is **MLA (multi-head latent attention)**, which caches a small
+low-rank *latent* per token and rebuilds K/V on the fly, shrinking the whole KV
+tensor instead of just its precision; sparse and summarising attentions do the
+same thing along the sequence. Lecture 19 attacks `dtype_bytes`; this attacks
+the `n_kv_heads × head_dim` term directly, and the two compose.
+[Full answer](qa.md#does-the-kv-cache-have-to-grow-linearly-what-is-mla)
+
 ??? question "What's the difference between an attention head and a KV head?"
     An attention head has its own **Q**; a KV head owns a **K,V** pair. Classic
     MHA ties them 1:1. GQA lets several queries share one K/V, Qwen3-0.6B has
@@ -259,6 +268,9 @@ workload choice determines what you can even see.
   field.
 - **[GQA: Training Generalized Multi-Query Transformer Models](https://arxiv.org/abs/2305.13245)**
   (Ainslie et al., 2023), why 8 KV heads instead of 16.
+- **[DeepSeek-V2](https://arxiv.org/abs/2405.04434)**: introduced MLA, caching a
+  low-rank latent per token instead of full K/V — the "shrink the number of
+  entries" lever, the complement to GQA's head reduction.
 - **[Field notes](field-notes.md)**: practitioners running 170k context on 2×3090.
   At that length the cache dwarfs the weights.
 

@@ -88,6 +88,10 @@ Compressing it buys concurrency rather than per-step speed. The
 [field notes](field-notes.md) flag a recurring caveat: KV compression that looks
 fine on general text can degrade **reasoning** specifically.
 
+Quantization changes the *bytes per entry*; structural methods (MLA, sparse
+attention, token merging, Lecture 05's "second lever") change the *number* of
+entries. The two compose, and the field-notes caveat applies to both.
+
 ### The methods worth knowing
 
 | Method | Idea |

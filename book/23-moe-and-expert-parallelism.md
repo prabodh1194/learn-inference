@@ -49,8 +49,14 @@ The vocabulary that follows from this, and which trips people up:
 - **Total parameters**: everything stored. Determines memory.
 - **Active parameters**: what runs per token. Determines compute.
 
-DeepSeek-V3 is 671B total, 37B active. With the book's standing convention of
-2 bytes per weight (the same arithmetic Lecture 22 used for its 70B example):
+DeepSeek-V3 is 671B total, 37B active. Its MoE shape is **1 shared expert plus
+256 routed experts, top-8**: each token's router picks the 8 best of 256
+(`8/256 = 3.1%` of the experts), on top of the always-on shared one. The
+original DeepSeekMoE made the same point at laptop scale: a **16B-total,
+2.8B-active** model going head-to-head with a 7B dense LLaMA while doing only
+`2.8/7 = 40%` of the arithmetic per token (and running `7/2.8 = 2.5×` faster).
+With the book's standing convention of 2 bytes per weight (the same arithmetic
+Lecture 22 used for its 70B example):
 
 ```
 total :  671B × 2 B  =  1,342 GB  ≈  1.34 TB    must be resident, always
@@ -63,6 +69,12 @@ The 1.34 TB is what you buy; the 74 GB is what you actually use per token, an
 18.1× buffer (`1,342 / 74 = 18.1`, the same ratio as `671 / 37`).
 
 That mismatch is the entire inference story for MoE.
+
+The small model makes the trap concrete: DeepSeekMoE's 16B model fits a 40 GB
+GPU because `16B × 2 B = 32 GB`, *not* because only 2.8B is active. Believe the
+second reason and you'll wrongly conclude a 100B-total MoE fits a 40 GB card
+"because only 20B is active". Memory is set by **total**; active only sets
+compute.
 
 ### What this does to your bottlenecks
 
@@ -105,6 +117,37 @@ But a new cost appears: **routing is dynamic and unbalanced.** Which experts a
 token needs isn't known until the router runs, and different tokens in a batch
 want different experts.
 
+### Fine-grained and shared experts
+
+Two design choices explain *why* 256 experts rather than 8, and why a couple are
+"shared".
+
+**Fine-grained segmentation** slices each fat expert into smaller ones and routes
+to more of them: 16 experts with top-2 becomes 64 with top-8. Same total
+parameters, same active parameters, same FLOPs — but the router has far more
+combinations to choose from:
+
+```
+C(16, 2)  =  16·15 / 2          =  120        possible expert pairs
+C(64, 8)  =  64! / (8! 56!)     ≈  4.4 billion
+```
+
+Granularity buys *combinations*, not capacity: the router can assign each token a
+more precisely matched subset. That is what the "256 skinny experts" in the V3
+number above is doing.
+
+**Shared experts** are a couple of experts that are always on, no routing. They
+hold the knowledge every token needs (grammar, common facts); the routed experts
+hold the specialist edge. The serving consequence matters: shared experts are
+*dense* compute — every token hits them, so they batch like a dense model —
+while routed experts are *sparse* dispatch, tokens scattering to different GPUs.
+V3's "1 shared + 256 routed" is exactly this split.
+
+The motivation for both is that knowledge in a dense model is **hybrid** (each
+neuron mixes many concepts) and **redundant** (one concept in many places).
+Fine-grained + shared is the fix: isolate the common knowledge in always-on
+experts, and let the routed ones specialize.
+
 ### Expert parallelism
 
 TP splits every tensor across GPUs. EP takes a different axis: **put whole experts
@@ -143,6 +186,15 @@ layers keep flowing) rather than a per-token latency one.
 **Production deployments mix them**: TP for attention (which isn't expert-sharded)
 and EP for the MoE layers. Kiely's Fig 5.15 (p.146) diagrams exactly this.
 
+One caveat from the largest deployments: cross-node EP's all-to-all is *not*
+free — DeepSeek reports the compute-to-communication ratio is near 1:1 across
+nodes, which is why V3 shipped custom all-to-all kernels and a "DualPipe" to
+hide the transfer underneath compute. "EP scales multi-node" is true, but only
+with that overlap work. And with 257 experts to shard, V3 **skipped tensor
+parallelism entirely**: enough experts give EP the intra-node sharding TP would,
+without the per-layer all-reduce. TP is the default when experts are few; EP can
+absorb its role when they are many.
+
 ### Load imbalance is the operational problem
 
 Nothing guarantees experts get equal traffic. Some are popular; their GPU becomes
@@ -158,6 +210,11 @@ Mitigations you'll see in the wild:
 - **Auxiliary load-balancing loss**: a training-time nudge toward uniformity; a
   small penalty term added when routing gets lopsided, so the router learns to
   share work before serving ever sees it.
+- **Auxiliary-loss-free routing** (DeepSeek-V3's choice): no penalty term at all.
+  A per-expert bias is added to the router's scores *at serving time* —
+  under-used experts get their bias nudged up, over-used nudged down — so the
+  router balances load without fighting the next-token objective. No gradient,
+  no loss term; the language-modeling loss stays pure, and the bias adapts live.
 - **Expert replication**: duplicate hot experts across GPUs, buying the
   popular ones extra attention at the cost of memory.
 

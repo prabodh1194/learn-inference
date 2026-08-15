@@ -79,7 +79,10 @@ production.
 run and maintain a second model.
 
 **Medusa**: extra heads on the target model predicting several positions ahead.
-No separate model, but requires training.
+No separate model, but requires training. DeepSeek-V3's **MTP** (multi-token
+prediction) is the production form of this — the model drafts its own next
+tokens, and its self-speculation accepts ~85–90% of drafts, ~1.8 tokens per
+step.
 
 **EAGLE**: predicts at the *feature* level rather than the token level, using
 hidden states (the model's internal numbers for a token as it moves through the

@@ -1172,9 +1172,10 @@ B ≈ (F/BW) × (N_total / N_active)
 
 For a dense model on the 3090 (`F/BW ≈ 76`), that's **B ≈ 76** concurrent
 sequences. For a frontier MoE in FP4, `F/BW ≈ 300` times a sparsity factor of
-~8 (256 experts, 32 active) gives **B ≈ 2,400**. Below that batch you're paying
+~18 (DeepSeek-V3: 671B total / 37B active, 8 of 256 experts) gives
+**B ≈ 5,400**. Below that batch you're paying
 for bytes you didn't have to; a solo user on the big machine sits near batch 1
-and pays ~2,400× the provider's assumed per-token cost. This is the batch-side
+and pays ~5,400× the provider's assumed per-token cost. This is the batch-side
 twin of the utilization multiplier — the two structural gaps a personal server
 can never close.
 
@@ -1184,14 +1185,52 @@ can never close.
 
 **Lecture:** [01. The two phases](01-the-two-phases.md) · [05. KV cache](05-kv-cache.md)
 
-Yes. The crossover is where the KV re-read per step equals the weight read,
-`C × bytes/token ≈ N_active × bytes/param`. Both sides differ by ~100× between
-the book and a frontier model: the book's Qwen3-0.6B has `bytes/token ≈ 112
-KiB` and ~0.6B active params, so it crosses at ~8k; a frontier model with
-~100B active params and ~1.7 KB/token (compressed KV) crosses at `~1e11 /
-(300×2e5) ≈ 1.7 KB` — i.e. ~200k. Different numbers, same balance point: the
-cache starts dominating when `context × bytes/token` catches up to the active
-weight set. That's why providers charge a premium past ~200k context, and why
-"long context" is a relative term that scales with model size.
+Yes. The crossover is where the KV re-read per step equals the weight read:
+`C × bytes/token = N_active × bytes/param`, i.e.
+
+```
+C = N_active × bytes/param / bytes_per_token
+```
+
+The book's Qwen3-0.6B: 840 MiB of weights against 112 KiB/token gives `840 MiB
+/ 112 KiB ≈ 7,500` tokens, hence "~8k". A frontier MoE with 37B active params in
+fp8 (1 byte each) and ~1.7 KB/token of *compressed* KV:
+
+```
+C ≈ 37e9 × 1 / 1741 ≈ 21M tokens
+```
+
+Different by ~3,000×, not ~100× — and the crossover now sits *far above* any
+real context, so a 1M-token session never reaches it. That is exactly what
+structural KV compression (MLA, sparse attention) buys: it pushes the
+crossover out past where any context actually lands, which is why 1M-token
+serving is routine for DeepSeek-V4 while "~8k" holds for an uncompressed 0.6B
+model. "Long context" is a relative term that scales with active params and
+shrinks with KV compression.
+
+---
+
+## Does the KV cache have to grow linearly? What is MLA?
+
+**Lecture:** [05. KV cache](05-kv-cache.md) · [19. Quantization](19-quantization.md)
+
+Two levers shrink the cache, acting on different terms of `cache_bytes = 2 ×
+layers × heads × head_dim × dtype_bytes × seq × batch`:
+
+- **GQA** (Lecture 05) cuts the number of *heads* (`n_kv_heads`), by sharing one
+  K/V across several query heads.
+- **MLA (multi-head latent attention)** cuts the *size* of what you cache: store
+  a single low-rank latent `c_KV` per token instead of the full K/V vectors, and
+  up-project it into K and V on the fly during attention. The cache holds the
+  latent, not the projections, so the `head_dim` term collapses.
+
+The trade is the same shape as quantization: you pay recomputation (the
+up-projection runs every time an entry is used) to move fewer bytes and hold
+less memory. GQA and MLA compose — GQA cuts heads, MLA cuts the per-head size —
+and DeepSeek uses both, which is how a 1M-token context fits where the
+uncompressed formula says it can't. The field-notes caveat applies here too:
+aggressive KV compression that holds up on general text can degrade *reasoning*,
+because a long reasoning trace is precisely the regime where the cache is doing
+the most work.
 
 ---
