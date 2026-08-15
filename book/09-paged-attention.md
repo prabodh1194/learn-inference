@@ -289,54 +289,49 @@ into a design that assumed sole ownership is unpleasant. Build the hook now.
 The gather, in PyTorch, for prototyping:
 
 ```python
-def gather_kv(cache, block_table, seq_len, block_size):
-    """Reassemble a logical K/V sequence from scattered physical blocks."""
+def _gather(cache, block_table, seq_len, block_size):
+    """Reassemble ONE scattered tensor into a contiguous (seq_len, H, D) span.
 
-    # `cache` is ONE tensor: ONE layer's keys OR values. Shape:
-    #   (n_blocks_total, block_size, H, D)
-    #
-    # K and V are two different vectors (different weight matrices W_K and
-    # W_V), so they are stored in two SEPARATE tensors -- there is no "2"
-    # dimension. The full cache is 2 x n_layers = 2 x 28 = 56 of these
-    # tensors: per layer, a keys tensor and a values tensor. This function
-    # is called once per tensor, i.e. 56 times per attention pass.
-    #
-    # The four dimensions:
-    #   n_blocks_total  -- physical blocks in THIS layer's pool (allocated/free)
-    #   block_size      -- tokens per block (16)
-    #   H               -- KV heads (8: GQA shares one K/V per query group)
-    #   D               -- head dimension (128)
-    #
-    # Why H and D are separate: one token's key is not one flat vector. Each
-    # head has its OWN key vector of length D, so a token's keys are an
-    # (H, D) = (8, 128) grid = 1024 numbers. This is the 8 x 128 in the
-    # 112 KiB/token formula (Lecture 05):
-    #
-    #    2 (K & V) x 28 layers x 8 heads x 128 dim x 2 bytes = 112 KiB/token
-    #
-    # `block_table` is one sequence's *logical* order: a list of physical
-    # indices, e.g. [3, 7, 12] = "my tokens live in block 3, then 7, then 12".
+    `cache` is one layer's keys tensor OR its values tensor, shape
+    (n_blocks_total, block_size, H, D). Where the 112 KiB/token formula's
+    factors live:
 
-    # A Python list can't index a GPU tensor. Turn it into a tensor first,
-    # and put it on the same device as `cache` (indices and data must be
-    # on the same device, CPU with CPU, GPU with GPU).
+        2 (K & V)  -> two separate tensors per layer  (this is one of them)
+       28 (layers) -> 28 copies of that pair of tensors
+        8 (heads)  -> the H dimension INSIDE the tensor
+      128 (dim)    -> the D dimension INSIDE the tensor
+        2 (bytes)  -> the dtype (fp16), not a dimension
+
+    `block_table` is one sequence's logical order: a list of physical indices,
+    e.g. [3, 7, 12] = "my tokens live in block 3, then 7, then 12".
+    """
+    # A Python list can't index a GPU tensor; turn it into a same-device tensor.
     blocks = torch.tensor(block_table, device=cache.device)
 
-    # Fancy indexing: `cache[blocks]` picks out the *rows* whose indices are
-    # in `blocks`, in that same order. The other dims ride along, giving
+    # Fancy indexing: cache[blocks] pulls the rows at those indices, in order.
     #   (len(block_table), block_size, H, D)
-    # One line, and the scattered blocks are back in logical order.
     gathered = cache[blocks]
 
     # Collapse (n_blocks, block_size) into one token dim:
-    #   before (n_blocks, block_size, H, D)  ->  after (n_blocks*block_size, H, D)
-    # `-1` = "infer this size" (= n_blocks * block_size). `*cache.shape[2:]`
-    # unpacks and keeps (H, D) unchanged.
+    #   (n_blocks, block_size, H, D)  ->  (n_blocks*block_size, H, D)
+    # `-1` = "infer it"; `*cache.shape[2:]` keeps (H, D) unchanged.
     flat = gathered.reshape(-1, *cache.shape[2:])
 
     # The last block is usually half-empty (the sequence stopped mid-block).
-    # Keep only the `seq_len` tokens that actually exist.
+    # Keep only the seq_len tokens that actually exist.
     return flat[:seq_len]
+
+
+def gather_kv(k_cache, v_cache, block_table, seq_len, block_size):
+    """Gather a layer's keys AND values into two contiguous spans.
+
+    K and V live in separate tensors but share one block_table (a token's key
+    and value always sit in the same physical block), so gather each and return
+    (k, v), both (seq_len, H, D). Attention uses them as Q·Kᵀ then ·V.
+    """
+    k = _gather(k_cache, block_table, seq_len, block_size)
+    v = _gather(v_cache, block_table, seq_len, block_size)
+    return k, v
 ```
 
 Concretely, for one layer's *keys* tensor, with `block_table = [3, 7, 12]`,
@@ -349,11 +344,9 @@ flat            (48,    8, 128)      3 × 16 = 48 tokens
 flat[:seq_len]  (40,    8, 128)      drop the 8 pad tokens in block 12
 ```
 
-Run the same gather on the *values* tensor and you get a matching `(40, 8, 128)`
-V. Attention then uses the two together: `Q · Kᵀ` (against this gathered K) and
-`· V` (against the gathered V). K and V are gathered separately, but with the
-*same* `block_table`, because a token's key and value always live in the same
-physical block.
+`gather_kv(k_cache, v_cache, block_table, ...)` runs this twice — once on the
+keys tensor, once on the values tensor — and hands back the matching `(40, 8, 128)`
+K and V that attention consumes as `Q · Kᵀ` then `· V`.
 
 Correct and slow, it materializes the whole sequence. Fine for now; Lecture 18
 fuses it into the attention kernel so nothing is materialized at all.
