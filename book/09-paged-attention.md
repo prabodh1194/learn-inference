@@ -372,6 +372,10 @@ Lecture 18 wins most of it back.
 - **[Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180)**
   (Kwon et al., SOSP '23): the vLLM paper. **Read it now**, having just built
   the thing. §4 is the memory manager; the OS analogy is drawn explicitly.
+- **["What is vLLM? | PagedAttention | Fully Explained: an OS Trick for 4× Throughput"](https://www.youtube.com/watch?v=xgl9Qrz31Mc)**
+  (Papers by Hand): a by-hand walkthrough of the same paper — the three kinds
+  of waste, a decode traced block-by-block, copy-on-write, preemption, and
+  where the 2–4× number comes from.
 - **vLLM `vllm/v1/core/block_pool.py`** and **`kv_cache_manager.py`**, the
   production version of what you wrote.
 - **nano-vllm `nanovllm/engine/block_manager.py`**: ~4.3KB, much closer to yours.

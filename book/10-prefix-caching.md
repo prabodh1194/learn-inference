@@ -280,6 +280,10 @@ completely different results.
 
 - **[Efficient Memory Management ... PagedAttention](https://arxiv.org/abs/2309.06180)**
   §4.3, copy-on-write and sharing, which you just built.
+- **["What is vLLM? | PagedAttention | Fully Explained: an OS Trick for 4× Throughput"](https://www.youtube.com/watch?v=xgl9Qrz31Mc)**
+  (Papers by Hand): copy-on-write and refcounts drawn out — parallel sampling,
+  beam search (up to 55% KV saved), and one physical copy of a shared prefix
+  serving many requests.
 - **[SGLang / RadixAttention](https://arxiv.org/abs/2312.07104)** (Zheng et al.),   a radix tree instead of a flat hash map, so prefixes share *structurally*.
   Better for branching conversation trees.
 - **Kiely §5.3.1** (p.136–138): the ordering rule, with the SF/NYC example this
