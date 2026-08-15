@@ -65,6 +65,33 @@ kernel optimization in Part III.** Put numbers on it: raising utilization from
 attention kernel, at roughly 20% of decode runtime (Lecture 15's table), buys
 `30% × 20% = 6%` end-to-end. Knowing which lever you're pulling is the skill.
 
+### The batch floor
+
+Utilization is the *across time* multiplier; batch size is the *across
+requests* one. The cost model above assumes a healthy batch. Run the same
+engine at batch 1 and the price is wildly different, for a reason you already
+hold: decode is memory-bound, and its per-token cost is the weight re-read
+**divided by the batch** — `B` sequences share one 840 MiB load (Lecture 07), so
+a token costs `840 MiB / B` of weight traffic.
+
+There is a floor: no amount of batching makes a token cheaper than the compute
+it needs. On the roofline, compute cost is `1 / (F/BW)` — the inverse of the
+ridge from Lecture 02, FLOPs per byte the chip sustains. Where the memory-bound
+cost line meets that compute floor is the batch size that stops paying:
+
+```
+B ≈ (F/BW) × (N_total / N_active)
+```
+
+For a dense model (`N_active = N_total`) on the 3090 (`F/BW ≈ 76`) that is
+**B ≈ 76** — you need roughly 76 concurrent sequences before batching stops
+moving the price. For a frontier MoE in FP4, `F/BW ≈ 300` and the sparsity
+factor `N_total/N_active ≈ 8` (DeepSeek-style 256 experts, 32 active), so
+**B ≈ 2,400**. A solo user at batch 1 on that machine pays ~2,400× the
+per-token cost the provider's economics assume. Utilization and batch size are
+the two levers that dwarf everything in Part III — and batch 1 is the regime a
+personal server lives in.
+
 ### Autoscaling and its costs
 
 Scale replicas with demand, but scaling is not free.
@@ -147,7 +174,13 @@ Both things are true.
 
 **Predict first:** what's your cost per million tokens at 50% utilization? Compare
 to the published price of a hosted API for a similar model. The gap, in either
-direction, is informative.
+direction, is informative. One tell to look for: hosted APIs commonly charge
+3–5× more per token for output than input, which is exactly what a memory-bound
+decode predicts — they're pricing the batch-1 hyperbola you just computed, and a
+solo user always pays it. A second: model size and token budget trade off at
+roughly `params × tokens`, so a 32B model that thinks for 21× more tokens costs
+as much to serve as a 671B model that answers in one — the economics behind
+distilling to a smaller model that reasons longer.
 
 ---
 

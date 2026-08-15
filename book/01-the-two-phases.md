@@ -136,6 +136,18 @@ statement, not a short-context one.
 
 **The shape to remember is `weights × tokens generated`.** Not the number.
 
+??? question "Why are reasoning models so much more expensive per answer?"
+    Because "thinking" is just ordinary decode: every chain-of-thought token is
+    one more `weights × 1`. A reasoning model that spends 10,000 tokens
+    thinking before its first answer token has re-read 840 MiB × 10,000 ≈
+    **8 TiB** of weights, against 840 MiB for a 1-token answer — and its KV
+    cache has grown to `10,000 × 112 KiB ≈ 1.1 GiB` per step, *larger* than the
+    weight read. Reasoning models don't change the cost model; they stretch the
+    `tokens generated` axis into the exact long-context regime where the KV
+    cache (Lecture 05) and the crossover above take over. Test-time compute is
+    the same thing as serving cost.
+    [Full answer](qa.md#why-are-reasoning-models-so-much-more-expensive-per-answer)
+
 ??? note "Sanity-check it against the hardware"
     One more step, and it becomes a prediction you can falsify. **Bandwidth**
     is how many bytes per second the memory can hand over, 936.2 GB/s on a

@@ -146,6 +146,13 @@ so a mismatch is a bug, not noise. This test is the foundation for the rest of
 the course, from Lecture 05 on, every faster version is checked against the same
 reference, so you find out the moment speed costs you correctness.
 
+Deterministic, that is, on the *same device with the same kernels*. Greedy means
+argmax, and argmax is exact — but floating-point reductions run in a
+nondeterministic thread order, so a tie-adjacent top logit can flip run to run
+across machines (or CUDA versions). Your oracle works because you hold device
+and code fixed; if greedy ever differs between two machines, that nondeterminism
+is the reason, not a logic bug.
+
 **4. Measure: the actual point of the lecture:**
 
 ```bash

@@ -85,7 +85,33 @@ That last one is worth pausing on: it's the same insight as speculative decoding
 tokens you can predict with certainty don't need a forward pass, arrived at from
 a completely different direction.
 
-The libraries: **XGrammar** (vLLM's default), **Outlines**, **llguidance**.
+The libraries: **XGrammar** (vLLM's default), **Outlines**, **llguidance**,
+and **llama.cpp's GBNF** (a context-free-grammar format; the "response_format =
+JSON object" sugar is convenience syntax over the same masking machinery).
+
+### The quality cost of masking
+
+Masking guarantees *validity*, not *quality*, and it has a subtle failure mode
+worth knowing: it can force a legal-but-unlikely *tokenization*.
+
+The canonical case is the URL: the model wants to emit `http` + `://` (two
+slashes, no space), but the grammar put the colon on one edge and the slash on
+another, so the mask admits only `http` + `:` + `//`. Both are the same string;
+one path has near-zero probability mass under the model. Forcing it *changes
+what the model would have said*. **Token healing** fixes it: when the mask
+picks a low-mass continuation, roll back one token and require the next to start
+with the desired prefix — the mirror image of jump-ahead (which emits forced
+tokens; healing un-forces a bad one). It's off by default because a rollback
+means a recomputed forward pass; that cost is why it's a heuristic, not a given.
+
+There is also a ceiling on what masking *can* express. A finite state machine
+cannot count: schemas with unbounded nesting (`{"a":{"a":{...}}}`) need a
+**stack**, so real backends compile JSON schemas to a pushdown automaton, not
+an FSA — and that stack is part of the per-sequence state that must survive
+preemption (next section). Constraints like "all keys unique" or "every `$ref`
+is defined before use" are beyond even context-free: no masking scheme can
+enforce them at all. The schema is a contract; the grammar only guarantees
+*syntax*, and required keys mean distinct FSM states, not just balanced braces.
 
 ### The interaction people miss
 
@@ -119,7 +145,14 @@ per-model **tool-call parser** for exactly this reason.
 
 **Model-specific formats.** Qwen, Llama, and Mistral all emit tool calls
 differently. The parser is per model family, and getting it wrong yields silently
-malformed calls.
+malformed calls. The industry standard for the *transport* is **MCP** (Model
+Context Protocol), but the per-model JSON-schema format still varies.
+
+**Tool definitions are prompt tokens.** Every tool's name, description, and
+input schema is serialized into the prompt, so it costs KV cache — a large tool
+set is prefill traffic and permanent context. This is why real agents ship a
+name-only menu and **deferred schemas**: load a tool's full schema only when the
+model actually reaches for it.
 
 **Interaction with speculation.** The [field notes](field-notes.md) record a real
 case of this: an operator found tool calling was **inaccurate when MTP
@@ -175,7 +208,9 @@ than a toy version.
 1. Add a **logit-processor hook** to `engine/sampling.py`: a callable that can
    mask logits before sampling. That's the extension point everything above uses.
 2. Implement a **minimal JSON grammar**, enough to force balanced braces and
-   quoted keys. Not a full schema engine; enough to feel the mechanism.
+   quoted keys. Not a full schema engine; enough to feel the mechanism. Note
+   where it *can't* help: duplicate keys and missing required keys are both
+   valid JSON syntactically, so a syntax-only mask admits them.
 3. `uv run pytest tests/test_12b_structured.py -v`
 4. **Measure the overhead.** Generate with and without the mask, and report the
    per-step CPU cost. Then ask: at batch 32, is this on the critical path?

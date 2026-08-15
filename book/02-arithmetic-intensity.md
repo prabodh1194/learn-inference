@@ -62,6 +62,15 @@ operations with it, and you've wasted the trip.
 > short for "number format": fp32, fp16, bf16, int8, each a different way of
 > packing a number into bits).
 
+One more wrinkle worth knowing before you trust a spec sheet: the rate is not
+linear in bit width. A multiplier that handles `p`-bit inputs builds `p×p`
+partial products, so halving the width from 8 to 4 bits should cut the area by
+**4×**, not 2× (Nvidia's own B300 specs list FP4 at 3× the FP8 rate, and the
+gap from 4× down to 3× is the fixed float-exponent circuitry plus how much die
+area they *chose* to give each format). FP8 needs hardware a 3090 doesn't have
+(Lecture 19); the rule here is just: **compute `F/BW` at your own dtype**, and
+don't assume a "half the bits" format is "half the speed".
+
 Now the same measure for an *algorithm*, called **arithmetic intensity**:
 
 ```

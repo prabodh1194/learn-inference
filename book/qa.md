@@ -155,7 +155,11 @@ The question usually comes from conflating two different things:
     | 32k | 840 MiB | 3,584 MiB, **KV dominates** |
 
     This is why long-context serving is a different engineering problem, and why
-    KV-cache quantization is a separate lever from weight quantization.
+    KV-cache quantization is a separate lever from weight quantization. An agent
+    loop is the machine that drives a session there: every tool round-trip
+    appends a prompt, an observation, and an action, so a 100-step agent is
+    ~10⁵ tokens before it's done, and the ~8k crossover is crossed inside the
+    first dozen steps.
 
 ---
 
@@ -342,7 +346,9 @@ pass**:
     (The 6 MB of L2 and 128 KB of L1 per SM that get quoted for "on-chip
     memory" are *caches*, and are not what FlashAttention's tiles occupy.
     The scratchpad is per-SM shared memory, and its bandwidth advantage over
-    HBM is ~20×, not the ~100× sometimes claimed.)
+    HBM is ~20×, not the ~100× sometimes claimed. Where the "~100×" comes from
+    is CPU cache-vs-DDR **latency**, ~50–70×, which is a different quantity
+    from bandwidth — the confusion is metric, not chip.)
 
     A weight streams in, gets used once, and is evicted before reuse.
 
@@ -954,5 +960,238 @@ The two metrics answer different questions. Utilization says: is the chip ever
 completely empty? Queue depth says: is work waiting for a free slot? Under
 memory-bound decode you can have the first high and the second low
 simultaneously, and the queue is the one that tells you whether to scale.
+
+---
+
+## Why does greedy decoding produce repetitive, degenerate text?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+Because picking the most-likely token *each step* is not picking the most-likely
+*sequence* — and the two diverge sharply. A biased coin, 60% heads, makes it
+concrete:
+
+```
+P("100 heads")        = 0.6¹⁰⁰                     ≈ 6.5×10⁻²³
+P(one 60/40 sequence) = 0.6⁶⁰ · 0.4⁴⁰             ≈ 5×10⁻³⁰
+number of 60/40 sequences = C(100, 60)            ≈ 1.4×10²⁸
+```
+
+The all-heads string is the single most likely ordered outcome, but it is a
+billion times less likely than *any one* "typical" string — and there are ~10²⁸
+of those, so almost all the probability mass lives in "about 60 heads". Argmax
+walks to the point of highest density, which for a language model is a short,
+looping, self-reinforcing phrase (the "repetition trap", Holtzman et al.). It's
+not that greedy is broken; it's that the mode of a high-dimensional
+distribution is a weird place. Sampling wanders through the bulk of the mass
+instead of pinning the spike.
+
+---
+
+## Why greedy/sampling instead of beam search?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+Beam search keeps `K` partial sequences alive and chases the mode of the
+*sequence* distribution, not the per-token mode greedy targets. Two problems.
+
+First, that sequence mode is the same degenerate likelihood trap as greedy —
+only pursued harder. The more thoroughly you maximize likelihood on a
+likelihood-trained model, the more you converge on the repetitive-but-confident
+continuations that no human prefers.
+
+Second, its cost is not where the naive story puts it. `K` beams run as one
+batch-K forward pass, so per-step weight traffic barely moves (decode is
+memory-bound: one step re-reads 840 MiB regardless of `K`); the real cost is
+the KV cache growing to `112 KiB × context × K`. Beam/A* still win where a
+strong scorer exists to rank the survivors (machine translation, exact
+decoding); for open-ended generation, sampling with a verifier (best-of-N) has
+largely displaced them.
+
+---
+
+## Why is T=1 the only temperature that samples the model's true distribution?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+Temperature reshapes the logits *before* softmax, so `T≠1` draws from a
+tempered distribution `q(x) ∝ p(x)^(1/T)`, not from `p` itself. Sample at
+`T=0.7` and your Monte-Carlo averages converge to a sharpened model, not the
+model. `T=1` is the one setting where the die's faces are the model's actual
+probabilities — which is why it's the only *unbiased* way to measure what the
+model believes. Every other temperature is a deliberate bias: useful for
+steering (T<1 for confident answers, "deterministic" work), but wrong for
+measuring. In practice T>1 is almost never used: it takes the model from
+"diverse" to "off the rails" without buying anything real.
+
+---
+
+## I ran greedy decoding twice and got different output — is my code wrong?
+
+**Lecture:** [03. Naive generation](03-naive-generation.md) · [06. Sampling](06-sampling.md)
+
+Not necessarily. Greedy is argmax, and argmax is exact — but it runs on
+floating-point logits, and floating-point reductions run in a nondeterministic
+thread order, so `a+b+c` can round to a slightly different value than
+`a+c+b`. If two top logits are within that rounding noise, the argmax flips,
+and one flipped token changes every token after it. On your own machine, with
+fixed kernels, greedy is reproducible — that's why it's the test oracle. Across
+machines, CUDA versions, or batch orders it can wobble. Hosted APIs add more:
+model updates, prompt-template differences, and input-order sensitivity. The
+oracle guarantee holds for *your* engine's own `argmax`, not for a remote call.
+
+---
+
+## What's the difference between epsilon sampling, η-sampling, and min-p?
+
+**Lecture:** [06. Sampling](06-sampling.md)
+
+Three ways to truncate the tail, beyond top-k/top-p, differing in what they
+compare each token's probability against:
+
+- **Epsilon sampling**: drop any token with `p < ε` (an absolute floor), then
+  renormalize. The simplest; the threshold is fixed, not adaptive.
+- **η-sampling**: set the threshold from the local entropy — a confident
+  distribution gets a tighter cutoff than a flat one, so the cutoff adapts to
+  how sure the model is.
+- **min-p**: relative — keep a token if `p ≥ p_max · p_base` (a fraction of the
+  top token's own probability). Adaptive to the peak, not the shape of the
+  whole tail.
+
+All three exist because top-k is fixed (the same `k` captures 68% of the mass on
+one step and 99% on another, depending on how peaked the distribution is), and
+top-p can't be tuned per-step. "Locally typical" is a further idea: keep tokens
+whose log-prob is *near the entropy*, on the theory that the model should
+sample its typical set, not its tail — it deliberately raises perplexity in
+exchange for more informative output.
+
+---
+
+## Does logit masking change the model's relative preferences?
+
+**Lecture:** [12b. Structured output](12b-structured-output.md)
+
+Not among the tokens it keeps. Masking multiplies the distribution by an
+indicator: `Q(v) = P(v)·1[v∈L] / Σ_{w∈L} P(w)`. For two legal tokens `a, b ∈ L`:
+
+```
+Q(a) / Q(b) = P(a) / P(b)
+```
+
+so the *relative ranking within the legal set is untouched* — the mask only
+zeroes the illegal tokens and renormalizes (that's the `-inf` → 0% trick). The
+one thing masking *can* distort is which *tokenizations* stay in the support: a
+grammar edge may admit `http`+`:`+`//` while forbidding the `://` token the
+model wanted, forcing a low-mass path to the same string. That's the failure
+mode token healing exists to fix, and it's a change to the *support*, not to
+the relative scores.
+
+---
+
+## Why can't the state machine enforce "all keys unique"?
+
+**Lecture:** [12b. Structured output](12b-structured-output.md)
+
+Because "no repeats" is a counting property, and finite state machines can't
+count. A grammar can enforce *syntax* — balanced braces, quoted keys, the right
+punctuation between fields — but not *cross-field constraints* like "each key
+appears exactly once" or "every `$ref` is defined before use". Those need
+memory of *how many times* you've seen something, which is what a pushdown
+automaton's stack is for; and even a stack can't express all of them (the
+general class is undecidable). So a schema engine guarantees the JSON parses,
+not that it satisfies the schema's *semantics*. Required keys are encoded by
+giving the grammar distinct states (a "waiting for name" state vs. a "done"
+state); uniqueness you check after the fact, in code.
+
+---
+
+## Why is scoring cheap and generating expensive in best-of-N?
+
+**Lecture:** [06. Sampling](06-sampling.md) · [12b. Structured output](12b-structured-output.md)
+
+Generating N candidate answers is N *decodes*: each token waits on the one
+before it, re-reading the weights per token (memory-bound). Scoring N completed
+answers is one *prefill*: all tokens pass through the model as a single block,
+which is compute-bound and batched for free. Same model, two different roofline
+regimes (Lecture 02). That's why the "sample a hundred, pick the best" recipe
+spends its money on the generation side — 100 paths is 100× the decode traffic,
+with only a log-ish gain in score (reported agent results go ~20 → 32 for 16×
+the inference). Scoring is cheap; sampling many candidates is the expensive
+part, and batching is where the multiple candidates ride nearly for free
+(Lecture 07).
+
+---
+
+## Why are reasoning models so much more expensive per answer?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md) · [05. KV cache](05-kv-cache.md)
+
+"Thinking" is ordinary decode: every chain-of-thought token costs one weight
+re-read, exactly like an answer token. The difference is volume.
+
+```
+1-token answer:       840 MiB weight traffic
+10,000-token trace:   840 MiB × 10,000 ≈ 8 TiB weight traffic
+                       + KV cache growing to 10,000 × 112 KiB ≈ 1.1 GiB per step
+```
+
+So a reasoning model stretches the "tokens generated" axis of the L01 cost
+model by orders of magnitude, and lands itself squarely in the long-context
+regime where the KV cache (L05) — and its compression, L19 — becomes the
+bottleneck. This is the concrete meaning of "test-time compute": compute moved
+from training time to serving time, priced as tokens.
+
+---
+
+## Where does the ~25 ms per-step cadence come from?
+
+**Lecture:** [25. Load testing](25-load-testing.md)
+
+Each decode step re-reads the whole weight set, so a step's lower bound is the
+time to read the card's entire memory: `capacity / bandwidth`. On the 3090 that
+is `24 GB / 936 GB/s ≈ 26 ms`; it has stayed ~20 ms across HBM generations
+because capacity and bandwidth scale together. The cadence matters because a
+request can't start mid-step: it waits up to one full cadence to board the next
+batch, then another for that batch to finish — a ~50 ms floor on latency even
+with zero queueing pressure. Short tokens and big GPUs don't lower this floor;
+they just make the same ~20 ms step produce one token instead of many.
+
+---
+
+## What batch size do you need to stop being memory-bandwidth-bound?
+
+**Lecture:** [28. Autoscaling and cost](28-autoscaling-and-cost.md)
+
+Decode's per-token cost is the weight re-read divided by the batch, `840 MiB /
+B`; its floor is the compute a token needs, `1 / (F/BW)` on the roofline.
+Balance them:
+
+```
+B ≈ (F/BW) × (N_total / N_active)
+```
+
+For a dense model on the 3090 (`F/BW ≈ 76`), that's **B ≈ 76** concurrent
+sequences. For a frontier MoE in FP4, `F/BW ≈ 300` times a sparsity factor of
+~8 (256 experts, 32 active) gives **B ≈ 2,400**. Below that batch you're paying
+for bytes you didn't have to; a solo user on the big machine sits near batch 1
+and pays ~2,400× the provider's assumed per-token cost. This is the batch-side
+twin of the utilization multiplier — the two structural gaps a personal server
+can never close.
+
+---
+
+## The book's KV crossover is 8k tokens; frontier models hover near 200k — is that the same line?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md) · [05. KV cache](05-kv-cache.md)
+
+Yes. The crossover is where the KV re-read per step equals the weight read,
+`C × bytes/token ≈ N_active × bytes/param`. Both sides differ by ~100× between
+the book and a frontier model: the book's Qwen3-0.6B has `bytes/token ≈ 112
+KiB` and ~0.6B active params, so it crosses at ~8k; a frontier model with
+~100B active params and ~1.7 KB/token (compressed KV) crosses at `~1e11 /
+(300×2e5) ≈ 1.7 KB` — i.e. ~200k. Different numbers, same balance point: the
+cache starts dominating when `context × bytes/token` catches up to the active
+weight set. That's why providers charge a premium past ~200k context, and why
+"long context" is a relative term that scales with model size.
 
 ---

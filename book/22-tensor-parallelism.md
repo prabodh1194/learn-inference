@@ -37,7 +37,7 @@ Three ways to split a model:
 
 | | Splits | Cost | Use |
 |---|---|---|---|
-| **Pipeline (PP)** | layers across GPUs | bubbles; poor latency | multi-node, low bandwidth |
+| **Pipeline (PP)** | layers across GPUs | training: bubbles; inference: latency-neutral, can't shard KV | multi-node, low bandwidth |
 | **Tensor (TP)** | tensors *within* each layer | all-reduce every layer | **default within a node** |
 | **Expert (EP)** | MoE experts across GPUs | token routing | MoE throughput (L23) |
 
@@ -47,6 +47,13 @@ waiting is time the GPUs are paid for and not working. An **all-reduce** is a
 collective (Lecture 21's cooperative operations), specifically a group sum:
 every GPU contributes its partial result, and every GPU ends with the total. It
 is the plumbing of TP, and most of what "TP is expensive" means.
+
+A phase caveat on the PP row. Bubbles are a *training* problem: there, each
+micro-batch must wait for the one ahead of it, and stages idle. In *inference*
+the stages fill back-to-back, so PP is roughly latency-neutral — the real reason
+inference avoids it is that PP **can't shard the KV cache** (the in-flight
+sequences rise with the number of stages, cancelling the weight-memory win) plus
+a per-hop latency that compounds across racks. At most 1–2 stages, if at all.
 
 TP is the default for single-node inference because every GPU works on *every*
 token, no pipeline bubbles, and latency genuinely drops.

@@ -56,6 +56,16 @@ logits = logits / temperature
 
     [Full answer in the Q&A](qa.md#why-is-temperature-0-special-cased-instead-of-a-very-small-divisor)
 
+??? question "Why is T=1 the only temperature that samples the model's true distribution?"
+    Temperature reshapes the logits *before* softmax, so `T≠1` draws from a
+    tempered distribution, `q(x) ∝ p(x)^(1/T)`, not from `p` itself. Sample at
+    `T=0.7` and your averages converge to a sharpened model, not the model.
+    `T=1` is the one setting where the die's faces are the model's actual
+    probabilities — the only unbiased way to *measure* what the model believes,
+    as opposed to steering it. (In practice `T>1` is almost never used: it
+    pushes the model past "diverse" into "off the rails".)
+    [Full answer](qa.md#why-is-t1-the-only-temperature-that-samples-the-models-true-distribution)
+
 ### Top-k
 
 Keep the `k` highest-probability tokens, zero the rest, renormalize. Blunt but
@@ -178,6 +188,34 @@ without a deterministic oracle is genuinely miserable.
 So: **seed everything, test in greedy mode, and treat any nondeterminism in the
 greedy path as a bug**, not as noise to average away.
 
+??? question "Why does greedy decoding produce repetitive, degenerate text?"
+    Because picking the most-likely token *each step* does not pick the
+    most-likely *sequence*. Picture a biased coin, 60% heads. The single most
+    likely ordered outcome is "100 heads", at `0.6¹⁰⁰ ≈ 6.5×10⁻²³`. But "about
+    60 heads" is the *typical* outcome: any one such sequence is only
+    `0.6⁶⁰·0.4⁴⁰ ≈ 5×10⁻³⁰` (a billion times less likely than "100 heads"),
+    yet there are `C(100,60) ≈ 1.4×10²⁸` of them, so nearly all the probability
+    mass lives there. Argmax chases the point of highest density — a string so
+    unlikely no sampling run would ever produce it — which is why likelihood-
+    maximizing decoders loop and repeat (Holtzman et al. call it the "repetition
+    trap"). Sampling wanders through the bulk of the distribution instead of
+    pinning the spike.
+    [Full answer](qa.md#why-does-greedy-decoding-produce-repetitive-degenerate-text)
+
+??? question "Why greedy/sampling instead of beam search?"
+    Beam search keeps `K` partial sequences alive each step, targeting the
+    *mode of the whole sequence*, not the per-token mode. Two things make it the
+    wrong default for an LLM. First, that sequence mode is exactly the
+    degenerate likelihood trap above — beam search maximizes the same quantity
+    greedy does, only more thoroughly. Second, it costs you on an axis you now
+    understand: `K` beams run as one **batch-K** forward pass, so per-step weight
+    traffic is ~unchanged (decode is memory-bound, one step re-reads 840 MiB
+    regardless of `K`), but the KV cache is `112 KiB × context × K`. Frontier
+    serving has largely dropped it — a verifier (best-of-N) or plain sampling
+    beats it for most tasks. Beam/A* still earn their keep where a strong
+    scorer exists (machine translation, exact decoding).
+    [Full answer](qa.md#why-greedysampling-instead-of-beam-search)
+
 ---
 
 ## Build it
@@ -196,6 +234,12 @@ greedy path as a bug**, not as noise to average away.
 - **[The Curious Case of Neural Text Degeneration](https://arxiv.org/abs/1904.09751)**
   (Holtzman et al., 2019), introduced nucleus sampling. The figures showing why
   pure likelihood maximization produces repetitive text are worth the read.
+- **Beyond top-k/top-p.** There's a whole family of truncation samplers the
+  book skips: **epsilon sampling** (drop tokens below a probability floor),
+  **η-sampling** (threshold from the local entropy), **min-p** (relative to the
+  top token), and **locally typical sampling** (keep tokens whose log-prob is
+  near the entropy; it *raises* perplexity on purpose). The Q&A unpacks the
+  family.
 - **vLLM `vllm/sampling_params.py`**: the production surface area. Note how many
   parameters exist beyond these four, and that they're applied in a defined order
   for the same reason.

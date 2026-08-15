@@ -112,6 +112,37 @@ the trailing logits. *(L12)*
 
 ---
 
+## Sampling & decoding
+
+**Greedy decoding**: pick the argmax logit every step. Deterministic on a fixed
+device/kernels — the test oracle. Chases the per-token mode, which is *not* the
+most-likely sequence, hence the "repetition trap". *(L06)*
+
+**Beam search**: keep K partial sequences, target the sequence mode. K beams run
+as one batch-K forward pass (weight traffic ~unchanged); the cost is ×K KV
+cache. *(L06)*
+
+**Temperature**: logits ÷ T before softmax. T<1 sharpens, T>1 flattens, T=0 is
+argmax (special-cased), T=1 samples the model's true distribution. *(L06)*
+
+**Perplexity**: `2^cross-entropy` — how many "sides" an equivalent fair die has.
+Lower is better, but it's an average over next-token prediction; it can hide a
+specific broken capability. *(L06, L19)*
+
+**Search error vs. model error**: the search algorithm picked a suboptimal
+completion (search error) vs. the model scored a bad completion highly (model
+error). Greedy/beam fix search errors; more training fixes model errors. *(L06)*
+
+**Best-of-N**: generate N candidates, score them, keep the best. Scoring is
+compute-bound prefill (cheap); generating N is N memory-bound decodes (dear).
+*(L06, L12b)*
+
+**Token healing**: when grammar masking forces a low-mass tokenization, roll back
+one token and require the continuation to start with the desired prefix. The
+mirror image of jump-ahead. *(L12b)*
+
+---
+
 ## Kernels
 
 **Kernel**: a function running on the GPU. *(L15)*
@@ -160,8 +191,8 @@ concurrency, not per-step speed. *(L19)*
 **Tensor parallelism (TP)**: splitting tensors within each layer across GPUs. Two
 all-reduces per layer. A **latency** optimization. *(L22)*
 
-**Pipeline parallelism (PP)**: splitting layers across GPUs. Bubbles; poor
-latency. Multi-node. *(L22)*
+**Pipeline parallelism (PP)**: splitting layers across GPUs. Training: bubbles;
+inference: latency-neutral but can't shard the KV cache. Multi-node. *(L22)*
 
 **Expert parallelism (EP)**: whole MoE experts on different GPUs. All-to-all token
 routing. A **throughput** optimization. *(L23)*

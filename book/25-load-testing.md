@@ -46,6 +46,17 @@ load = poisson_arrivals(mixed_length(n=1000), rate=20.0)   # 20 req/s
 Using a fixed inter-arrival time hides queueing entirely and makes your service
 look far more predictable than it is.
 
+??? question "Where does the ~25 ms per-step cadence come from?"
+    Decode steps don't take a variable amount of time; each one is a roughly
+    fixed wall-clock beat. The bound is the time to read the card's *entire*
+    memory: `capacity / bandwidth`. On the 3090 that's `24 GB / 936 GB/s ≈ 26
+    ms` (and it's stayed ~20 ms across HBM generations precisely because
+    capacity and bandwidth have grown together). A request that arrives just
+    after a step's batch is fixed has to wait up to one full cadence to *board*
+    the next step, then another for that step to finish — a ~50 ms worst-case
+    floor under *any* queueing, at *any* load. The train leaves on a schedule;
+    you wait for it even when it's empty.
+
 ??? question "Arrivals average 20 req/s and the server keeps up on average. Why does a queue ever form?"
     Because "on average" describes no particular moment. The 50 ms mean gap
     hides bursts: several requests can land within milliseconds of each other,

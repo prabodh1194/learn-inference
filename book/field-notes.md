@@ -135,6 +135,45 @@ Note the recurring caveat in these reports: compression that holds up on general
 text can degrade **reasoning** specifically. Another argument for task-based
 evaluation over aggregate metrics.
 
+## Reasoning is test-time compute, priced as tokens: **L01, L05**
+
+Reasoning models don't change the cost model — they stretch it. "Thinking" is
+ordinary decode, so a 10,000-token chain of thought is ~10,000 weight re-reads
+before the first answer token, and it lands the session in the long-context
+regime where the KV cache dominates (L05). That is the mechanism behind the
+recurring report above that KV-cache compression degrades reasoning: reasoning
+*is* long-context serving, and its tokens are the ones the cache holds.
+
+Reported curves match: response length and accuracy rise together (a DeepSeek-R1
+write-up has average response length growing from hundreds to thousands of
+tokens alongside accuracy), and majority-voting over 64 samples buys ~9 AIME
+points at ~64× the decode cost. Reasoning accuracy is bought with tokens, and
+tokens are bought with the bytes this book optimizes.
+
+## Agents treat context as a scarce resource: **L05, L10**
+
+The one resource an agent always runs out of is context, and production harnesses
+manage it with a lazy escalation ladder, cheapest move first: trim the budget,
+snip old turns, micro-compact, collapse, then full auto-compact. Each rung costs
+more fidelity, so you climb only when forced.
+
+Two specific techniques worth knowing: **deferred schemas** (ship a name-only
+tool menu; load a tool's full schema only when the model reaches for it — tool
+definitions are prompt tokens, hence KV cache), and **subagents** (a subagent
+gets a fresh context window and returns a short summary, isolating the parent's
+context at a reported ~7× token cost). L05's long-context crossover is the
+substrate; this is the application layer on top of it.
+
+## The harness is part of the benchmark: **L29, L19**
+
+A reverse-engineering report on an agentic coding tool found that holding the
+model fixed and changing *only* the harness swung its score on a long-horizon
+task by up to **18 points**. The harness — how the model is prompted, given
+tools, and scored — is not measurement plumbing; it is part of the workload (the
+same report's breakdown was roughly "1.5% model, 98% plumbing"). This is the
+"measure quality with a task" bar above, one level up: even a good task measures
+the *system*, not the model, unless you pin the harness too.
+
 ---
 
 ## How to use this
