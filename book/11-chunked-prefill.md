@@ -15,7 +15,8 @@ Then someone submits a **4,000-token** document, and the scheduler admits it.
 The step that runs that document's prefill is enormous. Count the arithmetic:
 every token, prefill or decode, costs one full pass over the weights,
 `2 × 440.4M` flops. The prefill adds 4,000 passes to the step, against the 22
-decode passes:
+decode passes the chats still make (the document is prefilling in a 23rd slot,
+so it is not in the decode part):
 
 ```
 prefill's extra work:   4,000 × 880.8 MFLOP  =  3,523.2 GFLOP
@@ -30,8 +31,8 @@ spends waiting on memory anyway. Every sequence decoding alongside it waits for
 the whole thing to finish.
 
 ```
-step 41: [decode ×21] + [prefill 4000 tokens]   <- everyone stalls
-step 42: [decode ×22]                            <- normal
+step 41: [decode ×22] + [prefill 4000 tokens]   <- everyone stalls
+step 42: [decode ×23]                            <- normal
 ```
 
 From the user's side, their token stream just froze for a beat because somebody
@@ -51,11 +52,11 @@ steps**, interleaved with decode:
 
 ```
 BEFORE                              AFTER  (chunk = 512)
-step 41: 21 decode + 4000 prefill   step 41: 21 decode + 512 prefill
-step 42: 22 decode                  step 42: 21 decode + 512 prefill
+step 41: 22 decode + 4000 prefill   step 41: 22 decode + 512 prefill
+step 42: 23 decode                  step 42: 22 decode + 512 prefill
                                     ...
-                                    step 48: 21 decode + 512 prefill
-                                    step 49: 22 decode
+                                    step 48: 22 decode + 512 prefill
+                                    step 49: 23 decode
 ```
 
 Same total prefill work, spread over `4,000 / 512 = 7.8` → 8 steps instead of
