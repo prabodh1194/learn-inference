@@ -115,68 +115,84 @@ chunked.
 
 ## The code
 
-`schedule()` returns `(prefill, decode)`: which sequences take a *prefill chunk*
-this step, and which take their one-token *decode*. Three conventions make the
-arithmetic work, and each is easy to miss:
+`schedule()` returns `(to_prefill, to_decode)`: which sequences take a *prefill
+chunk* this step, and which take their one-token *decode*. Three conventions make
+the arithmetic work, and each is easy to miss:
 
 - **A decode is exactly one token.** Every running sequence produces one token
   per step, so the *number of decoding sequences* equals the *number of decode
-  tokens*. That's why `budget = max_batched_tokens - len(decode)`.
+  tokens*. That's why `step_budget = max_batched_tokens - len(to_decode)`.
 - **A prefill is a chunk.** A prefilling sequence consumes up to `chunk_size`
   tokens this step (fewer if that's all that's left of its prompt, or all the
-  budget allows).
+  step budget allows).
 - **One step, one forward pass over everything.** Decodes and prefill chunks
   share one pass, capped by `max_batched_tokens`. The runner reads each
   sequence's `chunk_size_this_step` to know how many prompt tokens to feed it.
 
 ```python
+def _prefill_chunk(self, seq, step_budget):
+    """Give `seq` one prefill chunk. Bounded three ways, and this is the only
+    place that logic lives.
+
+    Returns the step budget after this sequence's chunk is subtracted.
+    """
+    tokens_left = len(seq.prompt_ids) - seq.num_prefilled   # per-sequence cap
+    chunk_tokens = min(tokens_left, step_budget, self.chunk_size)
+    seq.chunk_size_this_step = chunk_tokens
+    seq.num_prefilled += chunk_tokens
+    return step_budget - chunk_tokens
+
+
 def schedule(self):
     # 1. retire finished sequences (Lecture 08)
     ...
 
-    # 2. running sequences decode -- they get the budget first.
-    #    Each decode is exactly 1 token, so sequence count == token count.
-    decode = [s for s in self.running if s.is_prefill_done]
-    budget = self.max_batched_tokens - len(decode)
+    # 2. running sequences decode -- each is exactly 1 token, so sequence
+    #    count == token count. Decodes are reserved before any prefill.
+    to_decode = [s for s in self.running if s.is_prefill_done]
+    step_budget = self.max_batched_tokens - len(to_decode)
 
     # 3. continue in-flight partial prefills BEFORE admitting new work.
-    prefill = []
+    to_prefill = []
     for seq in self.running:
-        if seq.is_prefill_done or budget <= 0:
+        if seq.is_prefill_done or step_budget <= 0:
             continue
-        remaining = len(seq.prompt_ids) - seq.num_prefilled
-        chunk = min(remaining, budget, self.chunk_size)   # 3-way min
-        seq.chunk_size_this_step = chunk
-        seq.num_prefilled += chunk
-        budget -= chunk
-        prefill.append(seq)
+        step_budget = self._prefill_chunk(seq, step_budget)
+        to_prefill.append(seq)
 
-    # 4. only then admit new sequences into what's left -- they also start
-    #    prefilling, chunked exactly like everyone else.
+    # 4. only then admit waiting sequences into what's left. Same chunking,
+    #    same budget bookkeeping -- the only difference is where the
+    #    sequence came from (the waiting queue, not the running batch).
     while (self.waiting and len(self.running) < self.max_batch_size
-           and budget > 0):
+           and step_budget > 0):
         seq = self.waiting.popleft()
         self.running.append(seq)
-        remaining = len(seq.prompt_ids)
-        chunk = min(remaining, budget, self.chunk_size)
-        seq.chunk_size_this_step = chunk
-        seq.num_prefilled += chunk
-        budget -= chunk
-        prefill.append(seq)
+        step_budget = self._prefill_chunk(seq, step_budget)
+        to_prefill.append(seq)
 
-    return prefill, decode
+    return to_prefill, to_decode
 ```
 
-The three-way min is the whole idea:
+The three-way min is the whole idea, and it lives in exactly one place —
+`_prefill_chunk`:
 
 ```
-chunk = min(remaining, budget, chunk_size)
+chunk_tokens = min(tokens_left, step_budget, chunk_size)
 ```
 
-- `remaining` — can't over-prefill the prompt.
-- `budget` — can't blow `max_batched_tokens` minus the decodes.
+- `tokens_left` — how much of *this* prompt is still unprefilled (per-sequence
+  cap; fixed by the prompt and your progress, doesn't change when other
+  sequences are served).
+- `step_budget` — how much prefill *this whole step* can afford after the
+  decodes are reserved (shared cap; shrinks as you allocate chunks to each
+  sequence).
 - `chunk_size` — the dial you're tuning: how many tokens one sequence may add
   to a step.
+
+Steps 3 and 4 are the same operation fed by different sources — step 3 drains
+sequences already in the batch, step 4 admits waiting ones. They both call
+`_prefill_chunk`, which is why the admission loop is only three lines instead of
+a copy of the chunking logic.
 
 **Finish in-flight prefills before admitting new ones.** Otherwise you accumulate
 half-prefilled sequences that each hold KV memory while producing nothing,
