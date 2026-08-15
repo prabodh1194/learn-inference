@@ -264,13 +264,51 @@ should see the trade directly.
 
 ## Check yourself
 
-1. Why does chunked prefill cost so little throughput? *(Answer in terms of
-   Lecture 01's bottlenecks.)*
-2. Mean latency barely changed but p99 improved a lot. Explain both.
-3. Chunk size 64: what improves, what gets worse, and why?
+1. Prefill is compute-bound; decode is memory-bound. Why does that make chunked
+   prefill nearly free on throughput?
+2. A single 4,000-token prefill stalls every decoding sequence — head-of-line
+   blocking. How does chunking remove the stall, and why is the result
+   *interleaved*, not *parallel*?
+3. Chunked prefill protects the decodes. What does the long request trade away
+   for that, and what caps how slow its prefill gets?
 4. Why must in-flight prefills finish before new sequences are admitted?
 5. A sequence gets a 400-token prefix cache hit on a 3000-token prompt, with
    chunk size 512. How many prefill steps does it need?
+6. The last prefill chunk produces the first token. Explain how
+   `is_prefill_done` flips and why treating "prefilled a chunk this step" and
+   "decoding this step" as the same thing duplicates or drops that first token.
+
+??? question "Done? Tap to check — three clicks to the full answer"
+    ??? question "Still stuck? Show a hint for each"
+        1. Prefill fills the arithmetic decode isn't using.
+        2. Interleaved, not parallel: no second machine — the chunk shares the
+           step.
+        3. The long request's TTFT; capped by `max_batched_tokens − decodes`.
+        4. Half-prefilled sequences hold KV memory and produce nothing.
+        5. The cache hit skips 400 tokens before any chunking.
+        6. `is_prefill_done` flips one step after the final chunk.
+
+        ??? question "Show the answers"
+            1. Decode is memory-bound: the GPU waits on weights while its
+               arithmetic units sit idle. The prefill chunk rides in that idle
+               capacity, so the step costs about the same bytes as decode alone.
+            2. The prefill is split into chunks spread across steps, so no
+               single step is 182× normal. Each chunk shares a step with the
+               decodes on the same GPU — interleaving, not parallelism, and the
+               decodes still run one token per step.
+            3. It trades TTFT: the prefill now spans many steps instead of one.
+               The per-step cap is `max_batched_tokens` minus the decodes —
+               decode is budgeted first, prefill gets what's left.
+            4. Otherwise you pile up half-prefilled sequences, each holding KV
+               memory and producing nothing — memory pressure with no output,
+               and every request's TTFT gets worse.
+            5. `3000 − 400 = 2600`; `2600 / 512 = 5.08` → **6 steps**.
+            6. When `num_prefilled == len(prompt_ids)`, `is_prefill_done` turns
+               true and the sequence appears in `decode` on the *next* step. If
+               the runner also treats the final prefill step as a decode, the
+               first token is produced twice; if it treats it as neither, the
+               token is dropped. That off-by-one is exactly what
+               `test_final_chunk_transitions_to_decode` catches.
 
 ---
 
