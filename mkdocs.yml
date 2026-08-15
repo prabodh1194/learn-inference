@@ -99,6 +99,7 @@ nav:
   - Part II — The engine:
       - 05 The KV cache: 05-kv-cache.md
       - 06 Sampling: 06-sampling.md
+      - 06b Search-based decoding: 06b-search-based-decoding.md
       - 07 Static batching: 07-static-batching.md
       - 08 Continuous batching: 08-continuous-batching.md
       - 09 Paged attention: 09-paged-attention.md
@@ -121,10 +122,12 @@ nav:
       - 23 MoE and expert parallelism: 23-moe-and-expert-parallelism.md
   - Part V — Production:
       - 24 Serving: 24-serving.md
+      - 24b Serving agents: 24b-serving-agents.md
       - 25 Load testing: 25-load-testing.md
       - 26 Versus vLLM: 26-versus-vllm.md
       - 27 Routing and disaggregation: 27-routing-and-disaggregation.md
       - 28 Autoscaling and cost: 28-autoscaling-and-cost.md
+      - 28b Reasoning and test-time compute: 28b-reasoning-and-test-time-compute.md
       - 29 Contributing: 29-contributing.md
   - Reference:
       - Q&A — worked answers: qa.md

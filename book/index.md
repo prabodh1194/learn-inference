@@ -97,7 +97,7 @@ This book indexes two excellent sources rather than duplicating them:
 
 ## Status
 
-**All 30 lectures are written**, front matter through appendices.
+**All 34 lectures are written**, front matter through appendices.
 
 The **code** is a different matter, and deliberately so: `engine/`, `kernels/`,
 `jaxlm/`, and `serve/` are stubs for *you* to fill in. The demos in `book/code/`

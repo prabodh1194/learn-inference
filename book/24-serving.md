@@ -194,6 +194,9 @@ deliberately: it's a convincing demonstration.
 
 ## Next
 
+**[24b. Serving agents](24b-serving-agents.md)**: the dominant workload on that
+service — tool loops, context growth, and the compaction ladder.
+
 **[25. Load testing](25-load-testing.md)**: find out what your service actually
 does under pressure.
 

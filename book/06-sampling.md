@@ -260,6 +260,10 @@ greedy path as a bug**, not as noise to average away.
 
 ## Next
 
+**[06b. Search-based decoding](06b-search-based-decoding.md)**: a short detour
+into beam search and A*, and why the book mostly samples instead. Skippable if
+you're in a hurry.
+
 **[07. Static batching](07-static-batching.md)**: serve more than one request,
 and meet a new kind of waste.
 

@@ -21,6 +21,7 @@ LECTURES = [
     ("04", "Measuring", "test_04_measuring.py"),
     ("05", "KV cache", "test_05_kv_cache.py"),
     ("06", "Sampling", "test_06_sampling.py"),
+    ("06b", "Search decoding", "test_06b_beam.py"),
     ("07", "Static batching", "test_07_batching.py"),
     ("08", "Continuous batching", "test_08_scheduler.py"),
     ("09", "Paged attention", "test_09_paged.py"),
@@ -39,9 +40,11 @@ LECTURES = [
     ("22", "Tensor parallelism", "test_22_tp.py"),
     ("23", "MoE / expert parallel", "test_23_moe.py"),
     ("24", "Serving", "test_24_serving.py"),
+    ("24b", "Serving agents", "test_24b_agent.py"),
     ("25", "Load testing", "test_25_load.py"),
     ("27", "Routing / disagg", "test_27_routing.py"),
     ("28", "Autoscaling / cost", "test_28_cost.py"),
+    ("28b", "Reasoning / TTC", "test_28b_reasoning.py"),
 ]
 
 GREEN, RED, GREY, DIM, RESET = "\033[32m", "\033[31m", "\033[90m", "\033[2m", "\033[0m"
