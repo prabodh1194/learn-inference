@@ -18,7 +18,12 @@ intensity = 62 ops:byte     (vs. an H100's ridge of 295)
 
 Memory-bound by nearly 5× on an H100, though on the 3090 you're actually
 renting (ridge 76) it's memory-bound by only 1.2× (`76 / 62.4 = 1.22`), so
-temper your speedup expectations accordingly. And the `N²` terms dominate:
+temper your speedup expectations accordingly. Note that both of those are
+*this* N=4096 workload: the paper's own 3090 benchmarks show 2.5–4.5×
+speedups at 4k–16k context (the A100 shows 2–4× in the same charts), because
+there the `N²` traffic dominates and the 3090's lower bandwidth makes the
+bytes you remove worth more. The roofline ratio predicts the small-N case;
+the big-N case is the one FlashAttention was built for. And the `N²` terms dominate:
 that's the score matrix `S = QK^T`, written to **HBM**, the GPU's large slow
 memory, the fridge the chef walks to in Lecture 02's kitchen, and immediately
 read back, twice:
@@ -94,6 +99,28 @@ by `l`.
 attention, computed in a different order. That's what makes FlashAttention safe to
 use everywhere.
 
+??? question "Does it really come out to the same denominator as one-shot softmax?"
+    Run both on the same row and compare. Scores `[3, 1, 4, 1, 5, 2]`, tiles of
+    two; `l` is the running sum of `exp(score − m)`:
+
+    ```
+    tile 1:  m = 3            l = e⁰ + e⁻²                        = 1.1353
+    tile 2:  m = 4, move e⁻¹  l = 1.1353·e⁻¹ + e⁰ + e⁻³            = 0.4177 + 1.0498  = 1.4675
+    tile 3:  m = 5, move e⁻¹  l = 1.4675·e⁻¹ + e⁰ + e⁻³            = 0.5398 + 1.0498  = 1.5896
+    ```
+
+    One shot, with the true max `5`:
+
+    ```
+    l = e⁻² + e⁻⁴ + e⁻¹ + e⁻⁴ + e⁰ + e⁻³ = 1.5896
+    ```
+
+    Identical. And the accumulator rescales by exactly the same `e^(m_old − m_new)`
+    factor each step, so `acc / l` is the same weighted average the one-shot
+    would compute — that's *why* the answer is exact, and why the rescaling
+    steps are not optional decoration.
+    [Full answer](qa.md#why-does-a-running-max-softmax-recompute-the-exact-same-denominator)
+
 ??? question "How can two orderings of floating-point math both be 'exact'?"
     "Exact" here means no approximation: every score, every weight, every sum
     is computed, in full, once. Nothing is truncated, sampled, or skipped, the
@@ -168,6 +195,12 @@ def flash_attention_kernel(Q, K, V, Out, softmax_scale, N, ...):
     tl.store(Out + ..., acc / l_i[:, None])
 ```
 
+Note the loop direction: each program owns a row of queries and walks the key
+sequence in the inner loop (Q-per-program, K/V-inner). FlashAttention-1's
+Algorithm 1 loops the other way — K/V-outer, Q-inner. Your arrangement is the
+FlashAttention-2 one, and it's what the official kernels use today; nothing in
+the math changes, only which tile stays resident.
+
 Three things that go wrong:
 
 **Forgetting to rescale `acc`.** The most common bug. Output looks approximately
@@ -180,6 +213,33 @@ leaks future information: the model will look *better* at predicting, which is a
 uniquely confusing bug.
 
 **Wrong scale.** `1/sqrt(head_dim)`, applied before softmax.
+
+??? question "Why divide by √d and not by d?"
+    Scores are dot products, and a dot product of two `d`-dimensional vectors
+    with unit-variance entries has variance `d`, not 1 — the `d` independent
+    terms add their variances. So the scores scatter with standard deviation
+    `√d`: at `d = 64` that's **8**, "±8", not the "±1" people guess. Between
+    the most-liked and least-liked key of 64, the typical gap is ~2 sd ≈ 16,
+    and what `exp` does with 16:
+
+    ```
+    e¹⁶ ≈ 8.9 million
+    ```
+
+    The whole row collapses onto one token. On the toy scores `[0, 6, 2, 2]`
+    the top token grabs **96.2%** of the weight:
+
+    ```
+    e⁶ / (e⁶ + e⁰ + 2e²) = 403.4 / 419.2 = 96.2%
+    ```
+
+    A spiked softmax is nearly an argmax: attention "listens" to one key, and
+    its gradient vanishes (a softmax row's Jacobian is `p(δ − p)`, ≈ 0 where
+    one `p` is 1). Divide by `√d` first and the sd is back to 1, gaps of ~2,
+    `e²` is a 7:1 ratio, and the same toy softmax stays soft — dividing `[0, 6,
+    2, 2]` by √4 = 2 gives `[0, 3, 1, 1]`, top weight **76%**. The scalar keeps
+    the *spread* of the scores under control, not the individual values.
+    [Full answer](qa.md#why-divide-by-sqrt-d-and-not-by-d)
 
 **`-inf` minus `-inf` is NaN.** If a whole tile is masked out (entirely above the
 diagonal) while `m_i` is still `-inf`, then `correction = exp(m_i - m_new)`

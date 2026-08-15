@@ -127,7 +127,12 @@ over 256 decode steps: 70 MiB × 256              = 17,920 MiB
 ```
 
 Ignorable here at 7.7% (17,920 / 232,960); it takes over past ~8k context,
-which is a different problem.
+which is a different problem. And the closer the cache gets to the top of the
+ledger, the more the *number of KV heads* matters: halving them (grouped-query
+attention, Lecture 05) cuts total decode traffic by ~3% at 512-token context
+and ~26% at 8k — so "GQA is a direct 2× on the bottleneck" is a long-context
+statement, not a short-context one.
+[Full answer](qa.md#the-gqa-video-says-the-kv-cache-dwarfs-the-weights-the-book-says-weights-are-92-of-decode-traffic)
 
 **The shape to remember is `weights × tokens generated`.** Not the number.
 

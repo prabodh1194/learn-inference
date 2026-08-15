@@ -123,9 +123,12 @@ memory well.
 
 > **GQA is doing real work here.** Qwen3-0.6B has 16 query heads but only 8 KV
 > heads, and the cache is sized by *KV* heads. Grouped-query attention halves
-> this number outright. Since decode is memory-bound, that's a direct 2× on the
-> thing that bottlenecks you, which is why essentially every modern model uses
-> it.
+> this number outright. Decode is memory-bound, and the KV cache is the part
+> of its traffic that scales with context and batch — at the long contexts
+> where serving actually hurts, that's a direct 2× on the part that grows.
+> (At short context the weights dwarf the cache and the same halving buys ~3%
+> of the traffic; the crossover is the ~8k line from Lecture 01.)
+> [Full answer](qa.md#the-gqa-video-says-the-kv-cache-dwarfs-the-weights-the-book-says-weights-are-92-of-decode-traffic)
 
 ---
 

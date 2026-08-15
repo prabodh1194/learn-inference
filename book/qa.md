@@ -779,6 +779,98 @@ same math in a different order by hand.
 
 ---
 
+## Why does a running-max softmax recompute the exact same denominator?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+Because rescaling is exactly the arithmetic of "re-normalizing the old sum to
+the new max", which is what a one-shot softmax does implicitly in one pass.
+Work the same row both ways. Scores `[3, 1, 4, 1, 5, 2]`, tiles of two,
+`l = Σ exp(score − m)`:
+
+```
+tile 1:  m = 3            l = e⁰ + e⁻²                     = 1.1353
+tile 2:  m = 4, move e⁻¹  l = 1.1353·e⁻¹ + e⁰ + e⁻³         = 0.4177 + 1.0498  = 1.4675
+tile 3:  m = 5, move e⁻¹  l = 1.4675·e⁻¹ + e⁰ + e⁻³         = 0.5398 + 1.0498  = 1.5896
+```
+
+One shot, with the true max 5:
+
+```
+l = e⁻² + e⁻⁴ + e⁻¹ + e⁻⁴ + e⁰ + e⁻³  =  0.1353 + 0.0183 + 0.3679 + 0.0183 + 1 + 0.0498  =  1.5896
+```
+
+Same number. The move-by-`e^(m_old − m_new)` rule is not an approximation: it
+is the algebraic identity `e^(x − m_new) = e^(x − m_old) · e^(m_old − m_new)`
+applied to every term at once. The output accumulator rescales by the same
+factor, so the quotient `acc / l` is the same weighted average a one-shot pass
+computes — which is why the "recompute" framing in the video is really just
+"the order of the additions changed".
+
+---
+
+## Why divide by sqrt(d) and not by d?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+Scores are dot products, and a dot product of two `d`-dimensional vectors with
+unit-variance entries has variance `d`, not 1: the `d` independent terms add
+their variances instead of averaging. So the standard deviation of a score is
+`√d`, which at `d = 64` is **8** — scores scatter "±8", not the "±1" people
+guess — and the typical gap between the best and worst key is ~2 sd ≈ 16:
+
+```
+e¹⁶ ≈ 8.9 million
+```
+
+`exp` turns that gap into a near-total preference for one token. On the toy
+scores `[0, 6, 2, 2]` (a 4-dim dot product) the top token takes 96.2% of the
+softmax weight:
+
+```
+e⁶ / (e⁶ + e⁰ + 2e²)  =  403.4 / 419.2  =  96.2%
+```
+
+A spiked softmax is nearly an argmax. Attention "listens" to one key, and the
+gradient through it collapses: a softmax row's Jacobian is `p(δ − p)` (the
+identity minus the outer product of `p`, scaled by `p`), which is ~0 wherever
+one entry is ~1, so nothing learns. Dividing by `√d` first restores sd 1, the
+gaps shrink to ~2, `e²` is a 7:1 ratio, and the same toy stays soft — scaling
+`[0, 6, 2, 2]` by 1/√4 gives `[0, 3, 1, 1]`, top weight 76%. The scalar
+controls the *spread* of the scores, not the scale of any one value.
+
+One subtlety: the standard shorthand "restores the variance to exactly one"
+means the variance of each *score* (the dot product as a whole), not of each
+component — the components keep their variance, the sum is what lands on 1.
+
+---
+
+## The GQA video says the KV cache dwarfs the weights; the book says weights are 92% of decode traffic
+
+**Lecture:** [01. The two phases](01-the-two-phases.md) and [05. The KV cache](05-kv-cache.md)
+
+Both are right, on different sides of the same line — the ~8k-context
+crossover. The book's 92.3% is the *per-token* decode ledger at short context
+(215,040 MiB of 232,960 MiB total is the weights, Lecture 01). The video's
+"the KV cache dwarfs the weights" is the *stored-size* claim at long context
+(Lecture 05: at 32k the cache is 3.5 GiB, 4.3× the model).
+
+The practical question is where halving the KV heads (16 → 8, grouped-query
+attention) actually moves the needle. Per token, K and V cost 112 KiB across
+28 layers (Lecture 05's formula); weights are 880.8 MB:
+
+```
+context 512:  cache 56 MiB → 28 MiB   total 910.2 → 908.8 MB   ≈  3% cut
+context 8k:   cache 896 MiB → 448 MiB total 1776.8 → 1328.8 MB  ≈  26% cut
+```
+
+At 512 tokens the halving is rounding error; at 8k it is a quarter of the
+traffic. Serving hurts at long context *and* large batch, where the cache is
+both big and re-read every step — so the video and the book describe the two
+ends of one line, and GQA's payoff lives at the video's end.
+
+---
+
 ## Wait: "block" here is a thread block, not the KV block from Lecture 09?
 
 **Lecture:** [18. Paged attention kernel](18-paged-attention-kernel.md)
