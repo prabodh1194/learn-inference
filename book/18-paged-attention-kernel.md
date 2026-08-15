@@ -103,9 +103,17 @@ costing 114,688 bytes (from Lecture 05), one tile holds:
 
 And the lookup that finds it reads a single 32-bit index, 4 bytes. A 4-byte
 read steering a ~1.75 MiB read is why the indirection costs almost nothing
-while the gather it replaces cost a full extra copy of the sequence (224 MiB
+while the gather it replaced cost a full extra copy of the sequence (224 MiB
 at the 2048-token context Lecture 02 used). You're spending 4 bytes to save
 megabytes, every tile.
+
+The write side gets the same treatment. Every step the model computes fresh K/V
+for the batch's newest tokens, and a naive engine would stage them in a
+contiguous scratch buffer, then copy them into blocks. vLLM fuses the placement
+instead: a kernel that reshapes the freshly computed K/V and writes it straight
+into each sequence's assigned physical block — one scatter write, no staging
+copy. Same philosophy as the read side: bytes never make the round trip
+through a contiguous staging area.
 
 ### Decode is the special case
 

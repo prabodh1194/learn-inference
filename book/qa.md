@@ -617,6 +617,27 @@ when the conversation grows: you just add one more piece.
 
 ---
 
+## How can memory be free but unusable?
+
+**Lecture:** [09. Paged attention](09-paged-attention.md)
+
+"Free memory is free memory" is the wrong intuition. A freed strip of memory
+comes in the size of the request that freed it, and a next request can only use
+a strip that is contiguous and at least as large as its need. A finished
+128-token chat leaves a 128-token strip behind; a request that needs 32,768
+contiguous tokens cannot live in it. Space that no waiting request can use is
+called external fragmentation, and it grows with the variety of admitted
+sizes: book everyone at the same maximum and gaps don't arise (instead you pay
+reservation waste); book everyone at their own cap and dead strips of odd
+sizes accumulate.
+
+Paging removes the "contiguous and large enough" constraint. All blocks are
+the same size, so any freed block serves any next request, and a sequence is
+reassembled from whatever collection of blocks its block table points to.
+Wrong-sized fragments stop existing as a category.
+
+---
+
 ## Why can't decode just run the whole answer in one pass, like prefill runs the whole prompt?
 
 **Lecture:** [01. The two phases](01-the-two-phases.md)
@@ -670,6 +691,27 @@ The parent hash is what tells these two cases apart. It fingerprints the
 preceding block, so the chain is part of the block's identity: block "abc"
 after history X is not the same block as "abc" after history Y. Two stores
 with identical ids only merge if their entire histories match.
+
+---
+
+## Why can't a sequence just write into a block it shares?
+
+**Lecture:** [10. Prefix caching](10-prefix-caching.md)
+
+The naive plan: a sequence's next K/V entry lands in the next slot of the
+block its block table points to — and if three sequences share that block,
+all three would write to the same bytes. K/V are written in place, so the
+last writer wins and the other two attend to corrupted memory. The wrong
+intuition is that sharing implies write permission.
+
+Copy-on-write fixes it without banning sharing. A block with refcount > 1 is
+never written in place: the writer allocates a fresh block, copies the 16
+tokens, writes into the copy, decrements the original's refcount, and repoints
+its own block table at the copy. Cost: one small block copy, exactly at the
+moment a sequence diverges — before that, sharing was free. This is the same
+trick an OS uses for `fork()`, and it is what makes parallel sampling and
+beam search cheap: diverging alternatives copy one block, pruned alternatives
+just decrement.
 
 ---
 

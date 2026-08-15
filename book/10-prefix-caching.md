@@ -101,6 +101,55 @@ block 42 (system prompt, tokens 0-15)   ref_count = 3
 Three sequences use it. When one finishes, decrement to 2, **don't free.** Only
 at zero does the block become reclaimable.
 
+### Copy-on-write
+
+Sharing so far is read-only: everyone points at the same frozen prefix. But a
+sequence must *write* K/V for every token it generates. What happens when a
+shared block's owner needs to write into it?
+
+```
+block 42 (system prompt, tokens 0-15)      ref_count = 3
+sequence 3's next token needs its K/V written into block 42
+```
+
+Writing in place would corrupt sequences 1 and 2. The rule: **a block with
+refcount > 1 is never written in place.** The writer copies the block, writes
+into the private copy, and decrements the original's count:
+
+```
+copy block 42 -> block 51, ref_count(51) = 1, sequence 3 now points at 51
+                 ref_count(42) = 2, sequences 1 and 2 still share it
+```
+
+One block copied, not one sequence. That is **copy-on-write** — the same trick
+an OS uses for `fork()` — and it is what makes sharing work for sequences that
+are about to *diverge*, not just sequences that never will.
+
+**Parallel sampling.** A prompt sampled N times (Lecture 06) runs N sequences
+that share the prompt's blocks. They only differ in generated tokens, and a
+sequence copies a block only at the moment it must write into a shared one:
+until then, one physical copy serves all N.
+
+**Beam search.** Instead of one continuation, keep the K most promising
+candidate continuations alive and re-rank them each step. The candidates share
+their generated history too: when a beam diverges it copies exactly one block;
+when a beam is pruned its blocks are decremented, and only the last beam to
+let go of a block frees it. The paper reports up to 55% of beam search's KV
+memory saved this way. In a contiguous world every branch and every prune is a
+full-sequence KV copy; with paging it is one block copy or one decrement.
+
+> Notice nothing new was needed. The block table and the refcount were built
+> for prefixes; in-request sharing (samples, beams) and cross-request sharing
+> (prefixes) are the same two mechanisms at work.
+
+??? question "Why can't a sequence just write into a block it shares?"
+    Because K/V are written in place: if sequence 3 wrote into block 42, it
+    would silently corrupt the K/V that sequences 1 and 2 still attend to.
+    The fix is copy-on-write: refcount > 1 means write into a fresh copy and
+    decrement the original. The copy is one block of 16 tokens, never the
+    whole sequence.
+    [Full answer](qa.md#why-cant-a-sequence-just-write-into-a-block-it-shares)
+
 ### Eviction
 
 A block at refcount 0 isn't garbage; it's *cached*. Keep it around in case

@@ -82,6 +82,27 @@ every time it grows, and copying gigabytes is far too slow to happen between
 tokens of a live conversation (each arrives in milliseconds). So the engine
 reserves the worst case up front, every time.
 
+There is a third way memory disappears, and it needs a slightly different
+admission policy. Suppose the engine is honest instead: the chat is booked at
+its real cap of 128 tokens, the document at its 32,768. When the chat
+finishes, its strip joins the free list — as a **128-token strip**. The next
+long request still needs 32,768 contiguous tokens, and a 128-token strip can
+never serve it. Memory that is genuinely free but unusable, because the free
+pieces are the wrong sizes for every waiting request: **external
+fragmentation**. Uniform bookings (everyone at the full maximum) dodge this
+exactly because they are uniform — and pay for it with the reservation waste
+above. Contiguous allocation cannot have both: the pieces are always the wrong
+shape for something.
+
+??? question "How can memory be free but unusable?"
+    Freed strips come in the size of the request that freed them. A finished
+    128-token chat leaves a 128-token strip, and a 32,768-token document
+    cannot live in it. Free space is only usable when a waiting request needs
+    a contiguous strip that size — otherwise it is dead until some neighbour
+    frees enough. That is external fragmentation, and paging eliminates it:
+    every block is the same size, so a freed block fits any next request.
+    [Full answer](qa.md#how-can-memory-be-free-but-unusable)
+
 > That mismatch is the whole problem of this lecture: small requests, huge
 > reservations, memory filling with empty space, and a machine that could
 > serve everyone saying no to everyone. The next section counts exactly how
@@ -170,7 +191,9 @@ Blocks need not be adjacent. Attention gathers them through the table.
 
 **Waste becomes bounded.** Contiguous allocation wastes `max_seq_len - actual`
 per sequence, unbounded, and growing with the context you advertise. Paging
-wastes at most `block_size - 1` tokens: *internal fragmentation only*.
+wastes at most `block_size - 1` tokens: *internal fragmentation only*. External
+fragmentation disappears with it — every block is the same size, so a freed
+block serves any next request.
 
 **Growth is incremental.** A sequence gets one more block when it crosses a
 boundary, not a reservation at admission time.
@@ -200,6 +223,13 @@ differs is the block table: **2062 entries per sequence at block 1, versus 129 a
 Only at 512 does waste start costing you real capacity (77 sequences, 253 tokens
 wasted each). **vLLM defaults to 16** because that's where waste has gone to
 nothing and the table is still short.
+
+The kernel adds its own floor from below (Lecture 18): the 16 tokens inside a
+block sit in contiguous memory, so one block reads as one wide, coalesced
+burst. Too small, and decode attention pays a scatter jump per block and
+reads under-use the bus; too big, and the slack of the final block grows back.
+Block size is bounded on both sides; 16 is the middle where both the memory
+and the kernel are happy.
 
 ### The part that isn't free
 
@@ -273,13 +303,28 @@ fuses it into the attention kernel so nothing is materialized at all.
 ### Preemption
 
 You can now answer the question Lecture 08 deferred. Out of blocks with requests
-waiting? Evict a running sequence:
+waiting? Evict a running sequence. Two constraints shape how:
+
+**Eviction is all-or-nothing per sequence.** A sequence cannot take a step with
+half its blocks — the single new token attends over everything it has cached —
+so evicting a few blocks helps nobody. You evict a whole sequence or none.
+
+**The victim is the newest arrival.** vLLM admits in arrival order (FCFS) and
+preempts in reverse: the most recently admitted sequence is swapped out first,
+letting the oldest ones — nearest to finishing — run to completion and free
+their blocks. Then the victims resume, oldest first.
+
+Two ways to resume a victim:
 
 - **Swap**: copy its blocks to host RAM, restore later. Costs PCIe bandwidth.
 - **Recompute**: drop the blocks, redo prefill on resume. Costs compute.
 
-vLLM does both, choosing by sequence length. Short sequences are cheap to
-recompute; long ones are cheaper to swap.
+Which wins is an ablation, not a taste. With small blocks, swapping ships one
+tiny chunk per transfer and the PCIe overhead dominates: recompute wins. With
+large blocks the transfer is a fat contiguous read and swap wins. Sequence
+length enters too: a long sequence is expensive to recompute, so long victims
+get swapped, short ones recomputed. vLLM implements both and picks per
+situation — and in its measurements neither path is the bottleneck.
 
 ---
 
@@ -308,6 +353,14 @@ Push concurrent sequences up until OOM, with and without paging. **Record both.*
 **Throughput up as a consequence.** More concurrent sequences means bigger decode
 batches, and from Lecture 01 bigger batches directly raise arithmetic intensity
 on a memory-bound phase. A memory optimization bought you throughput.
+
+The paper reports the same story on a bigger stage: 2–4× the throughput of
+FasterTransformer and Orca on identical hardware, sustained at equal latency,
+across OPT-13B/66B/175B on real traces (ShareGPT, long and chatty; Alpaca,
+short and uniform) — and the gap is largest on exactly the traffic where KV
+memory is tightest. One baseline is Orca with perfect foresight, told each
+request's true output length at admission, and paging still wins: no
+reservation policy, however well-informed, beats not reserving.
 
 **Per-step latency slightly worse.** The gather isn't free, especially in PyTorch.
 Lecture 18 wins most of it back.
