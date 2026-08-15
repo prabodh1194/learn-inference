@@ -99,7 +99,7 @@ Two budgets bound the answer:
 - **`max_batched_tokens`**: total tokens per step. Every token, prefill or
   decode, costs one full pass over the weights, so the work in a step is
   proportional to its token count. A prefill of 4,000 tokens is 4,000 passes'
-  worth, against a decode part of 32, and 4,000 / 32 = 125× more work than
+  worth, against a decode part of 22, and 4,000 / 22 = 182× more work than
   the decode alone. Counting sequences alone underestimates a step's cost
   badly.
 

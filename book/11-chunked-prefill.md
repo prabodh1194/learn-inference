@@ -8,29 +8,30 @@
 
 ## The problem
 
-Lecture 08 warned you about this, and you should have measured it: continuous
-batching raised throughput and made **p99 latency worse**.
+Set the scene with a concrete moment. A service is decoding **22 short chats**,
+one token per sequence per step — the steady, boring work Lecture 08 made cheap.
+Then someone submits a **4,000-token** document, and the scheduler admits it.
 
-Here's the mechanism. A step containing a 4,000-token prefill is enormous.
-Count the arithmetic: every token, prefill or decode, costs one full pass over
-the weights, `2 × 440.4M` flops. So the prefill's addition to the step is 4,000
-passes, against a decode part of 32:
+The step that runs that document's prefill is enormous. Count the arithmetic:
+every token, prefill or decode, costs one full pass over the weights,
+`2 × 440.4M` flops. The prefill adds 4,000 passes to the step, against the 22
+decode passes:
 
 ```
 prefill's extra work:   4,000 × 880.8 MFLOP  =  3,523.2 GFLOP
-decode part:               32 × 880.8 MFLOP  =     28.2 GFLOP
-ratio:  3,523.2 / 28.2  =  125×
+decode part:               22 × 880.8 MFLOP  =     19.4 GFLOP
+ratio:  3,523.2 / 19.4  =  182×
 ```
 
-A 125× step, sitting among normal ones, and there is no spare capacity to
+One **182× step** sitting among normal ones, and there is no spare capacity to
 absorb it: prefill is *compute-bound*, arithmetic is the limit (Lecture 02),
 unlike decode's memory-bound arithmetic, which hides inside the time the chip
 spends waiting on memory anyway. Every sequence decoding alongside it waits for
 the whole thing to finish.
 
 ```
-step 41: [decode ×31] + [prefill 4000 tokens]   <- everyone stalls
-step 42: [decode ×32]                            <- normal
+step 41: [decode ×21] + [prefill 4000 tokens]   <- everyone stalls
+step 42: [decode ×22]                            <- normal
 ```
 
 From the user's side, their token stream just froze for a beat because somebody
@@ -50,11 +51,11 @@ steps**, interleaved with decode:
 
 ```
 BEFORE                              AFTER  (chunk = 512)
-step 41: 31 decode + 4000 prefill   step 41: 31 decode + 512 prefill
-step 42: 32 decode                  step 42: 31 decode + 512 prefill
+step 41: 21 decode + 4000 prefill   step 41: 21 decode + 512 prefill
+step 42: 22 decode                  step 42: 21 decode + 512 prefill
                                     ...
-                                    step 48: 31 decode + 512 prefill
-                                    step 49: 32 decode
+                                    step 48: 21 decode + 512 prefill
+                                    step 49: 22 decode
 ```
 
 Same total prefill work, spread over `4,000 / 512 = 7.8` → 8 steps instead of
