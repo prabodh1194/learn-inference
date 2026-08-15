@@ -75,10 +75,11 @@ production.
 
 ### Where drafts come from
 
-Four ways to produce the guess, differing along two axes that decide everything:
-**where the draft comes from** (a separate model, the target's own weights, or
-the text itself) and **how much machinery it costs** to train and serve. In
-roughly increasing order of setup:
+Five ways to produce the guess, differing along two axes that decide everything:
+**where the draft comes from** (a separate model, the target's own weights, a
+diffusion model, or the text itself) and **how much machinery it costs** to
+train and serve. In roughly increasing order of setup — the last one has no
+setup at all, which is why you'll build it:
 
 **Draft model — a separate, smaller model.** The original approach (Leviathan
 et al.). You keep a small model (say 0.5B) alongside the target (70B). Each
@@ -125,6 +126,25 @@ train heads. The trade: it's a trained addition to the model, and drafting still
 runs a small network per position, so it isn't as free as Medusa's single-
 forward drafting.
 
+**DFlash — draft in parallel, with a block diffusion model.** The newest
+paradigm, and it attacks the constraint every method above quietly shares:
+drafting has always been *autoregressive*. Even the cheap drafters produce token
+t+1 only after token t, so γ drafts cost γ sequential drafting steps — cheap
+steps, but sequential. DFlash instead trains a **lightweight block-diffusion
+model** that emits all γ draft tokens **in one parallel pass**, conditioned on
+features from the target model rather than on its own previous guesses
+(**KV-injection** — the drafter reads the target's hidden states directly).
+
+That one change moves the ceiling. The expected-tokens formula from the next
+section still bounds how many drafts *get accepted*, but the draft *cost* stops
+scaling with γ: producing 16 drafts costs no more than producing 4. DeepSeek's
+**DSpark** is the production sibling — semi-autoregressive drafting with
+confidence scheduling, shipped in their DeepSpec framework, and reported at
+51–400% faster decoding on DeepSeek-V4 (MIT-licensed) versus the single-token
+MTP path. The trade is the most machinery yet: a diffusion model to train plus
+the KV-injection plumbing into the target, which is why this is the frontier
+rather than the default.
+
 **N-gram / prompt lookup — no model at all.** The degenerate case, and the one
 this lecture makes you build. Keep an n-gram index of the prompt and everything
 generated so far; if the recent suffix has appeared before, propose whatever
@@ -135,13 +155,14 @@ collapses where the text is novel: prose has no matching n-gram, acceptance near
 zero, and you've added overhead for nothing. That failure is not a bug — it's
 the sharpest demonstration of "the workload decides" in the lecture.
 
-| | Draft model | Medusa / MTP | EAGLE | N-gram |
-|---|---|---|---|---|
-| Extra weights | a second model | heads on the target | trained module | none |
-| Training | no | yes | yes | no |
-| Draft mechanism | sequential small decode | one forward, parallel heads | per-position feature net | dictionary lookup |
-| Acceptance | model-dependent | good | **best** | code high, prose ~0 |
-| When it wins | no training allowed | target is fine-tunable | acceptance is the goal | output echoes input |
+| | Draft model | Medusa / MTP | EAGLE | DFlash / DSpark | N-gram |
+|---|---|---|---|---|---|
+| Extra weights | a second model | heads on the target | trained module | block-diffusion drafter | none |
+| Training | no | yes | yes | yes (diffusion) | no |
+| Draft mechanism | sequential small decode | one forward, parallel heads | per-position feature net | **one parallel block pass** | dictionary lookup |
+| Draft cost vs γ | scales with γ | scales with γ | scales with γ | **independent of γ** | O(1) |
+| Acceptance | model-dependent | good | very good | **best (reported)** | code high, prose ~0 |
+| When it wins | no training allowed | target is fine-tunable | acceptance is the goal | long γ, draft tax matters | output echoes input |
 
 ### The metric that matters
 
@@ -308,6 +329,11 @@ verify tokens that get thrown away.
 - **[DSpec](https://arxiv.org/abs/2406.14846)** (Zhou et al., 2024): distillation
   for speculative decoding — train the draft model to mimic the target and
   acceptance goes up. DeepSeek's contribution to the draft-model line.
+- **[DFlash](https://arxiv.org/abs/2602.06036)** (z-lab): block-diffusion
+  drafting — all drafts in one parallel pass, so drafting cost stops scaling
+  with γ. **DSpark** (DeepSeek, via DeepSpec) is the production sibling:
+  semi-autoregressive, confidence-scheduled drafting, 51–400% faster decode on
+  V4.
 - **Kiely §5.2–5.2.4** (p.129–136), all four approaches compared, including the
   n-gram/lookahead variant you built.
 - **[Field notes](field-notes.md)**: docs said 3 draft tokens, measurement said 5,

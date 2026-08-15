@@ -8,18 +8,33 @@
 
 ## Why this lecture exists
 
-Everything so far has optimized *how fast* tokens come out. Production serving
-also cares about *what* comes out, and about serving many models from one engine.
+Everything so far made the engine *fast*. This lecture makes it *usable* — a
+fast engine that emits invalid output, can't call a tool, and only serves one
+model is not something you can put in production.
 
-Three features you'll meet immediately in any real deployment, all first-class in
-vLLM, none of them free:
+Set the scene with what a real client actually sends. It asks for a JSON object
+(`response_format: {"type": "json_object"}`), not prose — because the next stage
+of its pipeline throws on anything else. Then it asks for a *tool call*: the
+model doesn't answer, it acts, and the engine must emit a function invocation
+the client can parse and run. And the app has twelve fine-tuned variants of your
+base model it wants served without loading twelve copies.
 
-- **Structured output**: force valid JSON, or a schema, or a grammar
-- **Tool calling**: the dominant use case for LLM inference in 2026
-- **LoRA adapters**: serve many fine-tunes from one set of base weights
+Three requirements, all from production, none of them about speed:
 
-They're grouped here because each is a *constraint on the engine* rather than a
-speed optimization, and each interacts with machinery you've already built.
+- **Structured output**: force valid JSON, a schema, or a grammar. "Mostly
+  valid" is a production incident.
+- **Tool calling**: the dominant use case for LLM inference in 2026 — and it is
+  structured output plus a protocol.
+- **LoRA adapters**: serve many fine-tunes from one set of base weights.
+
+They belong in one lecture because they are the same move from three angles:
+the engine **constrains what it emits**. Structured output masks the logits so
+only legal tokens survive; tool calling constrains to the tool's schema and
+parses the stream; LoRA constrains *which weights* apply to the request. Each
+reuses machinery you already built — the sampler (L06), the KV cache (L05), the
+scheduler (L08), the prefix cache (L10) — and each costs the engine something
+non-obvious that only shows up once you wire it in. None of them makes a token
+arrive faster; all of them are what turn an engine into a service.
 
 ---
 
