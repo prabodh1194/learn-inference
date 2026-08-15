@@ -107,9 +107,21 @@ use everywhere.
 
 ### Why it's faster
 
-Q, K, and V tiles are loaded into **SRAM**, the chip's on-chip scratchpad,
-about 6 MB total on the 3090, roughly 100× faster to access than HBM, the
-whole tile's work happens there, and only the final output goes back to HBM.
+Q, K, and V tiles are loaded into **SRAM**, the chip's on-chip scratchpad:
+~100 KB of shared memory per SM on the 3090 (a few MB across the whole chip),
+about 20× faster to access than HBM, the big slow main memory whose ~936 GB/s
+we measured in Lecture 04. The whole tile's work happens there, and only the
+final output goes back to HBM.
+
+Watch the terminology here, because two numbers get quoted for "on-chip
+memory" and they are different things. The **caches** — ~128 KB of L1 per SM,
+6 MB of L2 — are hardware-managed and invisible to your kernel. The
+**scratchpad** FlashAttention uses is per-SM **shared memory** (also ~100 KB),
+which the kernel allocates and controls explicitly (Lecture 20 shows the raw
+CUDA). The bandwidth advantage over HBM is ~20× for the scratchpad, not the
+"~100×" that sometimes gets quoted from cache numbers. Nothing in the
+algorithm changes either way: tiles live where the kernel puts them, and the
+traffic argument below is unaffected.
 
 ```
 BEFORE:  read Q,K -> write S -> read S -> write P -> read P,V -> write O

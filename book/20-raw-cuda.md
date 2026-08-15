@@ -71,8 +71,8 @@ Both loops are just `data[tid * stride]` versus `data[tid]`. The innocent
 expression is the strided one. The tell: your indexing expression jumps, the
 hardware pays per jump.
 
-**Shared memory.** The fast private memory attached to each SM, ~100× faster than
-HBM, ~100KB per SM, explicitly managed. This
+**Shared memory.** The fast private memory attached to each SM, ~20× faster than
+HBM on the 3090, ~100 KB per SM, explicitly managed. This
 is the resource FlashAttention's tiling exists to exploit; in Triton it was
 implicit, here you allocate it yourself. It exists to let the threads of one
 block hand data to each other and to hold a working set close, both without

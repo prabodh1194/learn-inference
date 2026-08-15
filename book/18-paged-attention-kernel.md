@@ -50,8 +50,8 @@ in the batch, and the strip you built was only ever a staging area to throw
 away.
 
 That is the **round-trip** Lecture 17 spent all its effort eliminating: bytes
-go out to the big slow memory (**HBM**, the GPU's main RAM, the memory that
-lecture's on-chip SRAM is ~100× faster than) and come back again. Paging
+go out to the big slow memory (**HBM**, the GPU's main RAM, the memory this
+lecture's on-chip SRAM scratchpad is ~20× faster than) and come back again. Paging
 scattered the data to save memory; FlashAttention assumed contiguous data to
 save traffic. You have both techniques now, working at cross purposes. That's
 the fight the lecture opener promised.
@@ -205,6 +205,11 @@ remaining gap is in the linear layers.
 
 - **[PagedAttention / vLLM](https://arxiv.org/abs/2309.06180)** §4, re-read now
   that you've written the kernel; the memory-manager design reads differently.
+- **["What is vLLM? | PagedAttention | Fully Explained: an OS Trick for 4× Throughput"](https://www.youtube.com/watch?v=xgl9Qrz31Mc)**
+  (Papers by Hand): the kernel-engineering side of paging — the fused
+  block-table lookup, the write-side kernels that place freshly computed K/V
+  straight into scattered blocks, and why block size 16 is a hardware choice
+  as much as a memory one.
 - **[FlashDecoding](https://crfm.stanford.edu/2023/10/12/flashdecoding.html)**:   the context-splitting idea, explained well and short.
 - **vLLM `vllm/v1/attention/backends/triton_attn.py`**: the production Triton
   path. Compare its block-table handling to yours. Note that V1 moved paged

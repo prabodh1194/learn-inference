@@ -329,12 +329,20 @@ pass**:
 | CPU RAM → VRAM (PCIe) | ~64 GB/s | once at load time |
 
 ??? question "Why can't the GPU just keep the weights on-chip?"
-    **SRAM is tiny.** A 3090 has ~128 KB of L1 per SM and 6 MB of L2, against
-    840 MiB (880.8 MB) of weights, off by ~147× even against L2:
+    **SRAM is tiny.** The scratchpad arithmetic actually runs in is the
+    shared memory attached to each SM: ~100 KB per SM on the 3090. Pooled
+    across all 82 SMs that's ~8.2 MB — and even that pooled total can't hold
+    a working set, because a tensor lives on **one** SM at a time — against
+    840 MiB (880.8 MB) of weights:
 
     ```
-    880.8 MB / 6 MB  =  ~147×
+    880.8 MB / ~8.2 MB  =  ~107×
     ```
+
+    (The 6 MB of L2 and 128 KB of L1 per SM that get quoted for "on-chip
+    memory" are *caches*, and are not what FlashAttention's tiles occupy.
+    The scratchpad is per-SM shared memory, and its bandwidth advantage over
+    HBM is ~20×, not the ~100× sometimes claimed.)
 
     A weight streams in, gets used once, and is evicted before reuse.
 

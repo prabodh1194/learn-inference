@@ -119,8 +119,8 @@ the trailing logits. *(L12)*
 **Kernel fusion**: combining operations into one kernel so intermediates stay in
 registers instead of crossing HBM. *(L16)*
 
-**HBM vs. SRAM**: high-bandwidth memory (GB, slow) vs. on-chip memory (KB, ~100×
-faster). The gap FlashAttention exploits. *(L17)*
+**HBM vs. SRAM**: high-bandwidth memory (GB, slow) vs. per-SM on-chip scratchpad
+(KB, ~20× faster on the 3090). The gap FlashAttention exploits. *(L17)*
 
 **FlashAttention**: tiled attention with online softmax that never materializes
 the N×N score matrix. O(N) memory instead of O(N²). *(L17)*

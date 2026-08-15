@@ -49,15 +49,19 @@ nearly everything in this book:
 
 ??? question "Wait, if the weights are already on the GPU, why is anything slow?"
     Because "on the GPU" means *in VRAM*, and VRAM isn't where arithmetic
-    happens. On-chip SRAM (L1 + L2 on the 3090) is ~6 MB; the weights are
+    happens. Arithmetic happens in the chip's **SRAM**, the per-SM scratchpad
+    that FlashAttention will later live in: ~100 KB per SM on the 3090
+    (~8 MB across the whole chip; L1 and L2, the 6 MB caches people quote,
+    are a different thing — caches, not scratchpad). The weights are
     840 MiB = 880.8 MB. That's off by
 
     ```
-    880.8 MB / 6 MB  =  ~147×
+    880.8 MB / ~8.2 MB  =  ~107×
     ```
 
-    so a weight streams in, gets used once, and is evicted before it can be
-    reused.
+    even if every SM pooled its scratchpad, which a single tensor cannot do —
+    it lives on one SM at a time. So a weight streams in, gets used once, and
+    is evicted before it can be reused.
 
     Longer answer: [Q&A: why is decode memory-bound if the weights are already
     on the GPU?](qa.md#why-is-decode-memory-bound-if-the-weights-are-already-on-the-gpu)
