@@ -291,10 +291,51 @@ The gather, in PyTorch, for prototyping:
 ```python
 def gather_kv(cache, block_table, seq_len, block_size):
     """Reassemble a logical K/V sequence from scattered physical blocks."""
+
+    # `cache` is the whole pool of physical blocks, one big tensor:
+    #   shape (n_blocks_total, block_size, H, D)
+    #     n_blocks_total  -- every block in the pool, allocated or free
+    #     block_size      -- tokens per block (16 by default)
+    #     H               -- KV heads
+    #     D               -- head dimension
+    #
+    # `block_table` is one sequence's *logical* order: a list of physical
+    # indices, e.g. [3, 7, 12] means "my tokens live in block 3, then 7,
+    # then 12" -- in that order, no matter where those blocks sit in cache.
+
+    # A Python list can't index a GPU tensor. Turn it into a tensor first,
+    # and put it on the same device as `cache` (indices and data must be
+    # on the same device, CPU with CPU, GPU with GPU).
     blocks = torch.tensor(block_table, device=cache.device)
-    gathered = cache[blocks]                       # (n_blocks, block_size, H, D)
-    flat = gathered.reshape(-1, *cache.shape[2:])  # (n_blocks*block_size, H, D)
-    return flat[:seq_len]                          # trim the partial last block
+
+    # Fancy indexing: `cache[blocks]` picks out the *rows* of cache whose
+    # indices are in `blocks`, stacked in that same order. Every other
+    # dimension comes along untouched, so the result has shape
+    #   (len(block_table), block_size, H, D)
+    # This one line is the whole "reassembly": the scattered blocks become
+    # one contiguous tensor, in logical order.
+    gathered = cache[blocks]
+
+    # Collapse the first two dims -- (n_blocks, block_size) -- into a single
+    # token dimension. Before: (n_blocks, block_size, H, D). After:
+    #   (n_blocks * block_size, H, D)
+    # `-1` means "figure out this size" (= n_blocks * block_size). The
+    # `*cache.shape[2:]` unpacking just says "keep (H, D) as-is".
+    flat = gathered.reshape(-1, *cache.shape[2:])
+
+    # The last block is usually only partly full: the sequence stopped
+    # mid-block. Keep only the `seq_len` tokens that actually exist.
+    return flat[:seq_len]
+```
+
+Concretely, with `block_table = [3, 7, 12]`, `block_size = 16`, and a 40-token
+sequence (`seq_len = 40`) on a pool of 1000 blocks:
+
+```
+cache           (1000, 16, 8, 128)   the whole pool
+cache[blocks]   (3,    16, 8, 128)   blocks 3, 7, 12, in logical order
+flat            (48,   8,  128)      3 × 16 = 48 tokens
+flat[:seq_len]  (40,   8,  128)      drop the 8 padding tokens in block 12
 ```
 
 Correct and slow, it materializes the whole sequence. Fine for now; Lecture 18
