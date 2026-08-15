@@ -1,0 +1,646 @@
+# claude-code-architecture
+# video: https://www.youtube.com/watch?v=9-flnmRnU5I
+
+Let's take apart a paper that reverse
+engineers the tool a lot of us now code
+with all day. It's called dive into
+Claude code, the design space of today's
+and future AI agent systems from the
+Viola lab. They read the actual shipping
+source code and ask a deceptively simple
+question. What actually makes a coding
+agent good? The answer, it turns out, is
+almost none of the model.
+Here's a number that should bother you a
+little. Someone measured how much of
+Claude code, the real shipping source,
+is the artificial intelligence part, the
+code that actually decides what to do
+next. It's about 1 and 1/2%. Everything
+else, the other 98 odd percent, is
+plumbing, permission checks, context
+management, tool routing, recovery
+logic. The part everyone obsesses over,
+the model, is basically a guest. The
+house it lives in is the product. So,
+this paper does something unusual. It
+ignores benchmark scores entirely and
+reads the harness line by line as an
+architecture. Because if the model is
+becoming a commodity that everyone has,
+then the thing wrapped around it is
+where all the real design decisions are
+hiding. Let's go find them.
+Strip everything away and the core of a
+coding agent is almost embarrassingly
+small, a while loop. Gather context,
+take an action, verify the result, and
+repeat until the task is done. That's
+the whole engine. The model looks at the
+conversation and emits a request to use
+a tool. Read this file. Run this
+command. The harness runs it, feeds the
+result back, and asks the model again.
+This is the reason and act pattern, and
+it commits to one action at a time with
+no backtracking. It trades the
+completeness of tree search for
+something more valuable in practice,
+simplicity and low latency. The clever
+part isn't the loop itself. It's that
+this trivial loop is the entire
+skeleton, and every hard problem in the
+rest of the paper is a whole subsystem
+bolted onto one of its three moments.
+What the model sees, what it can reach,
+and whether an action is actually
+allowed to run.
+The authors put the entire architecture
+into a single sentence.
+So, why is there anything to study in a
+while loop? Because moving from auto
+complete to autonomous action changes
+the problem completely. A completion
+tool suggests text, you accept it or you
+don't, and the worst case is a bad line
+you delete. An agent runs shell
+commands, edits files, calls external
+services on your machine, sometimes
+while you're not even watching. That
+shift creates a whole set of questions
+that simply don't exist for auto
+complete. Where should the reasoning
+live? What happens when an unrecognized
+action shows up? Do you allow it, block
+it, or ask? What's the scarce resource
+you have to budget? How do you hand off
+work? And how does a session survive
+longer than the model's own memory? The
+paper calls this recurring set of
+questions the design space. Every coding
+agent has to answer them. The genuinely
+interesting part is that different
+systems answer them in completely
+different ways.
+And here's the paper's real thesis.
+Those answers aren't arbitrary
+engineering taste. They trace back to
+human values. The authors pull five of
+them out of Anthropic's own writing and
+the source code itself. Keep the human
+ultimately in charge. Protect the human
+even when they're careless or
+distracted. Do what they actually meant,
+and let them verify it before trusting
+it. Amplify what one person can
+accomplish, and adapt to their specific
+project over time. Five values. From
+those, they derive 13 design principles.
+Things like deny first with human
+escalation, or treat context as a scarce
+resource. And each principle lands on a
+concrete choice in the code. It's a
+chain, a value to a principle to an
+implementation. That's the lens for the
+entire system. Every weird-looking
+decision we're about to see is one of
+five human commitments made mechanical.
+Start with the deepest choice of all.
+Where does the thinking actually happen?
+Claude code splits it clean down the
+middle. The model reasons about what to
+do. The harness decides whether it's
+allowed and then does it. The model
+never touches your file system, never
+runs a command directly, never opens a
+network connection. Its one and only way
+to affect the world is to emit a
+structured tool use request, which the
+harness inspects before executing. Now
+watch why that's not just tidiness, it's
+security. Because reasoning and
+enforcement live on completely separate
+code paths, a model that gets confused,
+jailbroken, or hit with a prompt
+injection still cannot override the
+permission rules or escape the sandbox.
+It can ask for anything it wants. The
+harness is the one holding the keys.
+This is the architecture behind that 1
+and 1/2% number. Keep the smart,
+unpredictable part tiny and caged, and
+pour all your engineering into the
+boring, deterministic cage around it.
+They put an actual number on just how
+thin that reasoning layer is.
+If a tool use request is the model's
+only lever on the world, then the set of
+tools you give it is the entire design
+of that world, the agent's hands. Claude
+code assembles up to 54 built-in tools
+before each session. Some are always on.
+Many are switched on by feature flags or
+by who you are. Then it merges in tools
+from external servers over a protocol
+called MCP, plus tools from plugins and
+skills, and it duplicates the whole
+thing into one flat pool the model picks
+from. But every tool you hand the model
+has a cost. Its name, description, and
+input schema all eat into the context
+window. So there's a lovely trick called
+deferred schemas. When there are too
+many tools, the model first sees only
+their names, like a table of contents.
+The full instruction manual for a tool
+loads only when the model actually
+reaches for it. The action surface is
+designed like a menu you don't read
+cover to cover. You open the page you
+need.
+Now the gate that every single action
+passes through. When the model wants to
+run a command, the request doesn't just
+execute. It hits the permission system
+and the answer is one of three words:
+allow, ask, or deny. And the ordering
+between them is the whole philosophy,
+deny first. A deny rule always wins,
+even over a more specific allow. A broad
+block all shell commands cannot be
+undone by a narrow but allow the test
+runner. Unknown actions are never
+silently allowed. They're escalated to
+you. And it isn't one switch. There are
+seven permission modes forming a
+spectrum, from plan mode, where the
+model must get its entire plan approved
+before touching anything, through the
+normal ask me first mode, up to modes
+that auto approve edits or hand judgment
+to a classifier. You don't pick a trust
+level once and freeze it. You walk up
+the spectrum as you learn to trust the
+thing. Trust is a trajectory, not a
+fixed setting.
+Here's that precedence rule, stated
+exactly in the source.
+But here's where it gets human and a
+little uncomfortable. Anthropic looked
+at how people actually respond to those
+permission prompts and users approve
+about 93% of them. Sit with what that
+means. If you say yes nine times out of
+10 without really reading, the prompt
+has stopped being a safety mechanism.
+It's become a button you mash to get
+unblocked. Approval fatigue quietly
+turns your vigilance into pure theater.
+So the design response is the genuinely
+interesting part. Not more warnings,
+fewer decisions. If people are going to
+rubber stamp prompts, then safety simply
+cannot depend on people reading them.
+So, you draw boundaries the agent can
+move around freely inside, a sandbox, an
+automated classifier, and you reserve an
+actual human decision for the genuinely
+unusual case. One analysis found that
+sandboxing cut the number of prompts by
+around 80%. The goal was never to ask
+better questions. It was to ask far
+fewer of them.
+This is the finding that reshaped the
+entire safety posture.
+Since you can't fully trust the human
+and you can't fully trust the model, the
+safety architecture rests on no single
+wall. It stacks independent layers, and
+any one of them can stop an action cold.
+Blanket denied tools are stripped from
+the model's view before it can even ask
+for them. Then deny rules evaluate. The
+active permission mode sets a baseline.
+An optional machine learning classifier
+can veto things the rules would have
+allowed. Approved shell commands can
+still be forced into a sandbox that
+limits file system and network access. A
+completely separate access. Permission
+is about authorization. The sandbox is
+about isolation. And permissions
+deliberately don't survive a session
+resume. So, stale trust can't leak into
+a new context. Seven layers, different
+techniques, so a failure in one doesn't
+open the door. And notice the elegant
+bit. When a layer blocks something, that
+denial isn't a dead end. The reason
+travels back to the model, which revises
+its approach and tries a safer path.
+Enforcement steers the agent instead of
+just halting it.
+If watching a supposedly simple while
+loop grows seven whole layers of safety
+machinery is your idea of a good time,
+do the Loop Why thing. Like, subscribe,
+and send this to the friend who still
+insists Claude code is just the model.
+Right, back to the plumbing that turns
+out to be the actual product.
+Here is the resource that quietly
+governs everything else, the context
+window. Older models get 200,000 tokens,
+the newest ones around a million, and it
+is always, eventually, the binding
+constraint. Every file read, every
+command output, every prior turn
+competes for that space, and when it
+fills up, quality falls off a cliff. So,
+Claude code manages it like a memory
+manager, not a garbage bin. Five
+compaction layers run in sequence before
+every model call. Gentlist first. Budget
+reduction trims individual tool outputs
+that are too big. Snip drops the oldest
+history segments. Micro compact does
+fine-grained, cache-aware compression.
+Context collapse replaces a stretch of
+history with a summary, but as a
+read-time projection, so the full record
+still exists underneath. And only if all
+of that still isn't enough does auto
+compact fire. A full, model-written
+summary of the whole conversation. It's
+lazy degradation. Spend the cheapest,
+least destructive move first, and
+escalate only when you're actually
+forced to.
+Compaction handles the conversation
+while it's in flight. But what about the
+things you want the agent to remember
+every single time? That's a separate
+system, and its defining choice is
+radical transparency. Instead of an
+opaque database or a vector index you
+can inspect, your instructions live in
+plain markdown files, the claude.md
+hierarchy. Four levels, from
+machine-wide policy down to your
+personal global file, down to a project
+files checked into the repo, down to a
+private local one. Files closer to the
+code you're working on load later, and
+win more of the model's attention. And
+they're lazy. Deep directory
+instructions only load when the agent
+actually reads files there. So, your
+instruction set literally grows as it
+explores the code base. Now, notice what
+they deliberately did not build. No
+embeddings, no similarity search. To
+find relevant memory, the system just
+has a language model skim the file
+headers and pick a few. You trade a
+little retrieval finesse for something
+priceless in a safety-critical tool. You
+can open the file and see exactly what
+the agent was told.
+Now, how do you let people extend this
+thing without drowning it? Most
+frameworks give you one mechanism.
+Everything you add is a tool. Claude
+code deliberately ships four, and the
+reason is beautiful once you see it.
+They're sorted by how much context they
+cost. At the free end are hooks, little
+bits of code that fire on lifecycle
+events to block, rewrite, or annotate
+actions. They cost zero context by
+default. Skills cost a little. Only a
+short description sits in the prompt,
+and the full instructions load when the
+skill is actually invoked. Plugins are
+the packaging layer, bundling any of the
+others together for distribution. And
+MCP servers, which give the model brand
+new callable tools, cost the most
+because every tool's schema has to live
+in the window. So, the four aren't
+redundant. They span a range from zero
+cost event handlers all the way to
+expensive full integrations. A single
+mechanism could never cover that spread
+without forcing everyone to pay the
+maximum price. And each one plugs into a
+different moment of the loop, what the
+model sees, what it can reach, and
+whether an action runs.
+Sometimes the smartest move is to not do
+the work yourself. Say fixing one
+failing test means first understanding
+an entire authentication module, a big
+messy exploration that would flood your
+context with dead ends. So, the agent
+spawns a subagent, and the key design
+choice here is isolation. The subagent
+gets its own fresh context window, its
+own tool set, does the messy
+exploration, and returns only a short
+summary to the parent. All the noise,
+the 20 files it read, the wrong turns,
+stays in a separate transcript on disk
+called a side chain and never touches
+the parent's window. It's delegation as
+context hygiene. You get the answer
+without inheriting the mess. Sub agents
+can even run inside a temporary Git work
+tree, their own private copy of the
+repo, so they can edit freely without
+stepping on your main branch. It is not
+free. Running whole teams of agents can
+burn something like seven times the
+tokens of a normal session, which is
+exactly why that summary only return
+matters so much.
+It's worth a quick detour on planning,
+because it's delightfully anticlimactic.
+Claude code has a plan mode and a
+planning tool, and one practitioner
+described that tool as basically a
+no-op. It doesn't compute anything. It
+doesn't call the outside world. So, why
+does it even exist? Because writing the
+plan down keeps the agent on track. The
+value isn't external computation at all.
+It's that laying out the steps focuses
+the model's own reasoning, and it gives
+you a clean checkpoint to approve before
+anything actually runs. And this is the
+whole philosophy in miniature. The
+harness doesn't impose a rigid planning
+graph the way some frameworks do, with
+type nodes and edges routing the model's
+every move. It just hands the model a
+scratch pad and gets out of the way.
+Minimal scaffolding, maximal room for
+the model to think.
+A production tool spends a shocking
+amount of its code on things going
+wrong, and how it chooses to fail is
+itself a design decision. The principle
+here is recover silently and only spend
+the human's precious attention on what's
+genuinely unrecoverable. Hit the output
+token cap in the middle of an answer?
+Retry with a bigger limit, up to three
+times. Context about to overflow?
+Reactively compact just enough to make
+room. The API rejects the prompt as too
+long? Try collapsing history and
+compacting before you give up. A
+streaming hiccup or the model itself
+failing? Fall back to a different
+strategy or to a backup model entirely.
+And Every one of these could have been a
+hard error thrown in your face. Instead,
+they're quietly caught and routed
+around. It's the exact same pattern as a
+denied permission. A failure becomes a
+signal the system acts on, not a wall it
+slams into. The whole agent is built to
+bend rather than break.
+Where does all of this lie between turns
+and across restarts? On disk as
+append-only logs. One file per session,
+one event per line, written the moment
+things happen and never rewritten.
+Append-only is a surprisingly strong
+choice. You can resume a session, fork
+it into a new branch to try something
+different, or rewind it. All just by
+replaying the log, and every event stays
+human-readable and auditable. You trade
+the fancy queries a real database would
+give you for total transparency and the
+power to reconstruct anything. But
+here's the sharp edge, and it is
+completely deliberate. When you resume a
+session, your conversation comes back,
+but your permission grants do not. You
+have to approve them again. It feels
+like friction, and that's the point.
+Each session is treated as its own
+isolated trust domain. So, a decision
+you made yesterday in a totally
+different context can't silently
+authorize something dangerous today.
+Safety wins over convenience.
+Let's watch one tiny request light up
+the entire machine at once. You type,
+"Fix the failing test in the auth test
+file." That single sentence fans out
+through every system we've built. It
+enters the loop through an interface,
+contacts assembly packs in your clawed
+markdown files, the git state, the
+recent history. The model decides to run
+the tests. That request hits the
+permission gate, and because it's a
+shell command, it asks you first. It
+reads the failure, decides it needs to
+understand the auth module, and
+delegates that exploration to a
+sub-agent that comes back with just a
+summary. It edits the file, reruns the
+tests, verifies they pass. Every step is
+recorded to the append-only transcript,
+and if the context ever got tight along
+the way, compaction quietly ran in the
+background. One mundane sentence, and it
+touched the loop, the tool pool,
+permissions, context management,
+delegation, and persistence. That's the
+whole architecture working as a single
+thing.
+Now, the move that makes this an actual
+study and not a fan letter. The authors
+take the exact same design questions to
+two other agent systems built from
+completely different starting points. A
+multi-channel assistant gateway and a
+single process assistant serving many
+surfaces, plus the wider world of coding
+agents. And the answers genuinely
+diverge. Take safety. Claude code puts
+the trust boundary between the model and
+your machine, checking every single
+action, deny first. Container isolated
+agents like SWE agent and open hands
+make a totally different bet. Wrap the
+whole thing in a sandbox and let it run
+freely inside. Ada makes a third bet
+entirely. Skip per-action checks and use
+Git as the safety net, so every change
+is reversible. Same question. How do I
+stay safe in three completely different
+architectures? The gateway system pushes
+the boundary all the way out to the
+perimeter, checking who's allowed in
+rather than what each action does. The
+lesson isn't that one of them is right.
+It's that the questions are universal
+and the deployment context is what
+decides the answer.
+Step back far enough and a familiar
+shape emerges. A tiny reasoning core
+wrapped in a thick shell of
+deterministic services for permissions,
+tools, memory, and recovery. If that
+sounds like something, it should. It's
+an operating system. The loop is the
+kernel. Everything around it is the OS,
+virtualizing the messy real world into
+safe, structured calls the model is
+allowed to make. And this reframes
+what's actually being built here. As
+frontier models converge, as they all
+get roughly, dependably good at coding,
+the model stops being the
+differentiator. The harness becomes it.
+The paper argues, and this is the part
+one keep chewing on, that investing in
+boring infrastructure, context
+management, safety layering, recovery,
+may buy you more real reliability than
+bolting yet another clever planner onto
+an already capable model. The
+intelligence is a commodity you rent by
+the token. The operating system you
+build around it is the thing you
+actually design.
+Is that just a nice story, or is it
+actually measurable? It's measurable.
+There's benchmarking where you hold the
+model completely fixed and change only
+the harness wrapped around it. And a
+single model score on long horizon task
+swings by up to 18 points. Same brain,
+different body, 18 points. That is an
+enormous effect for something people
+dismiss as mere plumbing. And on the
+other side of the ledger, Anthropic's
+own survey of their engineers found that
+around 27% of the tasks done with the
+tool were work that simply wouldn't have
+been attempted otherwise. Not faster
+versions of old work, genuinely new work
+that the harness made feel possible in
+the first place. So, the harness isn't
+just squeezing a bit more out of the
+model. It's changing what people even
+try to do. That is the payoff that
+justifies pouring 98% of your code into
+the cage around the model.
+Now, the honest part, because this paper
+is refreshingly willing to point at its
+own subject's cracks. Layering safety
+sounds unbeatable, right up until the
+layers share a weakness. Security
+researchers found that a command with
+more than 50 subcommands falls back to a
+single generic approval prompt, quietly
+skipping the per sub command denied
+checks, because parsing them all was
+freezing the interface. Defense in depth
+assumes the layers fail independently.
+Here, performance pressure made several
+of them degrade at exactly the same
+time. Extensibility carries its own
+bill. Every hook, plugin, and external
+server you add is also new attack
+surface. And some real vulnerabilities
+lived in the window before the trust
+dialogue even appeared. And all that
+clever compaction is largely invisible.
+When your history gets summarized or
+collapsed, you usually can't see what
+was dropped. Every one of these is the
+direct cost of a strength. Layering,
+extensibility, and compression each buy
+you something genuine, and each hands
+you a brand new failure mode as the
+change.
+And then the question the paper saves
+for last, the one that isn't really
+about architecture at all. All of this
+amplifies what you can do today, but
+does it quietly erode what you
+understand over time? The authors are
+careful here. They call this a
+cross-cutting concern, not a design
+value, precisely because the
+architecture doesn't actually optimize
+for it. But the evidence they gather is
+sobering. Anthropic Zone study names a
+paradox of supervision. Lean on the AI
+to do the work, and you slowly lose the
+very skills you'd need to supervise it
+well. Independent research found that
+developers working with AI assistants
+scored measurably lower on tests of
+actually understanding the resulting
+code. There's a real tension between
+amplifying a person this quarter and
+developing them over years, and almost
+nothing in the harness is built to
+protect that second one. It's the rare
+architecture paper that ends by
+questioning whether its own subject is
+missing an entire value.
+One measurement makes that worry
+uncomfortably concrete.
+So, the whole machine in one breath. A
+coding agent's power is not the model,
+it's the harness, 98% of the code. At
+its heart, a while loop. Gather, act,
+verify. The model only ever emits a tool
+request, and the harness owns the keys,
+which is exactly what keeps a jailbroken
+model caged. A gate answers every action
+deny first, across seven layers, because
+humans rubber stamp prompts and can't be
+the only guard. Context is the scarce
+resource, managed by five graduated
+compaction layers and plain inspectable
+memory files. For extension mechanisms,
+priced by context cost. Sub-agents that
+explore in isolation and hand back only
+a summary. Everything logged append
+only, resumable, but never re-trusting
+stale permissions. Trace every one of
+those choices back, and it's one of five
+human values made mechanical. The model
+reasons, the harness decides. That
+single split is the whole design.
+The one-line version: a coding agent's
+intelligence is a commodity, and its
+architecture is an operating system for
+that intelligence. A tiny reasoning core
+inside a thick deterministic shell that
+decides what it sees, what it can touch,
+and what it's allowed to do.
+What sticks with me is that very last
+question. We now have overwhelming
+evidence that the harness makes the
+model more capable. We have almost none
+that it keeps the human capable. The
+entire architecture is built to amplify
+what you can do today, and it's
+strangely silent about what you'll
+understand tomorrow. Maybe the next
+great harness isn't the one that makes
+the agent more autonomous. Maybe it's
+the one that keeps you in the loop on
+purpose. That's my read. Tell me yours.
+Until next time.

@@ -1,0 +1,2148 @@
+# cmu-llm-inference-11-agents-and-multi-agent
+# video: https://www.youtube.com/watch?v=ixLXrgF77ME
+# captions: manual
+
+Okay. Um, Okay. Um, Okay. Um, hi everyone. I have two uh homework hi
+everyone. I have two uh homework hi everyone. I have two uh homework
+related announcements before we get related announcements before we get
+related announcements before we get started. So, uh, the first one is
+started. So, uh, the first one is started. So, uh, the first one is
+homework 2 is probably going to be homework 2 is probably going to be
+homework 2 is probably going to be released today. Um, and by today I
+mean released today. Um, and by today I mean released today. Um, and by
+today I mean uh today anywhere on Earth. So, uh today anywhere on Earth.
+So, uh today anywhere on Earth. So, it will uh it will be out by
+hopefully it will uh it will be out by hopefully it will uh it will be
+out by hopefully the time you wake up tomorrow. Um and the time you wake
+up tomorrow. Um and the time you wake up tomorrow. Um and then uh then
+uh then uh number number two is that we would love number number two is
+that we would love number number two is that we would love to have
+feedback on homework one. Like to have feedback on homework one. Like to
+have feedback on homework one. Like some people said it was taking a
+long some people said it was taking a long some people said it was
+taking a long time or like certain parts were time or like certain parts
+were time or like certain parts were difficult and we'd like to make
+sure difficult and we'd like to make sure difficult and we'd like to
+make sure that we're trying to make the um you that we're trying to make
+the um you that we're trying to make the um you know the homeworks, know
+the homeworks, know the homeworks, you know, not easy but like
+informative you know, not easy but like informative you know, not easy
+but like informative and and helpful uh to learn about the and and
+helpful uh to learn about the and and helpful uh to learn about the
+things we talked about in class. And so things we talked about in class.
+And so things we talked about in class. And so we have a feedback forum.
+Uh we're we have a feedback forum. Uh we're we have a feedback forum. Uh
+we're trying to incorporate some game theory trying to incorporate some
+game theory trying to incorporate some game theory in how we're grading
+the feedback form, in how we're grading the feedback form, in how we're
+grading the feedback form, which is if 50% of the people in the which is
+if 50% of the people in the which is if 50% of the people in the class
+uh fill in the feedback form, class uh fill in the feedback form, class
+uh fill in the feedback form, everyone gets a free quiz. Um so it's an
+everyone gets a free quiz. Um so it's an everyone gets a free quiz. Um
+so it's an anonymous feedback. It's an anonymous anonymous feedback.
+It's an anonymous anonymous feedback. It's an anonymous feedback form.
+Um and if everybody fills feedback form. Um and if everybody fills
+feedback form. Um and if everybody fills it in, you will get an extra
+three out it in, you will get an extra three out it in, you will get an
+extra three out of three on your quiz grade. So that of three on your
+quiz grade. So that of three on your quiz grade. So that will make it a
+little bit easier to get will make it a little bit easier to get will
+make it a little bit easier to get a good quiz grade. But that only
+happens a good quiz grade. But that only happens a good quiz grade. But
+that only happens if half the people in the class fill it if half the
+people in the class fill it if half the people in the class fill it out.
+So, um you can bug your friends uh out. So, um you can bug your friends
+uh out. So, um you can bug your friends uh to try to get them to fill it
+out. So, to try to get them to fill it out. So, to try to get them to
+fill it out. So, um and the reason why we're doing this um and the
+reason why we're doing this um and the reason why we're doing this is we
+want to get it uh get anonymous is we want to get it uh get anonymous is
+we want to get it uh get anonymous feedback, but we um we want to get
+feedback, but we um we want to get feedback, but we um we want to get
+anonymous feedback, but we don't uh we anonymous feedback, but we don't
+uh we anonymous feedback, but we don't uh we want people to give us
+feedback. So, want people to give us feedback. So, want people to give
+us feedback. So, this is our way to encourage uh people this is our way
+to encourage uh people this is our way to encourage uh people to give
+feedback while still being to give feedback while still being to give
+feedback while still being anonymous. Um cool. Any questions? Okay. If
+not, I'll get started. We have Okay. If not, I'll get started. We have
+Okay. If not, I'll get started. We have two presentations today. I think
+you're two presentations today. I think you're two presentations today.
+I think you're here. Who else was presenting? Okay, here. Who else was
+presenting? Okay, here. Who else was presenting? Okay, great. Um, great.
+Um, great. Um, sounds good. sounds good. sounds good. So I would like to
+talk about agents and So I would like to talk about agents and So I
+would like to talk about agents and um I'm not going to talk much about
+um I'm not going to talk much about um I'm not going to talk much about
+training or designing uh agents uh in training or designing uh agents uh
+in training or designing uh agents uh in order to improve uh accuracy
+through order to improve uh accuracy through order to improve uh
+accuracy through architectural changes or language model architectural
+changes or language model architectural changes or language model
+changes but rather focus mostly on the changes but rather focus mostly
+on the changes but rather focus mostly on the things that are related to
+doing things that are related to doing things that are related to doing
+inference in agents because this is an inference in agents because this
+is an inference in agents because this is an inference class but there's
+kind of like inference class but there's kind of like inference class
+but there's kind of like no way around some of the you know uh no way
+around some of the you know uh no way around some of the you know uh the
+architecture stuff. So I'll be the architecture stuff. So I'll be the
+architecture stuff. So I'll be talking a bit about that as well. Um but
+talking a bit about that as well. Um but talking a bit about that as
+well. Um but basically an agent is a system that basically an agent is a
+system that basically an agent is a system that iteratively uses tools
+to achieve a iteratively uses tools to achieve a iteratively uses tools
+to achieve a task. Um so it's not just a one-shot task. Um so it's not
+just a one-shot task. Um so it's not just a one-shot tool use but it's
+uh using tools over tool use but it's uh using tools over tool use but
+it's uh using tools over and over again. Um almost all agents and over
+again. Um almost all agents and over again. Um almost all agents
+nowadays are powered by large language nowadays are powered by large
+language nowadays are powered by large language models. Um there are
+possibly some models. Um there are possibly some models. Um there are
+possibly some agents uh that are not powered by large agents uh that are
+not powered by large agents uh that are not powered by large language
+models still. Anybody have an language models still. Anybody have an
+language models still. Anybody have an idea of what those might be? What
+what was an example of an agent What what was an example of an agent
+What what was an example of an agent that was uh that existed like that
+was uh that existed like that was uh that existed like three years ago
+or five years ago? three years ago or five years ago? three years ago or
+five years ago? Siri and Cortana are good examples. Siri and Cortana are
+good examples. Siri and Cortana are good examples. Yeah. And they're
+maybe mostly not Yeah. And they're maybe mostly not Yeah. And they're
+maybe mostly not powered by uh powered by uh powered by uh by large
+language models now. Any other by large language models now. Any other
+by large language models now. Any other ideas? What about the ones you
+use to uh get What about the ones you use to uh get What about the ones
+you use to uh get customer service when you call your customer service
+when you call your customer service when you call your favorite airline
+or something? Those are favorite airline or something? Those are
+favorite airline or something? Those are other ones that are basically
+based on other ones that are basically based on other ones that are
+basically based on on trees. Uh you know like if uh if this on trees. Uh
+you know like if uh if this on trees. Uh you know like if uh if this and
+classifiers and stuff and those you and classifiers and stuff and those
+you and classifiers and stuff and those you know you still use but now
+all the all know you still use but now all the all know you still use
+but now all the all the newly developed agents mostly people the newly
+developed agents mostly people the newly developed agents mostly people
+are using LLM. Um agents are interesting are using LLM. Um agents are
+interesting are using LLM. Um agents are interesting because they pose
+unique inference because they pose unique inference because they pose
+unique inference challenges in a number of ways. Uh the challenges in a
+number of ways. Uh the challenges in a number of ways. Uh the first one
+is reasoning and planning. Um first one is reasoning and planning. Um
+first one is reasoning and planning. Um and because of this uh you know
+you have and because of this uh you know you have and because of this uh
+you know you have to uh do extra steps that require to uh do extra steps
+that require to uh do extra steps that require inference over them. Um
+environment inference over them. Um environment inference over them. Um
+environment representation uh so like how do you uh representation uh so
+like how do you uh representation uh so like how do you uh represent all
+of the output from the represent all of the output from the represent
+all of the output from the tool calls that you get? Uh long context tool
+calls that you get? Uh long context tool calls that you get? Uh long
+context modeling. So agents are probably one of modeling. So agents are
+probably one of modeling. So agents are probably one of the biggest long
+context use cases the biggest long context use cases the biggest long
+context use cases nowadays in addition to things like nowadays in
+addition to things like nowadays in addition to things like
+summarization or or question answering summarization or or question
+answering summarization or or question answering evaluation. I'm going
+to talk a little evaluation. I'm going to talk a little evaluation. I'm
+going to talk a little bit about this in case people want to uh bit
+about this in case people want to uh bit about this in case people want
+to uh you know use agents and evaluate them. you know use agents and
+evaluate them. you know use agents and evaluate them. Uh another thing
+that we've been working Uh another thing that we've been working Uh
+another thing that we've been working on uh you know kind of more uh
+from my on uh you know kind of more uh from my on uh you know kind of
+more uh from my personal experience is uh critic models personal
+experience is uh critic models personal experience is uh critic models
+and uh critic models are models that are and uh critic models are models
+that are and uh critic models are models that are essentially similar to
+the reward models essentially similar to the reward models essentially
+similar to the reward models that we're going to talk about later but
+that we're going to talk about later but that we're going to talk about
+later but I'd like to talk about them now because I'd like to talk about
+them now because I'd like to talk about them now because this is only
+agent class uh and then you this is only agent class uh and then you
+this is only agent class uh and then you can remember them when we uh we
+cover can remember them when we uh we cover can remember them when we uh
+we cover reward models later and also multi- aent reward models later
+and also multi- aent reward models later and also multi- aent
+delegation. And I'm I'm not really going delegation. And I'm I'm not
+really going delegation. And I'm I'm not really going to uh cover this
+in that much detail, to uh cover this in that much detail, to uh cover
+this in that much detail, but I'll I'll talk about it a little. but I'll
+I'll talk about it a little. but I'll I'll talk about it a little.
+&gt;&gt; Cool. Um, so the first thing is uh some &gt;&gt; Cool. Um, so
+the first thing is uh some &gt;&gt; Cool. Um, so the first thing is uh
+some use cases for agents. Has anybody like use cases for agents. Has
+anybody like use cases for agents. Has anybody like built an agent to do
+something? built an agent to do something? built an agent to do
+something? &gt;&gt; Yeah. &gt;&gt; Sim users on a search engine will
+user click and what's the next will user click and what's the next will
+user click and what's the next action users will take. action users will
+take. action users will take. &gt;&gt; Okay. simulate users on a search
+engine. &gt;&gt; Okay. simulate users on a search engine. &gt;&gt; Okay.
+simulate users on a search engine. That sounds good. Any other
+interesting That sounds good. Any other interesting That sounds good.
+Any other interesting use cases? Okay. Well, thank you for uh Okay.
+Well, thank you for uh Okay. Well, thank you for uh accidentally
+volunteering accidentally volunteering accidentally volunteering to talk
+about your agent. Um we have uh to talk about your agent. Um we have uh
+to talk about your agent. Um we have uh a bunch of different use cases.
+One of a bunch of different use cases. One of a bunch of different use
+cases. One of the biggest ones nowadays is software the biggest ones
+nowadays is software the biggest ones nowadays is software development.
+Uh so code generation, development. Uh so code generation, development.
+Uh so code generation, debugging and testing. Um there's uh debugging
+and testing. Um there's uh debugging and testing. Um there's uh kind of
+popular examples like claude kind of popular examples like claude kind
+of popular examples like claude code by enthropic codecs and also code
+by enthropic codecs and also code by enthropic codecs and also openhands
+which is an open-source uh openhands which is an open-source uh
+openhands which is an open-source uh agent that I'm developing that I'll
+talk agent that I'm developing that I'll talk agent that I'm developing
+that I'll talk about a little bit. Um also web about a little bit. Um
+also web about a little bit. Um also web automation so things like data
+automation so things like data automation so things like data extraction
+form filling uh testing and extraction form filling uh testing and
+extraction form filling uh testing and things like this and um there's
+uh things like this and um there's uh things like this and um there's uh
+closed source things like open AI agent closed source things like open
+AI agent closed source things like open AI agent mode if anybody has
+used this and then mode if anybody has used this and then mode if
+anybody has used this and then there's open source ones that you can
+there's open source ones that you can there's open source ones that you
+can download and use in research like download and use in research like
+download and use in research like browser use uh is a very popular
+example browser use uh is a very popular example browser use uh is a
+very popular example of this of this of this uh things for research and
+analysis so uh things for research and analysis so uh things for
+research and analysis so kind of by default a lot of the uh you kind of
+by default a lot of the uh you kind of by default a lot of the uh you
+know chatbot interfaces like uh chat or know chatbot interfaces like uh
+chat or know chatbot interfaces like uh chat or claude now support
+things like claude now support things like claude now support things
+like information gathering and report information gathering and report
+information gathering and report generation. Um there's also things like
+generation. Um there's also things like generation. Um there's also
+things like perplexity pro. There's open source uh perplexity pro.
+There's open source uh perplexity pro. There's open source uh versions
+of things like this like open versions of things like this like open
+versions of things like this like open deep research and there's like
+seven deep research and there's like seven deep research and there's
+like seven different open researches. So um you can different open
+researches. So um you can different open researches. So um you can find
+one and pick your favorite one. Um find one and pick your favorite one.
+Um find one and pick your favorite one. Um and then there's also uh
+interactive and then there's also uh interactive and then there's also
+uh interactive environments like games uh simulations environments like
+games uh simulations environments like games uh simulations and uh
+robotics. So you know things to and uh robotics. So you know things to
+and uh robotics. So you know things to play games like Minecraft and and
+work play games like Minecraft and and work play games like Minecraft
+and and work on robots. on robots. on robots. So I I have been actually
+building um an So I I have been actually building um an So I I have been
+actually building um an open source agent called open hands is open
+source agent called open hands is open source agent called open hands is
+uh kind of originally is an open- source uh kind of originally is an
+open- source uh kind of originally is an open- source uh tool and then
+is uh part of a startup uh tool and then is uh part of a startup uh tool
+and then is uh part of a startup uh that I work with and uh because of
+uh that I work with and uh because of uh that I work with and uh because
+of this a lot of my best examples are from this a lot of my best
+examples are from this a lot of my best examples are from my experience
+with this. Uh basically my experience with this. Uh basically my
+experience with this. Uh basically it's a software development agent
+that it's a software development agent that it's a software development
+agent that also supports web browsing and other uh also supports web
+browsing and other uh also supports web browsing and other uh other
+varieties of tools. Um it's other varieties of tools. Um it's other
+varieties of tools. Um it's available here. I'd like to show a available
+here. I'd like to show a available here. I'd like to show a little
+example. Um so you can like click little example. Um so you can like
+click little example. Um so you can like click through and create a
+conversation. through and create a conversation. through and create a
+conversation. Um anybody have something interesting I can anybody have
+something interesting I can anybody have something interesting I can do?
+I usually try to pick something that do? I usually try to pick something
+that do? I usually try to pick something that I uh I uh I uh that I want
+to do recently. that I want to do recently. that I want to do recently.
+Um, okay. Here, here's one. Find okay. Here, here's one. Find okay.
+Here, here's one. Find the the the find the website for CMU inference
+find the website for CMU inference find the website for CMU inference
+algorithms class in fall uh 2025. algorithms class in fall uh 2025.
+algorithms class in fall uh 2025. Download the homework assignment and
+Download the homework assignment and Download the homework assignment
+and guess how long it will take to finish guess how long it will take to
+finish guess how long it will take to finish homework assignment one.
+Okay. So, let let's see how accurate Okay. So, let let's see how
+accurate Okay. So, let let's see how accurate this is. Um, oh, uh,
+sorry. This is using GPT5 and oh, uh, sorry. This is using GPT5 and oh,
+uh, sorry. This is using GPT5 and inference on GPT5 is really slow. So,
+inference on GPT5 is really slow. So, inference on GPT5 is really slow.
+So, I'm going to stop doing that and, uh, I'm going to stop doing that
+and, uh, I'm going to stop doing that and, uh, and use, uh, Claude
+because I'd like it and use, uh, Claude because I'd like it and use, uh,
+Claude because I'd like it to finish before the class finishes. 4.5 came
+up nice. 4.5 came up nice. 4.5 came up nice. &gt;&gt; Yeah, we we just
+haven't updated the &gt;&gt; Yeah, we we just haven't updated the
+&gt;&gt; Yeah, we we just haven't updated the interface yet. So, um so
+like G G G G G G G G G G G G G G G G so like G G G G G G G G G G G G G G
+G G so like G G G G G G G G G G G G G G G G G G G G GPD5 uh has we we
+run it with G G G G GPD5 uh has we we run it with G G G G GPD5 uh has we
+we run it with the like reasoning effort high and the the like reasoning
+effort high and the the like reasoning effort high and the high
+reasoning effort takes a long time high reasoning effort takes a long
+time high reasoning effort takes a long time but it's really good so it
+doesn't uh but it's really good so it doesn't uh but it's really good so
+it doesn't uh doesn't make as many mistakes. Uh but doesn't make as many
+mistakes. Uh but doesn't make as many mistakes. Uh but yeah, yeah, yeah,
+&gt;&gt; you specify whether it's like a person &gt;&gt; you specify
+whether it's like a person &gt;&gt; you specify whether it's like a
+person or itself finishing or itself finishing or itself finishing
+&gt;&gt; that that's a good point. If I ask it to &gt;&gt; that that's a
+good point. If I ask it to &gt;&gt; that that's a good point. If I ask
+it to guess how long software engineering guess how long software
+engineering guess how long software engineering tasks will take, it
+usually says like tasks will take, it usually says like tasks will take,
+it usually says like much longer than it actually takes. So much longer
+than it actually takes. So much longer than it actually takes. So um
+it'll probably say like two to three um it'll probably say like two to
+three um it'll probably say like two to three weeks or something. weeks
+or something. weeks or something. But anyway, like because this is a
+demo, But anyway, like because this is a demo, But anyway, like because
+this is a demo, I'd like to just show you what it's I'd like to just
+show you what it's I'd like to just show you what it's doing. So here
+it's calling a search doing. So here it's calling a search doing. So
+here it's calling a search engine tool. Um it's calling a search engine
+tool. Um it's calling a search engine tool. Um it's calling a search
+engine tool uh to try to like find um engine tool uh to try to like find
+um engine tool uh to try to like find um like search for this class. It
+found it like search for this class. It found it like search for this
+class. It found it taught by me and Amanda. And then it taught by me and
+Amanda. And then it taught by me and Amanda. And then it sees there's an
+assignments page. It's sees there's an assignments page. It's sees
+there's an assignments page. It's going to that extracting the
+information going to that extracting the information going to that
+extracting the information from the page. Um and uh then it's from the
+page. Um and uh then it's from the page. Um and uh then it's cloning uh
+cloning uh cloning uh cloning the code uh to see where the cloning the
+code uh to see where the cloning the code uh to see where the code is.
+Um, code is. Um, code is. Um, it's reading the PDF. So, you can see it's
+reading the PDF. So, you can see it's reading the PDF. So, you can see
+that it it opened the PDF and it's that it it opened the PDF and it's
+that it it opened the PDF and it's reading through the assignment and
+stuff reading through the assignment and stuff reading through the
+assignment and stuff like this. Um, scrolling down to read like this.
+Um, scrolling down to read like this. Um, scrolling down to read more of
+it to get gather more more of it to get gather more more of it to get
+gather more information and stuff. Um, I won't make information and
+stuff. Um, I won't make information and stuff. Um, I won't make you
+watch all of this. I'll I'll like go you watch all of this. I'll I'll
+like go you watch all of this. I'll I'll like go back to this um uh like
+back to this um uh like back to this um uh like uh to check on it when
+it's done because uh to check on it when it's done because uh to check
+on it when it's done because I don't want to spend too much time I don't
+want to spend too much time I don't want to spend too much time watching
+the agent work. It's kind of a watching the agent work. It's kind of a
+watching the agent work. It's kind of a failure mode of agents. You
+shouldn't failure mode of agents. You shouldn't failure mode of agents.
+You shouldn't watch your agent work. you should let it watch your agent
+work. you should let it watch your agent work. you should let it go do
+things and go back and check on it go do things and go back and check on
+it go do things and go back and check on it because it's too like fun to
+watch the because it's too like fun to watch the because it's too like
+fun to watch the agent do what it's doing. Um but uh that agent do what
+it's doing. Um but uh that agent do what it's doing. Um but uh that that
+wastes a lot of your time. So cool. that wastes a lot of your time. So
+cool. that wastes a lot of your time. So cool. Um any any questions so
+far? Um any any questions so far? Um any any questions so far? &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; What do you use like lang?
+&gt;&gt; What do you use like lang? &gt;&gt; What do you use like lang?
+&gt;&gt; Yeah. So great great question. Um &gt;&gt; Yeah. So great great
+question. Um &gt;&gt; Yeah. So great great question. Um langraph and
+lang chain are like tools langraph and lang chain are like tools
+langraph and lang chain are like tools to build agents. We actually
+decided not to build agents. We actually decided not to build agents. We
+actually decided not to use anything like this. And I can I to use
+anything like this. And I can I to use anything like this. And I can I
+can talk a little bit about uh the can talk a little bit about uh the
+can talk a little bit about uh the design decisions, but we have our own
+um design decisions, but we have our own um design decisions, but we
+have our own um agent SDK that we designed um specifically for that we
+designed um specifically for that we designed um specifically for this.
+this. this. And And And the reason why we did this is um ling the reason
+why we did this is um ling the reason why we did this is um ling graph
+and link chain basically my graph and link chain basically my graph and
+link chain basically my description of them and other things description
+of them and other things description of them and other things like
+autogen is they're kind of more like autogen is they're kind of more
+like autogen is they're kind of more fixed agent workflows. So it's like
+I I fixed agent workflows. So it's like I I fixed agent workflows. So
+it's like I I want to do this and then I want to send want to do this
+and then I want to send want to do this and then I want to send the
+information to this and do that and the information to this and do that
+and the information to this and do that and then send the information to
+this and then send the information to this and then send the information
+to this and then do that. Um, and so they're then do that. Um, and so
+they're then do that. Um, and so they're particularly good when you have
+like a particularly good when you have like a particularly good when you
+have like a more fixed workflow, but in software more fixed workflow,
+but in software more fixed workflow, but in software engineering or like
+the workflow is very engineering or like the workflow is very
+engineering or like the workflow is very various, right? Like I did a um
+I I did various, right? Like I did a um I I did various, right? Like I
+did a um I I did something here that's like a workflow something here
+that's like a workflow something here that's like a workflow that I've
+never really done before, like that I've never really done before, like
+that I've never really done before, like you know, look look at homework
+and you know, look look at homework and you know, look look at homework
+and estimate the time. And so in order to estimate the time. And so in
+order to estimate the time. And so in order to make things uh kind of
+more diverse, we make things uh kind of more diverse, we make things uh
+kind of more diverse, we um we basically just wanted to create a um we
+basically just wanted to create a um we basically just wanted to create
+a single uh agent that could do lots of single uh agent that could do
+lots of single uh agent that could do lots of different things. So we
+didn't use that different things. So we didn't use that different
+things. So we didn't use that sort of scaffolding ourselves. So sort of
+scaffolding ourselves. So sort of scaffolding ourselves. So basically
+what you do is um you add basically what you do is um you add basically
+what you do is um you add tools uh the tools that you wanted to tools uh
+the tools that you wanted to tools uh the tools that you wanted to have
+available to it and then uh the have available to it and then uh the
+have available to it and then uh the like framework that we created has
+all like framework that we created has all like framework that we
+created has all the like inference or all the methods the like inference
+or all the methods the like inference or all the methods that I
+basically will talk about slides that I basically will talk about slides
+that I basically will talk about slides implemented in it but it's
+mostly not implemented in it but it's mostly not implemented in it but
+it's mostly not like doing delegation between multiple like doing
+delegation between multiple like doing delegation between multiple
+agents which is what lang graph and agents which is what lang graph and
+agents which is what lang graph and autogen are good at. Yeah. Cool. Um
+autogen are good at. Yeah. Cool. Um autogen are good at. Yeah. Cool. Um
+okay sounds good. Let's uh let's move okay sounds good. Let's uh let's
+move okay sounds good. Let's uh let's move actually may maybe it's done
+25 to 35 hours total. So we'll see if 25 to 35 hours total. So we'll see
+if 25 to 35 hours total. So we'll see if that is uh we also we're going
+to have that is uh we also we're going to have that is uh we also we're
+going to have the um the feedback survey that the um the feedback survey
+that the um the feedback survey that hopefully everybody will fill out
+so you hopefully everybody will fill out so you hopefully everybody will
+fill out so you can see uh how how correct this can see uh how how
+correct this can see uh how how correct this estimation was. estimation
+was. estimation was. Um cool. Let's go. So um first I'd like Um cool.
+Let's go. So um first I'd like Um cool. Let's go. So um first I'd like
+to talk about reasoning and planning and to talk about reasoning and
+planning and to talk about reasoning and planning and the basic idea is
+that um the basic idea is that um the basic idea is that um we talked
+about reasoning from the point we talked about reasoning from the point
+we talked about reasoning from the point of view of mathematical
+reasoning. Um of view of mathematical reasoning. Um of view of
+mathematical reasoning. Um and the mathematical reasoning uh there and
+the mathematical reasoning uh there and the mathematical reasoning uh
+there it's mostly kind of like deductive it's mostly kind of like
+deductive it's mostly kind of like deductive reasoning where it's like
+okay I have reasoning where it's like okay I have reasoning where it's
+like okay I have this math problem I want to apply my this math problem
+I want to apply my this math problem I want to apply my principles to
+perform uh you know to principles to perform uh you know to principles
+to perform uh you know to solve the math problem. Um here it's a solve
+the math problem. Um here it's a solve the math problem. Um here it's a
+little bit different. It's like not this little bit different. It's like
+not this little bit different. It's like not this is the information I
+have and I want to is the information I have and I want to is the
+information I have and I want to combine it together to solve a problem
+combine it together to solve a problem combine it together to solve a
+problem in a kind of like fixed way but rather I in a kind of like fixed
+way but rather I in a kind of like fixed way but rather I would like to
+come up with the best idea would like to come up with the best idea
+would like to come up with the best idea of what to do next given my
+overall of what to do next given my overall of what to do next given my
+overall objective. So this is more uh objective. So this is more uh
+objective. So this is more uh open-ended. Uh the standard way of doing
+open-ended. Uh the standard way of doing open-ended. Uh the standard way
+of doing reasoning within uh language models is reasoning within uh
+language models is reasoning within uh language models is based on uh a
+paper called react uh based on uh a paper called react uh based on uh a
+paper called react uh which is um a framework where you which is um a
+framework where you which is um a framework where you basically do
+reasoning and then uh basically do reasoning and then uh basically do
+reasoning and then uh perform actions. perform actions. perform actions.
+And so this is in contrast to only And so this is in contrast to only
+And so this is in contrast to only acting. So um you you're given a task
+acting. So um you you're given a task acting. So um you you're given a
+task and then you have an action which is go and then you have an action
+which is go and then you have an action which is go to draw one and then
+the door is closed. to draw one and then the door is closed. to draw one
+and then the door is closed. open door one, uh, you know, you open open
+door one, uh, you know, you open open door one, uh, you know, you open
+the door, etc., but you actually add the door, etc., but you actually
+add the door, etc., but you actually add the, um, uh, add the thoughts
+here. And the, um, uh, add the thoughts here. And the, um, uh, add the
+thoughts here. And there's two reasons why you would want there's two
+reasons why you would want there's two reasons why you would want to do
+this. Um, the first reason why you to do this. Um, the first reason why
+you to do this. Um, the first reason why you would want to do this is
+we've all seen would want to do this is we've all seen would want to do
+this is we've all seen that chain of thought like improves that chain of
+thought like improves that chain of thought like improves accuracy and
+agents are no uh, you know, accuracy and agents are no uh, you know,
+accuracy and agents are no uh, you know, exception to that. The second
+reason is exception to that. The second reason is exception to that. The
+second reason is um, it actually gives you updates of um, it actually
+gives you updates of um, it actually gives you updates of like what the
+what it's doing in natural like what the what it's doing in natural like
+what the what it's doing in natural language. Um, so you can see that
+it's language. Um, so you can see that it's language. Um, so you can see
+that it's saying here, I'll help you find the the saying here, I'll help
+you find the the saying here, I'll help you find the the website. Great.
+I found the website. website. Great. I found the website. website.
+Great. I found the website. Let's access the uh let's access it. I Let's
+access the uh let's access it. I Let's access the uh let's access it. I
+can see there's an assignments page. You can see there's an assignments
+page. You can see there's an assignments page. You can kind of like
+follow along what the can kind of like follow along what the can kind of
+like follow along what the agent is doing without looking at its agent
+is doing without looking at its agent is doing without looking at its
+actual actions uh here. So that's kind actual actions uh here. So that's
+kind actual actions uh here. So that's kind of like a major uh a major
+advantage of of like a major uh a major advantage of of like a major uh
+a major advantage of doing things like that. doing things like that.
+doing things like that. So um you know accuracy uh accuracy and So um
+you know accuracy uh accuracy and So um you know accuracy uh accuracy
+and uh kind of legibility. Um so React is a um a method for Um so React
+is a um a method for Um so React is a um a method for basically multi-
+step agents that use basically multi-step agents that use basically
+multi-step agents that use reasoning. There's another method uh
+reasoning. There's another method uh reasoning. There's another method
+uh called Kodact. And basically the idea of called Kodact. And basically
+the idea of called Kodact. And basically the idea of codeact is um
+instead of calling codeact is um instead of calling codeact is um
+instead of calling uh individual tools with an agent, you uh individual
+tools with an agent, you uh individual tools with an agent, you have the
+agent write code that executes have the agent write code that executes
+have the agent write code that executes the actions for you. And the the
+basic the actions for you. And the the basic the actions for you. And
+the the basic idea was um like let's say you wanted to idea was um like
+let's say you wanted to idea was um like let's say you wanted to uh
+extract you wanted to check the price uh extract you wanted to check the
+price uh extract you wanted to check the price of 10 different uh items
+and find the of 10 different uh items and find the of 10 different uh
+items and find the maximum the most expensive item or the maximum the
+most expensive item or the maximum the most expensive item or the least
+expensive item or something like least expensive item or something like
+least expensive item or something like that. Um the that. Um the that.
+Um the original way you would do this is you original way you would do
+this is you original way you would do this is you would make a bunch of
+individual tool would make a bunch of individual tool would make a bunch
+of individual tool calls. you would get the results of all calls. you
+would get the results of all calls. you would get the results of all of
+those tool calls and then you might of those tool calls and then you
+might of those tool calls and then you might make another tool call or
+use the LLM to make another tool call or use the LLM to make another
+tool call or use the LLM to pick, you know, the like highest price pick,
+you know, the like highest price pick, you know, the like highest price
+or lowest price item. But what you can or lowest price item. But what
+you can or lowest price item. But what you can do instead is you can
+just write a do instead is you can just write a do instead is you can
+just write a Python program that calls all the tools Python program that
+calls all the tools Python program that calls all the tools for you. Um,
+and that was the basic idea for you. Um, and that was the basic idea for
+you. Um, and that was the basic idea behind the uh the Kodak framework.
+And behind the uh the Kodak framework. And behind the uh the Kodak
+framework. And uh what codeact does is it uh simplifies uh what codeact
+does is it uh simplifies uh what codeact does is it uh simplifies your
+action space because now all of your action space because now all of
+your action space because now all of your work is basically writing uh
+you your work is basically writing uh you your work is basically writing
+uh you know writing programs in a language like know writing programs in
+a language like know writing programs in a language like Python and it
+also makes you be able to Python and it also makes you be able to Python
+and it also makes you be able to solve tasks a lot more efficiently. So
+solve tasks a lot more efficiently. So solve tasks a lot more
+efficiently. So this is um this is pretty popular this is um this is
+pretty popular this is um this is pretty popular nowadays and so now a
+lot of agents have nowadays and so now a lot of agents have nowadays and
+so now a lot of agents have kind of a um like coding style action kind
+of a um like coding style action kind of a um like coding style action
+space uh where they can run Python space uh where they can run Python
+space uh where they can run Python programs or they can run bash
+programs programs or they can run bash programs programs or they can run
+bash programs or other things like that. or other things like that. or
+other things like that. And this is important for inference of And this
+is important for inference of And this is important for inference of
+course because it's the difference course because it's the difference
+course because it's the difference between between between one action
+that generates a very large one action that generates a very large one
+action that generates a very large output versus many many individual
+output versus many many individual output versus many many individual
+actions that generate a small and less actions that generate a small and
+less actions that generate a small and less complex output. So you could
+even like complex output. So you could even like complex output. So you
+could even like trade-off between the two, right? you trade-off between
+the two, right? you trade-off between the two, right? you could have um
+an even if you're using could have um an even if you're using could have
+um an even if you're using codec, you can have an agent that codec, you
+can have an agent that codec, you can have an agent that prefers to
+write small chunks of code um prefers to write small chunks of code um
+prefers to write small chunks of code um and where it's more certain
+about the and where it's more certain about the and where it's more
+certain about the result or write very large chunks of result or write
+very large chunks of result or write very large chunks of code where
+it's less certain about the code where it's less certain about the code
+where it's less certain about the result. So you need to think about
+result. So you need to think about result. So you need to think about
+trading off between those. Cool. Um any any questions about that? Cool.
+Um any any questions about that? Cool. Um any any questions about that?
+Okay, so another thing about planning Okay, so another thing about
+planning Okay, so another thing about planning with agents. So re react
+is a very uh with agents. So re react is a very uh with agents. So re
+react is a very uh reactive way of doing planning. Um so uh reactive way
+of doing planning. Um so uh reactive way of doing planning. Um so uh
+kind kind of pun intended kind of not kind kind of pun intended kind of
+not kind kind of pun intended kind of not but like basically the idea is
+it plans but like basically the idea is it plans but like basically the
+idea is it plans in very small chunks um in that it is in very small
+chunks um in that it is in very small chunks um in that it is usually
+reasoning about the best next usually reasoning about the best next
+usually reasoning about the best next action to be performing. Um,
+another action to be performing. Um, another action to be performing.
+Um, another thing that we did uh thing that we did uh thing that we did
+uh in uh open hands and you know other in uh open hands and you know
+other in uh open hands and you know other libraries also uh other
+libraries and libraries also uh other libraries and libraries also uh
+other libraries and methods have similar ideas is we have a methods have
+similar ideas is we have a methods have similar ideas is we have a
+planning system that utilizes tools and planning system that utilizes
+tools and planning system that utilizes tools and um that can set out a
+plan and then um that can set out a plan and then um that can set out a
+plan and then update that plan as you start executing update that plan
+as you start executing update that plan as you start executing the plan.
+So this is something that we the plan. So this is something that we the
+plan. So this is something that we introduced relatively recently but
+it's introduced relatively recently but it's introduced relatively
+recently but it's a um it's been very useful and effective a um it's
+been very useful and effective a um it's been very useful and effective
+is um you have a task tracker tool and is um you have a task tracker
+tool and is um you have a task tracker tool and um this gives you
+structured task um this gives you structured task um this gives you
+structured task management where it basically will um management where
+it basically will um management where it basically will um uh like come
+up with a task where uh like come up with a task where uh like come up
+with a task where you have different uh individual steps you have
+different uh individual steps you have different uh individual steps in
+that task and then it can update the in that task and then it can update
+the in that task and then it can update the status every time. So, it
+will like status every time. So, it will like status every time. So, it
+will like recall the tool every time a step in the recall the tool every
+time a step in the recall the tool every time a step in the plan
+changes. So, let me see if I can plan changes. So, let me see if I can
+plan changes. So, let me see if I can get it to do this. Um, check all
+of the get it to do this. Um, check all of the get it to do this. Um,
+check all of the classes and see if there are any missing classes and
+see if there are any missing classes and see if there are any missing
+references. references. references. References create a plan and check
+off References create a plan and check off References create a plan and
+check off each item each item each item of the plan. And I actually
+don't need of the plan. And I actually don't need of the plan. And I
+actually don't need to write the second sentence here. it to write the
+second sentence here. it to write the second sentence here. it will
+usually do it spontaneously but will usually do it spontaneously but
+will usually do it spontaneously but because this is a demo I want to
+make because this is a demo I want to make because this is a demo I want
+to make like extra like extra like extra um extra sure that it will
+actually call um extra sure that it will actually call um extra sure
+that it will actually call that tool. Let's see if that works. that
+tool. Let's see if that works. that tool. Let's see if that works. Yeah.
+So here it created a plan and it Yeah. So here it created a plan and it
+Yeah. So here it created a plan and it says like examine all starter
+code says like examine all starter code says like examine all starter
+code files, check the shared task example files, check the shared task
+example files, check the shared task example code, uh verify the
+requirements and code, uh verify the requirements and code, uh verify
+the requirements and then it it updated this to in progress. then it it
+updated this to in progress. then it it updated this to in progress. So
+now it's working on this part and it So now it's working on this part
+and it So now it's working on this part and it knows that this is in
+progress. So it knows that this is in progress. So it knows that this is
+in progress. So it will continue working on that. When it will continue
+working on that. When it will continue working on that. When it
+finishes, it will write done. And then finishes, it will write done. And
+then finishes, it will write done. And then when it writes done, it will
+make sure when it writes done, it will make sure when it writes done, it
+will make sure to include all of the other elements of to include all of
+the other elements of to include all of the other elements of the plan.
+And because of that, it kind the plan. And because of that, it kind the
+plan. And because of that, it kind of like refreshes the more recent of
+like refreshes the more recent of like refreshes the more recent context
+window to include all elements context window to include all elements
+context window to include all elements of the plan in the context
+window. And of the plan in the context window. And of the plan in the
+context window. And this lets it like not lose track of its this lets it
+like not lose track of its this lets it like not lose track of its plan.
+plan. plan. And this actually gets stored on the And this actually gets
+stored on the And this actually gets stored on the disk, too. So it gets
+stored in like disk, too. So it gets stored in like disk, too. So it
+gets stored in like tasks.md. So like the it can't just tasks.md. So
+like the it can't just tasks.md. So like the it can't just disappear
+from the context window. Um, another tool is a thinking tool. Um, Um,
+another tool is a thinking tool. Um, Um, another tool is a thinking
+tool. Um, and the thinking tool basically gives and the thinking tool
+basically gives and the thinking tool basically gives the model uh
+permission to take another the model uh permission to take another the
+model uh permission to take another step to write a really long chain of
+step to write a really long chain of step to write a really long chain
+of thought. And so, um, this was introduced thought. And so, um, this
+was introduced thought. And so, um, this was introduced by Claude when
+they introduced Claude by Claude when they introduced Claude by Claude
+when they introduced Claude code. And the basic idea is um like you
+code. And the basic idea is um like you code. And the basic idea is um
+like you you tell the agent if you need to think you tell the agent if
+you need to think you tell the agent if you need to think really
+carefully about something write a really carefully about something write
+a really carefully about something write a like long explanation of what
+you need like long explanation of what you need like long explanation of
+what you need to do in this uh in this tool. Um and to do in this uh in
+this tool. Um and to do in this uh in this tool. Um and that that tool
+has no effect whatsoever. that that tool has no effect whatsoever. that
+that tool has no effect whatsoever. It just like um is there for
+thinking It just like um is there for thinking It just like um is there
+for thinking and so it outputs this thought and then and so it outputs
+this thought and then and so it outputs this thought and then in the
+next step based on that thought in the next step based on that thought
+in the next step based on that thought it can actually take the action.
+This it can actually take the action. This it can actually take the
+action. This probably technically isn't necessary if probably
+technically isn't necessary if probably technically isn't necessary if
+you have a reasoning model, but um it's you have a reasoning model, but
+um it's you have a reasoning model, but um it's a way to turn a like
+moderately a way to turn a like moderately a way to turn a like
+moderately uh like maybe a shorter chain of thought uh like maybe a
+shorter chain of thought uh like maybe a shorter chain of thought model
+that wasn't explicitly trained for model that wasn't explicitly trained
+for model that wasn't explicitly trained for this into a model that can
+do this. So this into a model that can do this. So this into a model
+that can do this. So it's kind of like an inference time it's kind of
+like an inference time it's kind of like an inference time trick even
+because you're not changing trick even because you're not changing trick
+even because you're not changing the model, but you're giving it the
+model, but you're giving it the model, but you're giving it increased
+capacity to think. increased capacity to think. increased capacity to
+think. &gt;&gt; Cool. Um any questions? &gt;&gt; Cool. Um any questions?
+&gt;&gt; Cool. Um any questions? &gt;&gt; Yeah. like the ide consistent
+with what you are doing in consistent with what you are doing in
+consistent with what you are doing in that case like these don't really
+they that case like these don't really they that case like these don't
+really they break down for those models. break down for those models.
+break down for those models. &gt;&gt; So the the question was if you
+have like &gt;&gt; So the the question was if you have like &gt;&gt; So
+the the question was if you have like a reasoning model with a really
+long a reasoning model with a really long a reasoning model with a
+really long chain of thought do these frameworks chain of thought do
+these frameworks chain of thought do these frameworks break down for the
+models? I I think um break down for the models? I I think um break down
+for the models? I I think um essentially everybody is doing React.
+essentially everybody is doing React. essentially everybody is doing
+React. there's like no no agents without any there's like no no agents
+without any there's like no no agents without any reasoning whatsoever.
+So your choice is reasoning whatsoever. So your choice is reasoning
+whatsoever. So your choice is either to use a short chain of thought
+either to use a short chain of thought either to use a short chain of
+thought um or a long chain of thought that was um or a long chain of
+thought that was um or a long chain of thought that was like explicitly
+trained for reasoning. like explicitly trained for reasoning. like
+explicitly trained for reasoning. And so in a way the framework isn't
+And so in a way the framework isn't And so in a way the framework isn't
+breaking down. It's just like constantly breaking down. It's just like
+constantly breaking down. It's just like constantly present. I think um
+the extra thought present. I think um the extra thought present. I think
+um the extra thought tool I think honestly may not be tool I think
+honestly may not be tool I think honestly may not be necessary if you do
+training. It's like necessary if you do training. It's like necessary if
+you do training. It's like a way to retrofit, a way to retrofit, a way
+to retrofit, you know, extra thought into a model you know, extra
+thought into a model you know, extra thought into a model that was not
+initially trained for it. that was not initially trained for it. that
+was not initially trained for it. Um the task planning I think is still
+Um the task planning I think is still Um the task planning I think is
+still useful probably. Um unless you trained a useful probably. Um
+unless you trained a useful probably. Um unless you trained a model to
+do that natively, but even if model to do that natively, but even if
+model to do that natively, but even if you trained a model to do that
+natively, you trained a model to do that natively, you trained a model
+to do that natively, um it's not quite as effective as having um it's
+not quite as effective as having um it's not quite as effective as
+having like the plan stored on disk and you like the plan stored on disk
+and you like the plan stored on disk and you know being able to recall
+it without it know being able to recall it without it know being able to
+recall it without it being in your context window. Um, so it being in
+your context window. Um, so it being in your context window. Um, so it
+might not be necessary, but I I think it might not be necessary, but I I
+think it might not be necessary, but I I think it still could be helpful
+and it's at the still could be helpful and it's at the still could be
+helpful and it's at the very least it's helpful for vis very least it's
+helpful for vis very least it's helpful for vis visualization to people
+who are watching visualization to people who are watching visualization
+to people who are watching your plans. Yeah, great question though. your
+plans. Yeah, great question though. your plans. Yeah, great question
+though. Um, cool. So the next thing I'd like to Um, cool. So the next
+thing I'd like to Um, cool. So the next thing I'd like to talk about is
+environment talk about is environment talk about is environment
+representation. Um, so like as we representation. Um, so like as we
+representation. Um, so like as we learned from the tools class uh the
+learned from the tools class uh the learned from the tools class uh the
+previous time um the tools have actions previous time um the tools have
+actions previous time um the tools have actions and they get
+observations. So then the and they get observations. So then the and
+they get observations. So then the question is how do you represent
+these question is how do you represent these question is how do you
+represent these observations in your model? Um as I observations in your
+model? Um as I observations in your model? Um as I mentioned I want to
+talk about inference mentioned I want to talk about inference mentioned
+I want to talk about inference related things and this is important
+related things and this is important related things and this is
+important because uh these can be very large and because uh these can be
+very large and because uh these can be very large and because it they
+can be very large this because it they can be very large this because it
+they can be very large this impacts how you do inference when you're
+impacts how you do inference when you're impacts how you do inference
+when you're working with agents. working with agents. working with
+agents. So um the the first type of environment So um the the first type
+of environment So um the the first type of environment representation
+I'm going to maybe representation I'm going to maybe representation I'm
+going to maybe specifically talk about representing specifically talk
+about representing specifically talk about representing websites because
+I work with a lot of websites because I work with a lot of websites
+because I work with a lot of web agents uh but I'll talk a little bit
+web agents uh but I'll talk a little bit web agents uh but I'll talk a
+little bit about representing code in files also. about representing
+code in files also. about representing code in files also. Um so the
+first type of uh environment Um so the first type of uh environment Um
+so the first type of uh environment representation for websites is um uh
+representation for websites is um uh representation for websites is um
+uh textbased. And so what this does is this textbased. And so what this
+does is this textbased. And so what this does is this basically takes a
+website or um or maybe basically takes a website or um or maybe
+basically takes a website or um or maybe a PowerPoint presentation or
+some other a PowerPoint presentation or some other a PowerPoint
+presentation or some other thing that's not natively text and just thing
+that's not natively text and just thing that's not natively text and
+just converts it into markdown. And so this converts it into markdown.
+And so this converts it into markdown. And so this is an example of um
+what something like is an example of um what something like is an
+example of um what something like this would look like for uh the LTI
+this would look like for uh the LTI this would look like for uh the LTI
+homepage. Um and so instead of you know homepage. Um and so instead of
+you know homepage. Um and so instead of you know the beautiful uh LTI
+homepage that we've the beautiful uh LTI homepage that we've the
+beautiful uh LTI homepage that we've newly updated uh and you know
+everybody newly updated uh and you know everybody newly updated uh and
+you know everybody uh knows and loves uh we uh get this uh knows and
+loves uh we uh get this uh knows and loves uh we uh get this markdown
+representation and it's very markdown representation and it's very
+markdown representation and it's very concise very easy to to use. Um I
+concise very easy to to use. Um I concise very easy to to use. Um I uh
+got I actually maybe didn't get this uh got I actually maybe didn't get
+this uh got I actually maybe didn't get this directly from the Tavi
+extract function directly from the Tavi extract function directly from
+the Tavi extract function but um we we use a search engine called but um
+we we use a search engine called but um we we use a search engine called
+Tavly when we uh in open hands but Tavly when we uh in open hands but
+Tavly when we uh in open hands but there's a whole bunch of other uh
+search there's a whole bunch of other uh search there's a whole bunch of
+other uh search engines uh that could be used for this engines uh that
+could be used for this engines uh that could be used for this that like
+kind of create these that like kind of create these that like kind of
+create these representations that are specifically representations that
+are specifically representations that are specifically for agents. for
+agents. for agents. Um, Um, Um, one problem with representing it in text
+one problem with representing it in text one problem with representing
+it in text though is you can actually perform though is you can actually
+perform though is you can actually perform actions on websites uh like
+clicking and actions on websites uh like clicking and actions on
+websites uh like clicking and scrolling and stuff like this. And
+scrolling and stuff like this. And scrolling and stuff like this. And
+it's not like it's not like it's not like in this markdown
+representation, we in this markdown representation, we in this markdown
+representation, we don't have a specific don't have a specific don't
+have a specific um representation of the interactable um representation
+of the interactable um representation of the interactable elements on
+the site. So like let's say elements on the site. So like let's say
+elements on the site. So like let's say I wanted to click on natural
+language I wanted to click on natural language I wanted to click on
+natural language processing um and there was a link here. processing um
+and there was a link here. processing um and there was a link here.
+There's no link um or let's say I wanted There's no link um or let's say
+I wanted There's no link um or let's say I wanted to enter something in
+a text box or to enter something in a text box or to enter something in
+a text box or something like that. There's no text no something like
+that. There's no text no something like that. There's no text no way to
+represent a text box natively in way to represent a text box natively in
+way to represent a text box natively in markdown. So you'd either need
+to come markdown. So you'd either need to come markdown. So you'd either
+need to come up with a representation of markdown or up with a
+representation of markdown or up with a representation of markdown or
+you would need to do something like um a you would need to do something
+like um a you would need to do something like um a textbased uh
+representation of the HTML textbased uh representation of the HTML
+textbased uh representation of the HTML DOM tree. Uh and this is the
+standard DOM tree. Uh and this is the standard DOM tree. Uh and this is
+the standard way of doing this for web agents. Um way of doing this for
+web agents. Um way of doing this for web agents. Um it's called the
+accessibility tree and it's called the accessibility tree and it's
+called the accessibility tree and it was originally created for um
+screen it was originally created for um screen it was originally created
+for um screen readers for vision impaired people. Uh readers for vision
+impaired people. Uh readers for vision impaired people. Uh so you know
+if you uh are not able to so you know if you uh are not able to so you
+know if you uh are not able to like actually see the site you can put
+like actually see the site you can put like actually see the site you
+can put it into a screen reader and it will read it into a screen reader
+and it will read it into a screen reader and it will read the site for
+you. And so this is the site for you. And so this is the site for you.
+And so this is basically just reusing the uh the method basically just
+reusing the uh the method basically just reusing the uh the method that
+was used there. Um and so this is that was used there. Um and so this is
+that was used there. Um and so this is what it looks like. And
+importantly, it what it looks like. And importantly, it what it looks
+like. And importantly, it gives you a uh ID for each of the gives you a
+uh ID for each of the gives you a uh ID for each of the elements. And if
+the element is elements. And if the element is elements. And if the
+element is clickable, you can then click on that clickable, you can then
+click on that clickable, you can then click on that element by selecting
+this ID uh by element by selecting this ID uh by element by selecting
+this ID uh by calling a tool that basically clicks on calling a tool
+that basically clicks on calling a tool that basically clicks on this
+ID. Um so that's another thing you this ID. Um so that's another thing
+you this ID. Um so that's another thing you can do. can do. can do. So
+this is the original way that agents So this is the original way that
+agents So this is the original way that agents represented websites. Um
+now it's represented websites. Um now it's represented websites. Um now
+it's becoming more and more common to uh becoming more and more common
+to uh becoming more and more common to uh represent websites through
+vision. Um, represent websites through vision. Um, represent websites
+through vision. Um, and this is an example uh from a paper and this is
+an example uh from a paper and this is an example uh from a paper visual
+web arena. And the way it works visual web arena. And the way it works
+visual web arena. And the way it works is you take a screenshot of the
+website is you take a screenshot of the website is you take a screenshot
+of the website and then around every element in this and then around
+every element in this and then around every element in this screenshot
+you put a box and then you screenshot you put a box and then you
+screenshot you put a box and then you put a number next to the box. So
+this is put a number next to the box. So this is put a number next to
+the box. So this is like the ID that I showed before, but like the ID
+that I showed before, but like the ID that I showed before, but this
+number um you can then like click this number um you can then like click
+this number um you can then like click on this number and you also uh
+get a on this number and you also uh get a on this number and you also
+uh get a like kind of summarization of all of the like kind of
+summarization of all of the like kind of summarization of all of the
+elements with their numbers in text as elements with their numbers in
+text as elements with their numbers in text as well just to like
+reinforce that these well just to like reinforce that these well just to
+like reinforce that these are the elements that you have uh access are
+the elements that you have uh access are the elements that you have uh
+access to. So this is called set of marks. Um to. So this is called set
+of marks. Um to. So this is called set of marks. Um and uh this paper
+applied set of marks and uh this paper applied set of marks and uh this
+paper applied set of marks to uh kind of vision-based web agents. Um Um
+Um this is uh actually and sorry um one one this is uh actually and
+sorry um one one this is uh actually and sorry um one one thing I should
+mention is when we're thing I should mention is when we're thing I
+should mention is when we're representing code I think maybe I I
+representing code I think maybe I I representing code I think maybe I I
+forgot to add the slide to this uh slide forgot to add the slide to this
+uh slide forgot to add the slide to this uh slide deck but when we're
+representing code deck but when we're representing code deck but when
+we're representing code another problem or files on your file another
+problem or files on your file another problem or files on your file
+system you don't want to read a like 10 system you don't want to read a
+like 10 system you don't want to read a like 10 million line file by
+accident and million line file by accident and million line file by
+accident and completely destroy your context window. completely destroy
+your context window. completely destroy your context window. Um, so
+another thing that uh people do Um, so another thing that uh people do
+Um, so another thing that uh people do is they um either train models or
+is they um either train models or is they um either train models or
+explicitly give models tools that only explicitly give models tools that
+only explicitly give models tools that only select like a subset of the
+um like select like a subset of the um like select like a subset of the
+um like lines of the file and uh like there are lines of the file and uh
+like there are lines of the file and uh like there are file editing
+tools that allow you to do file editing tools that allow you to do file
+editing tools that allow you to do that. Um that. Um that. Um so that
+that's about environment that that's about environment that that's about
+environment representation. Uh any questions here? representation. Uh
+any questions here? representation. Uh any questions here? &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; In like visual environments
+like &gt;&gt; In like visual environments like &gt;&gt; In like visual
+environments like environment with environment with environment with
+&gt;&gt; when you couple this image with text, &gt;&gt; when you couple
+this image with text, &gt;&gt; when you couple this image with text,
+won't the level the VM just tend to pay won't the level the VM just tend
+to pay won't the level the VM just tend to pay a lot more attention to
+the to the a lot more attention to the to the a lot more attention to
+the to the textual data as opposed to the image? textual data as opposed
+to the image? textual data as opposed to the image? &gt;&gt; Um yeah,
+great question. Won't won't it &gt;&gt; Um yeah, great question. Won't
+won't it &gt;&gt; Um yeah, great question. Won't won't it pay more
+attention to the textual data pay more attention to the textual data pay
+more attention to the textual data than it will to the image? I than it
+will to the image? I than it will to the image? I it depends on the LLM.
+Um, one thing I it depends on the LLM. Um, one thing I it depends on the
+LLM. Um, one thing I will say is that LLMs are not natively will say is
+that LLMs are not natively will say is that LLMs are not natively good
+at using at understanding web good at using at understanding web good at
+using at understanding web pages. Um, this is this was a major pages.
+Um, this is this was a major pages. Um, this is this was a major problem
+9 months ago or 12 months ago. problem 9 months ago or 12 months ago.
+problem 9 months ago or 12 months ago. Uh, where certainly most of the
+open LMS Uh, where certainly most of the open LMS Uh, where certainly
+most of the open LMS could not understand web pages at all. could not
+understand web pages at all. could not understand web pages at all. Um,
+and so, you know, they would not be Um, and so, you know, they would not
+be Um, and so, you know, they would not be able to do OCR. Uh, they
+would not be able to do OCR. Uh, they would not be able to do OCR. Uh,
+they would not be able to do uh character recognition. able to do uh
+character recognition. able to do uh character recognition. They would
+not be able to identify like They would not be able to identify like
+They would not be able to identify like which elements meant what. And
+so I which elements meant what. And so I which elements meant what. And
+so I think basically the good news is you can think basically the good
+news is you can think basically the good news is you can generate
+infinite sets of marks by generate infinite sets of marks by generate
+infinite sets of marks by essentially taking the web page and
+essentially taking the web page and essentially taking the web page and
+automatically writing the set of marks automatically writing the set of
+marks automatically writing the set of marks on it and then you can say
+okay what is on it and then you can say okay what is on it and then you
+can say okay what is the 41st element on this web page um and the 41st
+element on this web page um and the 41st element on this web page um and
+then the you'll train the model to be then the you'll train the model to
+be then the you'll train the model to be able to do this and we actually
+have a able to do this and we actually have a able to do this and we
+actually have a paper called um where we created a data paper called um
+where we created a data paper called um where we created a data set
+called multiUI that explains like 10 set called multiUI that explains
+like 10 set called multiUI that explains like 10 uh different auxiliary
+training tasks uh different auxiliary training tasks uh different
+auxiliary training tasks that you can use to improve web page that you
+can use to improve web page that you can use to improve web page
+understanding and so once you start understanding and so once you start
+understanding and so once you start doing that the models start to be
+like doing that the models start to be like doing that the models start
+to be like very good at understanding web pages and very good at
+understanding web pages and very good at understanding web pages and I
+think most of the kind of like I think most of the kind of like I think
+most of the kind of like foundation model companies are doing foundation
+model companies are doing foundation model companies are doing that sort
+of thing now that sort of thing now that sort of thing now &gt;&gt;
+marks like caption marks are really &gt;&gt; marks like caption marks
+are really &gt;&gt; marks like caption marks are really really close to
+each other's really close to each other's really close to each other's
+overlapping overlapping overlapping like doesn't that &gt;&gt; um
+&gt;&gt; um &gt;&gt; um It does not hurt more than it helps. So It does
+not hurt more than it helps. So It does not hurt more than it helps. So
+people have have tried doing this people have have tried doing this
+people have have tried doing this without set of marks and doing it with
+without set of marks and doing it with without set of marks and doing it
+with set of marks is definitely more set of marks is definitely more set
+of marks is definitely more effective. So that's why people do it.
+effective. So that's why people do it. effective. So that's why people
+do it. But um is this the optimal way of doing But um is this the
+optimal way of doing But um is this the optimal way of doing things?
+Maybe no. Um one one other thing things? Maybe no. Um one one other
+thing things? Maybe no. Um one one other thing I should mention actually
+which is uh I should mention actually which is uh I should mention
+actually which is uh actually maybe I'll mention it in the actually
+maybe I'll mention it in the actually maybe I'll mention it in the next
+section but um yeah that's a great next section but um yeah that's a
+great next section but um yeah that's a great question and there's
+certainly more that question and there's certainly more that question
+and there's certainly more that could be done there I think. Cool. Um,
+could be done there I think. Cool. Um, could be done there I think.
+Cool. Um, I'd also like to talk about efficiency I'd also like to talk
+about efficiency I'd also like to talk about efficiency optimizations.
+So, like one really big optimizations. So, like one really big
+optimizations. So, like one really big challenge with agents is context
+length. challenge with agents is context length. challenge with agents
+is context length. Um, so we have long conversation Um, so we have long
+conversation Um, so we have long conversation histories. Uh, histories.
+Uh, histories. Uh, in a typical evaluation of something in a typical
+evaluation of something in a typical evaluation of something like
+Sweetbench or Web Arena, which are like Sweetbench or Web Arena, which
+are like Sweetbench or Web Arena, which are some of the the like
+benchmarks I'm some of the the like benchmarks I'm some of the the like
+benchmarks I'm going to talk about in a bit. I would going to talk about
+in a bit. I would going to talk about in a bit. I would say the
+conversation history can go up say the conversation history can go up
+say the conversation history can go up to as much as like a hundred
+steps. Um to as much as like a hundred steps. Um to as much as like a
+hundred steps. Um for instance, so like uh you know for instance, so
+like uh you know for instance, so like uh you know a hundred a hundred a
+hundred uh like maybe 50 tool calls, 100 actions uh like maybe 50 tool
+calls, 100 actions uh like maybe 50 tool calls, 100 actions and
+observations. Uh this is can be very and observations. Uh this is can be
+very and observations. Uh this is can be very long. This can get over uh
+hundreds of long. This can get over uh hundreds of long. This can get
+over uh hundreds of thousands of tokens. Um, thousands of tokens. Um,
+thousands of tokens. Um, in practical usage, I I have used agents in
+practical usage, I I have used agents in practical usage, I I have used
+agents for up to 2,000 steps. And so that's for up to 2,000 steps. And
+so that's for up to 2,000 steps. And so that's like tens of millions of
+tokens in your like tens of millions of tokens in your like tens of
+millions of tokens in your context length. And so most language context
+length. And so most language context length. And so most language models
+cannot handle this. Even if they models cannot handle this. Even if they
+models cannot handle this. Even if they can handle this, it get becomes
+very can handle this, it get becomes very can handle this, it get
+becomes very expensive. Um, it's particularly bad if expensive. Um, it's
+particularly bad if expensive. Um, it's particularly bad if you're doing
+something like web because you're doing something like web because
+you're doing something like web because web pages can be very big. Um,
+and so web pages can be very big. Um, and so web pages can be very big.
+Um, and so you need efficient context management you need efficient
+context management you need efficient context management strategies.
+strategies. strategies. Um, Um, Um, number one, which is really, really
+number one, which is really, really number one, which is really, really
+important, we're not going to talk about important, we're not going to
+talk about important, we're not going to talk about this until later in
+the class, it um is this until later in the class, it um is this until
+later in the class, it um is prompt caching or KV caching. And prompt
+caching or KV caching. And prompt caching or KV caching. And basically
+the way this works is when you basically the way this works is when you
+basically the way this works is when you send a first output um you send
+a first output um you send a first output um you or when you send the
+first prompt, you or when you send the first prompt, you or when you
+send the first prompt, you can send the uh system prompt, the can send
+the uh system prompt, the can send the uh system prompt, the
+observation, and get an action. And then observation, and get an action.
+And then observation, and get an action. And then here you need to
+calculate the here you need to calculate the here you need to calculate
+the representations for all of them. But the representations for all of
+them. But the representations for all of them. But the next time you
+calculate the next time you calculate the next time you calculate the
+representations, you have the system representations, you have the
+system representations, you have the system prompt, the observation in
+the action. prompt, the observation in the action. prompt, the
+observation in the action. And you've already calculated the auto And
+you've already calculated the auto And you've already calculated the
+auto reggressive representations for these. reggressive representations
+for these. reggressive representations for these. And so then you just
+need to feed in the And so then you just need to feed in the And so then
+you just need to feed in the next observation and action. And um then
+next observation and action. And um then next observation and action.
+And um then the next time you have all of these the next time you have
+all of these the next time you have all of these premputed and then you
+you calculate the premputed and then you you calculate the premputed and
+then you you calculate the next observation in action. Um and so next
+observation in action. Um and so next observation in action. Um and so
+what this means is you can basically what this means is you can
+basically what this means is you can basically save all the compute that
+you use to save all the compute that you use to save all the compute
+that you use to calculate these and that saves you a lot calculate these
+and that saves you a lot calculate these and that saves you a lot of
+money um and time uh when you're of money um and time uh when you're of
+money um and time uh when you're running these. Um in reality a lot of
+running these. Um in reality a lot of running these. Um in reality a lot
+of services will only uh cache the things services will only uh cache
+the things services will only uh cache the things that you had in your
+prompt. So some of that you had in your prompt. So some of that you had
+in your prompt. So some of them will only cache the system uh the them
+will only cache the system uh the them will only cache the system uh the
+system message and the observation. But system message and the
+observation. But system message and the observation. But in reality you
+can also cach the action in reality you can also cach the action in
+reality you can also cach the action as well if you're clever about it.
+Um and we're going to talk about more Um and we're going to talk about
+more Um and we're going to talk about more details about this. So I'm
+not going to details about this. So I'm not going to details about this.
+So I'm not going to talk about all the details this time. talk about all
+the details this time. talk about all the details this time. Um, Um, Um,
+another thing I'll talk about a little another thing I'll talk about a
+little another thing I'll talk about a little bit is context
+condensation. And this is bit is context condensation. And this is bit
+is context condensation. And this is a way of taking in the previous
+context a way of taking in the previous context a way of taking in the
+previous context and removing some of it. Basically and removing some of
+it. Basically and removing some of it. Basically summarizing it or
+removing it um so that summarizing it or removing it um so that
+summarizing it or removing it um so that you can uh get uh better
+results. Um you can uh get uh better results. Um you can uh get uh
+better results. Um within open hands we have a number of within open
+hands we have a number of within open hands we have a number of
+different ways that we do this uh that different ways that we do this uh
+that different ways that we do this uh that are kind of representative
+ways that are are kind of representative ways that are are kind of
+representative ways that are used pretty broadly including in other used
+pretty broadly including in other used pretty broadly including in other
+like coding CLI like gemini and cloud like coding CLI like gemini and
+cloud like coding CLI like gemini and cloud code. Um but uh I'll I'll
+just cover code. Um but uh I'll I'll just cover code. Um but uh I'll
+I'll just cover cover both of them here. So the first cover both of them
+here. So the first cover both of them here. So the first one is uh
+summarization. And so the way one is uh summarization. And so the way
+one is uh summarization. And so the way we do this is we we do this is
+we we do this is we after we have done a certain number of after we have
+done a certain number of after we have done a certain number of steps,
+we take a previous like a portion steps, we take a previous like a
+portion steps, we take a previous like a portion of the previous steps
+and we feed it of the previous steps and we feed it of the previous
+steps and we feed it into an LLM and we summarize what into an LLM and
+we summarize what into an LLM and we summarize what happened in the
+previous steps. And what happened in the previous steps. And what
+happened in the previous steps. And what this allows us to do is this
+allows us this allows us to do is this allows us this allows us to do is
+this allows us to basically remove um you know half of to basically
+remove um you know half of to basically remove um you know half of the
+context while still keeping most of the context while still keeping most
+of the context while still keeping most of the relevant information.
+It's not the relevant information. It's not the relevant information.
+It's not perfect. uh sometimes you lose perfect. uh sometimes you lose
+perfect. uh sometimes you lose information that would be useful later
+information that would be useful later information that would be useful
+later but um after a certain amount of prompt but um after a certain
+amount of prompt but um after a certain amount of prompt engineering we
+have been able to you engineering we have been able to you engineering
+we have been able to you know do this successfully and you can know do
+this successfully and you can know do this successfully and you can see
+like our prompt uh uh within the the see like our prompt uh uh within
+the the see like our prompt uh uh within the the codebase if you're
+interested in the the codebase if you're interested in the the codebase
+if you're interested in the the details about this. Um details about
+this. Um details about this. Um so uh from the so uh from the so uh from
+the from the kind of uh experimental results from the kind of uh
+experimental results from the kind of uh experimental results we did uh
+we were able to see like 2x or we did uh we were able to see like 2x or
+we did uh we were able to see like 2x or even more cost reductions uh
+while even more cost reductions uh while even more cost reductions uh
+while maintaining performance on swbench. Uh maintaining performance on
+swbench. Uh maintaining performance on swbench. Uh we actually have a
+few um kind of like we actually have a few um kind of like we actually
+have a few um kind of like war stories about this. So we did like war
+stories about this. So we did like war stories about this. So we did
+like experiments on um we did experiments on experiments on um we did
+experiments on experiments on um we did experiments on Swebench which is
+you know the very Swebench which is you know the very Swebench which is
+you know the very common benchmark uh that people use for common
+benchmark uh that people use for common benchmark uh that people use for
+evaluating uh coding agents and then we evaluating uh coding agents and
+then we evaluating uh coding agents and then we like actually started
+using it and it like actually started using it and it like actually
+started using it and it worked pretty well but it did some worked pretty
+well but it did some worked pretty well but it did some really stupid
+things. So like for really stupid things. So like for really stupid
+things. So like for example um it would send a pull request example um
+it would send a pull request example um it would send a pull request uh
+to like update code on GitHub. It uh to like update code on GitHub. It
+uh to like update code on GitHub. It would forget that it had sent a
+pull would forget that it had sent a pull would forget that it had sent
+a pull request and then it would send another request and then it would
+send another request and then it would send another pull request over
+and over and over pull request over and over and over pull request over
+and over and over again. So we needed to modify the prompt again. So we
+needed to modify the prompt again. So we needed to modify the prompt to
+say okay remember if you've sent a to say okay remember if you've sent a
+to say okay remember if you've sent a pull request before and like other
+stuff pull request before and like other stuff pull request before and
+like other stuff like this. So it's not as simple like it like this. So
+it's not as simple like it like this. So it's not as simple like it
+demonstrates the difficulty of like demonstrates the difficulty of like
+demonstrates the difficulty of like benchmarking in real use but you
+know benchmarking in real use but you know benchmarking in real use but
+you know basically this overall idea works. Um, basically this overall
+idea works. Um, basically this overall idea works. Um, another thing
+that's really common in another thing that's really common in another
+thing that's really common in agents, this uh started out in the agents,
+this uh started out in the agents, this uh started out in the agents for
+web arena, which is uh the agents for web arena, which is uh the agents
+for web arena, which is uh the benchmark that I'm going to talk about
+benchmark that I'm going to talk about benchmark that I'm going to talk
+about in a bit, um, but is web context in a bit, um, but is web context
+in a bit, um, but is web context condensation. So, web pages are large
+condensation. So, web pages are large condensation. So, web pages are
+large and noisy. Um, there's actually two and noisy. Um, there's
+actually two and noisy. Um, there's actually two methods that I'd like
+to talk about. I methods that I'd like to talk about. I methods that I'd
+like to talk about. I only have one on the slide but um one only have
+one on the slide but um one only have one on the slide but um one one
+method is after you have already one method is after you have already
+one method is after you have already processed the web page after you've
+processed the web page after you've processed the web page after you've
+already sent it to the agent once you already sent it to the agent once
+you already sent it to the agent once you can keep only the most recent
+um can keep only the most recent um can keep only the most recent um
+accessibility tree or image. And so what accessibility tree or image.
+And so what accessibility tree or image. And so what that means is um
+like after you've that means is um like after you've that means is um
+like after you've looked at it once then you basically looked at it once
+then you basically looked at it once then you basically just remove it
+uh entirely from the just remove it uh entirely from the just remove it
+uh entirely from the history. Um history. Um history. Um uh so on the
+challenge here I wrote uh so on the challenge here I wrote uh so on the
+challenge here I wrote prompt caching is less effective. You prompt
+caching is less effective. You prompt caching is less effective. You
+lose one of your um you lose one of your lose one of your um you lose
+one of your lose one of your um you lose one of your inputs uh when
+you're doing prompt inputs uh when you're doing prompt inputs uh when
+you're doing prompt caching. Uh another problem with this caching. Uh
+another problem with this caching. Uh another problem with this though
+is like you um you still need to though is like you um you still need to
+though is like you um you still need to process the big web pages and
+the big process the big web pages and the big process the big web pages
+and the big web pages can be pretty expensive. So web pages can be
+pretty expensive. So web pages can be pretty expensive. So there's
+another method um in a paper there's another method um in a paper
+there's another method um in a paper called mind to web called mind to
+web called mind to web which isn't in the references like most which
+isn't in the references like most which isn't in the references like
+most of these references are on the web page of these references are on
+the web page of these references are on the web page but this this
+particular one is not um but this this particular one is not um but this
+this particular one is not um and this is only a minor part of the and
+this is only a minor part of the and this is only a minor part of the
+paper but they have an interesting paper but they have an interesting
+paper but they have an interesting inference time technique there where
+inference time technique there where inference time technique there
+where basically what they do is they try to basically what they do is
+they try to basically what they do is they try to guess which parts of
+the web page are guess which parts of the web page are guess which parts
+of the web page are going to be useful first. Um and so what going to be
+useful first. Um and so what going to be useful first. Um and so what
+they do they do they do is they get this accessibility tree. is they get
+this accessibility tree. is they get this accessibility tree. They try
+to guess which elements in the They try to guess which elements in the
+They try to guess which elements in the accessibility tree are the most
+accessibility tree are the most accessibility tree are the most
+important ones to be looking at uh using important ones to be looking at
+uh using important ones to be looking at uh using a very lightweight
+cheap model and then a very lightweight cheap model and then a very
+lightweight cheap model and then they take all of those and all of the
+they take all of those and all of the they take all of those and all of
+the parents of those elements and feed only parents of those elements
+and feed only parents of those elements and feed only that into the
+language model. So, um, that into the language model. So, um, that into
+the language model. So, um, that might also be a method that could that
+might also be a method that could that might also be a method that could
+be used to keep around more history, uh, be used to keep around more
+history, uh, be used to keep around more history, uh, while like not,
+uh, you know, not while like not, uh, you know, not while like not, uh,
+you know, not hurting performance. So, I've not heard hurting
+performance. So, I've not heard hurting performance. So, I've not heard
+of, um, I've not heard of a lot of of, um, I've not heard of a lot of
+of, um, I've not heard of a lot of people using it from in this context,
+people using it from in this context, people using it from in this
+context, but it might be an interesting thing to but it might be an
+interesting thing to but it might be an interesting thing to try if
+you're uh, if you're interested try if you're uh, if you're interested
+try if you're uh, if you're interested in web agents. in web agents. in
+web agents. Cool. Um, any questions here? as well like per action
+environment as well like per action environment as well like per action
+environment changes and I suppose a lot of elements changes and I
+suppose a lot of elements changes and I suppose a lot of elements would
+change like and some for example would change like and some for example
+would change like and some for example the coffee example I have in my
+for a the coffee example I have in my for a the coffee example I have in
+my for a search query there are two search search query there are two
+search search query there are two search queries that are similar the
+top six queries that are similar the top six queries that are similar
+the top six shown would be very similar so the shown would be very
+similar so the shown would be very similar so the environment
+representation you created environment representation you created
+environment representation you created at point A will be very similar
+to the at point A will be very similar to the at point A will be very
+similar to the next environment representation so do next environment
+representation so do next environment representation so do you
+completely you completely you completely refresh the representation at
+every time refresh the representation at every time refresh the
+representation at every time and what is the frequency in which this and
+what is the frequency in which this and what is the frequency in which
+this environment represented? environment represented? environment
+represented? &gt;&gt; Yeah. Um that's a good question. So like &gt;&gt;
+Yeah. Um that's a good question. So like &gt;&gt; Yeah. Um that's a good
+question. So like the question was do the environment the question was
+do the environment the question was do the environment representations
+change? Like if you representations change? Like if you representations
+change? Like if you retrieve the same web page over and over retrieve
+the same web page over and over retrieve the same web page over and over
+again, do you like reprocess that web again, do you like reprocess that
+web again, do you like reprocess that web page every time? As far as I
+know, the page every time? As far as I know, the page every time? As far
+as I know, the answer is yes. You reprocess it every answer is yes. You
+reprocess it every answer is yes. You reprocess it every time. Um, but
+time. Um, but time. Um, but I think there might be situations where I
+think there might be situations where I think there might be situations
+where you could save compute by not doing it you could save compute by
+not doing it you could save compute by not doing it every time. Like
+especially like if you every time. Like especially like if you every
+time. Like especially like if you were running a really high volume
+search were running a really high volume search were running a really
+high volume search engine like Perplexity or Chat GPD or engine like
+Perplexity or Chat GPD or engine like Perplexity or Chat GPD or
+something like that. I could I could something like that. I could I
+could something like that. I could I could definitely definitely
+definitely think of wanting to premputee the think of wanting to
+premputee the think of wanting to premputee the representations for
+those web pages and representations for those web pages and
+representations for those web pages and getting them to work. So that
+seems like getting them to work. So that seems like getting them to
+work. So that seems like an interesting like thing to try. Yeah. an
+interesting like thing to try. Yeah. an interesting like thing to try.
+Yeah. Cool. Any others? Cool. Any others? Cool. Any others? Okay. Um so
+the next thing uh I'd like Okay. Um so the next thing uh I'd like Okay.
+Um so the next thing uh I'd like to talk about is evaluation. Um there's
+to talk about is evaluation. Um there's to talk about is evaluation. Um
+there's many um agentic evaluation benchmarks. many um agentic
+evaluation benchmarks. many um agentic evaluation benchmarks. Um I
+actually Um I actually Um I actually I I'll talk about a few specific
+ones I I'll talk about a few specific ones I I'll talk about a few
+specific ones first and then I'll talk about a place first and then I'll
+talk about a place first and then I'll talk about a place where like
+many benchmarks are kind of where like many benchmarks are kind of where
+like many benchmarks are kind of aggregated together. So um the the
+first aggregated together. So um the the first aggregated together. So
+um the the first benchmark uh that I personally pay a lot benchmark uh
+that I personally pay a lot benchmark uh that I personally pay a lot of
+attention to is uh Swebench and I of attention to is uh Swebench and I
+of attention to is uh Swebench and I think a lot of other people pay
+think a lot of other people pay think a lot of other people pay
+attention to this as well. This is attention to this as well. This is
+attention to this as well. This is basically a benchmark for fixing
+issues basically a benchmark for fixing issues basically a benchmark for
+fixing issues on uh GitHub. So the input is a GitHub on uh GitHub. So
+the input is a GitHub on uh GitHub. So the input is a GitHub issue and
+issue and issue and a codebase and so it's like there's a a codebase and
+so it's like there's a a codebase and so it's like there's a data leak.
+This is the codebase and then data leak. This is the codebase and then
+data leak. This is the codebase and then the agent needs to generate the
+agent needs to generate the agent needs to generate modifications to the
+codebase uh in modifications to the codebase uh in modifications to the
+codebase uh in order to fix the issue. And then the way order to fix the
+issue. And then the way order to fix the issue. And then the way this is
+evaluated is um with together this is evaluated is um with together this
+is evaluated is um with together with this issue there were some unit
+with this issue there were some unit with this issue there were some
+unit tests that were introduced to check the tests that were introduced
+to check the tests that were introduced to check the correctness of the
+fix. And all of the correctness of the fix. And all of the correctness
+of the fix. And all of the unit tests that were introduced together unit
+tests that were introduced together unit tests that were introduced
+together with the issue must pass in order for with the issue must pass
+in order for with the issue must pass in order for you to get full
+credit. and um a select you to get full credit. and um a select you to
+get full credit. and um a select number of unit tests from the testing
+number of unit tests from the testing number of unit tests from the
+testing harness that existed before uh the PR harness that existed
+before uh the PR harness that existed before uh the PR also must pass.
+So basically you need to also must pass. So basically you need to also
+must pass. So basically you need to fix the issue while not breaking
+things. fix the issue while not breaking things. fix the issue while not
+breaking things. Um so that's how it's evaluated. Um Um so that's how
+it's evaluated. Um Um so that's how it's evaluated. Um so there's uh
+2,000 uh GitHub issues so there's uh 2,000 uh GitHub issues so there's
+uh 2,000 uh GitHub issues from 12 popular Python repositories. from 12
+popular Python repositories. from 12 popular Python repositories. Um and
+Um and Um and there's because this is very popular there's because this
+is very popular there's because this is very popular there have been a
+number of extensions. there have been a number of extensions. there have
+been a number of extensions. Uh there's an extension called Swebench Uh
+there's an extension called Swebench Uh there's an extension called
+Swebench verified which is 500 issues that were verified which is 500
+issues that were verified which is 500 issues that were specifically
+verified to be like specifically verified to be like specifically
+verified to be like solvable based on the input to the issue solvable
+based on the input to the issue solvable based on the input to the issue
+uh sorry based on the issue description. uh sorry based on the issue
+description. uh sorry based on the issue description. And the the reason
+why is because a lot And the the reason why is because a lot And the the
+reason why is because a lot of issue descriptions are kind of vague of
+issue descriptions are kind of vague of issue descriptions are kind of
+vague and you wouldn't necessarily be able to and you wouldn't
+necessarily be able to and you wouldn't necessarily be able to come up
+with the uh like cor quote come up with the uh like cor quote come up
+with the uh like cor quote unquote correct answer um from the vague
+unquote correct answer um from the vague unquote correct answer um from
+the vague issue description. And so Sweetbench issue description. And so
+Sweetbench issue description. And so Sweetbench verified is an attempt
+to make like all verified is an attempt to make like all verified is an
+attempt to make like all of them solvable. This is what everybody of
+them solvable. This is what everybody of them solvable. This is what
+everybody evaluates on nowadays because it's just evaluates on nowadays
+because it's just evaluates on nowadays because it's just like this we
+don't really know what the like this we don't really know what the like
+this we don't really know what the upper bound on performance is but on
+upper bound on performance is but on upper bound on performance is but
+on sweet bench verified we think the upper sweet bench verified we think
+the upper sweet bench verified we think the upper bound is close to 100.
+So um that's what bound is close to 100. So um that's what bound is
+close to 100. So um that's what people use. On the other hand it takes a
+people use. On the other hand it takes a people use. On the other hand
+it takes a lot of the fun out of uh like trying to lot of the fun out of
+uh like trying to lot of the fun out of uh like trying to resolve
+ambiguous issues and stuff like resolve ambiguous issues and stuff like
+resolve ambiguous issues and stuff like that. So um you know uh just
+because you that. So um you know uh just because you that. So um you
+know uh just because you get a good score on Sweetbench verified get a
+good score on Sweetbench verified get a good score on Sweetbench
+verified doesn't mean you've solved all uh all doesn't mean you've
+solved all uh all doesn't mean you've solved all uh all GitHub issues
+which would require like GitHub issues which would require like GitHub
+issues which would require like interacting with a human uh you know to
+interacting with a human uh you know to interacting with a human uh you
+know to clarify ask clarifying questions or clarify ask clarifying
+questions or clarify ask clarifying questions or something but uh
+there's that another something but uh there's that another something but
+uh there's that another thing this is this is all in Python and thing
+this is this is all in Python and thing this is this is all in Python
+and so there's also things like multis so there's also things like
+multis so there's also things like multis bunchen which have different
+programming bunchen which have different programming bunchen which have
+different programming languages and swbench multimodal which languages
+and swbench multimodal which languages and swbench multimodal which has
+multimodal uh data where you need to has multimodal uh data where you
+need to has multimodal uh data where you need to like fix a front end
+and stuff like like fix a front end and stuff like like fix a front end
+and stuff like that. So a lot of different examples that. So a lot of
+different examples that. So a lot of different examples also su rebench
+which is updated every also su rebench which is updated every also su
+rebench which is updated every month with new issues. Uh so uh a lot of
+month with new issues. Uh so uh a lot of month with new issues. Uh so uh
+a lot of examples here. examples here. examples here. Um a second one is
+web arena and web Um a second one is web arena and web Um a second one
+is web arena and web arena was actually one that we created arena was
+actually one that we created arena was actually one that we created here
+but um in my lab at CMU but a lot here but um in my lab at CMU but a lot
+here but um in my lab at CMU but a lot of people uh use it to evaluate
+web of people uh use it to evaluate web of people uh use it to evaluate
+web agents. And basically the way it works agents. And basically the way
+it works agents. And basically the way it works is um you set up uh you
+know a bunch of is um you set up uh you know a bunch of is um you set up
+uh you know a bunch of different uh websites and these are all different
+uh websites and these are all different uh websites and these are all
+open-source versions of something you open-source versions of something
+you open-source versions of something you might think are like popular
+websites. might think are like popular websites. might think are like
+popular websites. So um there's one-stop shop which is an So um there's
+one-stop shop which is an So um there's one-stop shop which is an open-
+source version of uh basically open- source version of uh basically
+open- source version of uh basically Amazon. It's you know a shopping
+site. Amazon. It's you know a shopping site. Amazon. It's you know a
+shopping site. You have a content management system. So You have a
+content management system. So You have a content management system. So
+this is the content management system this is the content management
+system this is the content management system for one-stop shop. So
+basically you go for one-stop shop. So basically you go for one-stop
+shop. So basically you go in and like add uh you know in and like add uh
+you know in and like add uh you know like items uh items to a store and
+other like items uh items to a store and other like items uh items to a
+store and other stuff like that. Um we also have a open stuff like that.
+Um we also have a open stuff like that. Um we also have a open source
+version of Reddit called source version of Reddit called source version
+of Reddit called Postmill, an open source version of Postmill, an open
+source version of Postmill, an open source version of GitHub called
+GitLab. Um so uh like GitHub called GitLab. Um so uh like GitHub called
+GitLab. Um so uh like these are kind of like production grade these are
+kind of like production grade these are kind of like production grade uh
+open source sites and then we have a uh open source sites and then we
+have a uh open source sites and then we have a lot of other information
+sources like lot of other information sources like lot of other
+information sources like Wikipedia and stuff and then the agent
+Wikipedia and stuff and then the agent Wikipedia and stuff and then the
+agent goes through and tries to uh answer goes through and tries to uh
+answer goes through and tries to uh answer questions like um tell me how
+much I questions like um tell me how much I questions like um tell me
+how much I spent on food purchases in March 2023 or spent on food
+purchases in March 2023 or spent on food purchases in March 2023 or uh
+create um a Nolan fans repo listing uh create um a Nolan fans repo
+listing uh create um a Nolan fans repo listing Nolan's Oscar winning
+films in a readme Nolan's Oscar winning films in a readme Nolan's Oscar
+winning films in a readme file. um and uh there are lots of tasks file.
+um and uh there are lots of tasks file. um and uh there are lots of
+tasks complex multi-step web interactions. So complex multi-step web
+interactions. So complex multi-step web interactions. So this is kind of
+a standard web agent uh this is kind of a standard web agent uh this is
+kind of a standard web agent uh evaluation benchmark. evaluation
+benchmark. evaluation benchmark. Um another area where people use agents
+Um another area where people use agents Um another area where people use
+agents like I I talked about before is like I I talked about before is
+like I I talked about before is research. And so a kind of standard uh
+research. And so a kind of standard uh research. And so a kind of
+standard uh version of this is Gaia. Um and Gaia is version of this is
+Gaia. Um and Gaia is version of this is Gaia. Um and Gaia is uh
+basically a research benchmark where uh basically a research benchmark
+where uh basically a research benchmark where you need to find things
+like uh or it's you need to find things like uh or it's you need to find
+things like uh or it's kind of a general assistance benchmark kind of a
+general assistance benchmark kind of a general assistance benchmark with
+like leaning towards research. And with like leaning towards research.
+And with like leaning towards research. And so it's like what is the
+enrollment so it's like what is the enrollment so it's like what is the
+enrollment count of clinical tri of this clinical count of clinical tri
+of this clinical count of clinical tri of this clinical trial um you
+know read this uh label and trial um you know read this uh label and
+trial um you know read this uh label and tell me tell me about it. Um
+read about tell me tell me about it. Um read about tell me tell me about
+it. Um read about NASA's astronomy picture of the day. Um NASA's
+astronomy picture of the day. Um NASA's astronomy picture of the day. Um
+and so uh a lot of uh you know the idea and so uh a lot of uh you know
+the idea and so uh a lot of uh you know the idea is that this allows you
+to do research. is that this allows you to do research. is that this
+allows you to do research. Um this was created by HuggingFace and Um
+this was created by HuggingFace and Um this was created by HuggingFace
+and Meta and they actually just released Meta and they actually just
+released Meta and they actually just released about last week Gaia 2. Um
+which I about last week Gaia 2. Um which I about last week Gaia 2. Um
+which I haven't tried out yet but it's supposed haven't tried out yet
+but it's supposed haven't tried out yet but it's supposed to be kind of
+a modernized version of to be kind of a modernized version of to be kind
+of a modernized version of this. So you can also check that out. this.
+So you can also check that out. this. So you can also check that out. Um
+Um Um there's a lot of other evaluation there's a lot of other
+evaluation there's a lot of other evaluation benchmarks that you can use
+and I would benchmarks that you can use and I would benchmarks that you
+can use and I would maybe like to highlight maybe like to highlight
+maybe like to highlight a few of those. Um so in the in the open a few
+of those. Um so in the in the open a few of those. Um so in the in the
+open hands repo hands repo hands repo we have an evaluation we have an
+evaluation we have an evaluation um benchmarks um benchmarks um
+benchmarks directory which has like 25 25 different directory which has
+like 25 25 different directory which has like 25 25 different benchmarks
+which are all implemented um benchmarks which are all implemented um
+benchmarks which are all implemented um and these cover things like
+coding all and these cover things like coding all and these cover things
+like coding all the way to um like general assistance to the way to um
+like general assistance to the way to um like general assistance to web
+navigation other stuff like this. So web navigation other stuff like
+this. So web navigation other stuff like this. So this is one example.
+Also recently um a this is one example. Also recently um a this is one
+example. Also recently um a company called Prime Intellect company
+called Prime Intellect company called Prime Intellect um released um
+released um released uh a environment hub which has a bunch of uh
+environments. which has a bunch of uh environments. which has a bunch of
+uh environments. The environments could be used for The environments
+could be used for The environments could be used for training or
+evaluation but I I would say training or evaluation but I I would say
+training or evaluation but I I would say that most of these are more
+like that most of these are more like that most of these are more like
+evaluation environments. They're not evaluation environments. They're
+not evaluation environments. They're not like training environments. But
+um this like training environments. But um this like training
+environments. But um this is another uh another place that you is
+another uh another place that you is another uh another place that you
+could look to find lots of environments. could look to find lots of
+environments. could look to find lots of environments. The ones in the
+open hands hub will skew The ones in the open hands hub will skew The
+ones in the open hands hub will skew towards being like practical ones
+that towards being like practical ones that towards being like practical
+ones that like immediately you could see the like immediately you could
+see the like immediately you could see the usability of uh the ones in
+the usability of uh the ones in the usability of uh the ones in the
+environments hub for prime intellect environments hub for prime
+intellect environments hub for prime intellect will be more on the ones
+that are like will be more on the ones that are like will be more on the
+ones that are like more sandboxed and like simpler to run. more
+sandboxed and like simpler to run. more sandboxed and like simpler to
+run. So um if you want to do like a research So um if you want to do
+like a research So um if you want to do like a research project, I think
+the ones on the project, I think the ones on the project, I think the
+ones on the environments hub might be a good place environments hub
+might be a good place environments hub might be a good place to start
+and then when you want to to start and then when you want to to start
+and then when you want to graduate to things that are more complex
+graduate to things that are more complex graduate to things that are
+more complex or uh kind of real world usage, the ones or uh kind of real
+world usage, the ones or uh kind of real world usage, the ones on the
+open ends are um are probably on the open ends are um are probably on
+the open ends are um are probably better and uh they kind of like
+overlap better and uh they kind of like overlap better and uh they kind
+of like overlap to some extent. There are some that are to some extent.
+There are some that are to some extent. There are some that are included
+in both. Cool. Um any any questions here? Another thing is this is very
+expensive to thing is this is very expensive to thing is this is very
+expensive to evaluate. So um if you want to uh work evaluate. So um if
+you want to uh work evaluate. So um if you want to uh work on uh work on
+inference and make this on uh work on inference and make this on uh work
+on inference and make this faster for me, I would be very happy. faster
+for me, I would be very happy. faster for me, I would be very happy. Um
+the the next thing is uh critic Um the the next thing is uh critic Um
+the the next thing is uh critic models and I'd like to talk a little bit
+models and I'd like to talk a little bit models and I'd like to talk a
+little bit about this. Um so critic models for about this. Um so critic
+models for about this. Um so critic models for agents the motivation
+here is it can agents the motivation here is it can agents the
+motivation here is it can help to have a second opinion about um help to
+have a second opinion about um help to have a second opinion about um
+how well your agent is doing. And how well your agent is doing. And how
+well your agent is doing. And there's a a couple use cases for this.
+there's a a couple use cases for this. there's a a couple use cases for
+this. Um the first use case is to rerank Um the first use case is to
+rerank Um the first use case is to rerank multiple candidates to
+increase multiple candidates to increase multiple candidates to increase
+accuracy. Um another is to audit to accuracy. Um another is to audit to
+accuracy. Um another is to audit to ensure safety. Um and so uh safety
+or or ensure safety. Um and so uh safety or or ensure safety. Um and so
+uh safety or or maybe just like performance. maybe just like
+performance. maybe just like performance. And so to give an example of a
+paper on And so to give an example of a paper on And so to give an
+example of a paper on reranking uh this is a paper that uh we reranking
+uh this is a paper that uh we reranking uh this is a paper that uh we
+did with uh people uh in collaboration did with uh people uh in
+collaboration did with uh people uh in collaboration with people at UC
+Berkeley. It's called with people at UC Berkeley. It's called with
+people at UC Berkeley. It's called Sweden. And basically there were two
+Sweden. And basically there were two Sweden. And basically there were
+two parts to this paper. The first part of parts to this paper. The
+first part of parts to this paper. The first part of this paper was just
+training software this paper was just training software this paper was
+just training software engineering models through reinforcement
+engineering models through reinforcement engineering models through
+reinforcement learning or software engineering agent learning or
+software engineering agent learning or software engineering agent models
+through reinforcement learning. models through reinforcement learning.
+models through reinforcement learning. But the second part was uh
+training a But the second part was uh training a But the second part was
+uh training a critic model to rerank multiple critic model to rerank
+multiple critic model to rerank multiple candidate uh trajectories agent
+candidate uh trajectories agent candidate uh trajectories agent
+trajectories. And the basic idea is that trajectories. And the basic
+idea is that trajectories. And the basic idea is that you want to
+perform inference where you you want to perform inference where you you
+want to perform inference where you roll out end times and then pick the
+roll out end times and then pick the roll out end times and then pick
+the best output. best output. best output. And basically what we showed
+is that if And basically what we showed is that if And basically what we
+showed is that if you started out with a model that had uh you started
+out with a model that had uh you started out with a model that had uh 20
+uh about 20% accuracy at the time, um 20 uh about 20% accuracy at the
+time, um 20 uh about 20% accuracy at the time, um every time you double
+the number of every time you double the number of every time you double
+the number of rollouts you do, you see an rollouts you do, you see an
+rollouts you do, you see an approximately constant gain in the
+approximately constant gain in the approximately constant gain in the
+amount that the score increases on amount that the score increases on
+amount that the score increases on Sweetbench. And we were able to get
+uh Sweetbench. And we were able to get uh Sweetbench. And we were able
+to get uh from, you know, around 20 to uh up to 32 from, you know,
+around 20 to uh up to 32 from, you know, around 20 to uh up to 32 here.
+Um, and so basically if you really here. Um, and so basically if you
+really here. Um, and so basically if you really want the best benchmark
+score, this is want the best benchmark score, this is want the best
+benchmark score, this is super effective at getting the best super
+effective at getting the best super effective at getting the best
+benchmark score at the cost of having to benchmark score at the cost of
+having to benchmark score at the cost of having to run inference like 16
+times uh which is run inference like 16 times uh which is run inference
+like 16 times uh which is very expensive because running agents is very
+expensive because running agents is very expensive because running
+agents is expensive already. Um, and if I haven't expensive already. Um,
+and if I haven't expensive already. Um, and if I haven't convinced you
+that this is something, convinced you that this is something, convinced
+you that this is something, uh, like important, uh, like important, uh,
+like important, um, we were just talking about, uh, um, we were just
+talking about, uh, um, we were just talking about, uh, Claude Sonnet 4.5
+coming out. Um, Um, Um, and if you look at their results here, and if
+you look at their results here, and if you look at their results here,
+um, the dark bar is single instance um, the dark bar is single instance
+um, the dark bar is single instance inference and the light bar is where
+inference and the light bar is where inference and the light bar is
+where they did lots of rollouts and then they they did lots of rollouts
+and then they they did lots of rollouts and then they reranked them. Um,
+and so this is uh reranked them. Um, and so this is uh reranked them.
+Um, and so this is uh this is what everybody does when they this is what
+everybody does when they this is what everybody does when they want to
+uh when Anthropic wants to beat want to uh when Anthropic wants to beat
+want to uh when Anthropic wants to beat OpenAI and then OpenAI wants to
+beat OpenAI and then OpenAI wants to beat OpenAI and then OpenAI wants
+to beat Anthropic or uh you know we want we want Anthropic or uh you
+know we want we want Anthropic or uh you know we want we want to beat uh
+you know whoever else. So, to beat uh you know whoever else. So, to beat
+uh you know whoever else. So, um, in reality, I don't know if there's
+um, in reality, I don't know if there's um, in reality, I don't know if
+there's that many people, uh, that many people that many people, uh,
+that many people that many people, uh, that many people who use this in
+like a production who use this in like a production who use this in like
+a production setting, but like let's say, um, let's setting, but like
+let's say, um, let's setting, but like let's say, um, let's say you were
+working on a agent to run say you were working on a agent to run say you
+were working on a agent to run like a machine learning experiment or
+like a machine learning experiment or like a machine learning experiment
+or something like this and you, um, you something like this and you, um,
+you something like this and you, um, you really wanted it to succeed and
+you really wanted it to succeed and you really wanted it to succeed and
+you could spend um, $10,000 on making sure could spend um, $10,000 on
+making sure could spend um, $10,000 on making sure that it succeeded,
+then this could be a that it succeeded, then this could be a that it
+succeeded, then this could be a viable option for something like that.
+Um and then the way it is the way it's Um and then the way it is the way
+it's Um and then the way it is the way it's trained actually sorry I I
+totally um trained actually sorry I I totally um trained actually sorry
+I I totally um this is the first time I made the slides this is the
+first time I made the slides this is the first time I made the slides so
+I I forgot a few slides but basically so I I forgot a few slides but
+basically so I I forgot a few slides but basically the way the way it's
+trained is pretty the way the way it's trained is pretty the way the way
+it's trained is pretty simple um what you do is you do a roll simple um
+what you do is you do a roll simple um what you do is you do a roll out
+uh of the trajectory you evaluate out uh of the trajectory you evaluate
+out uh of the trajectory you evaluate the roll out using the like unit
+tests the roll out using the like unit tests the roll out using the like
+unit tests on that you have to evaluate the output on that you have to
+evaluate the output on that you have to evaluate the output and um Then
+after you've evaluated the and um Then after you've evaluated the and um
+Then after you've evaluated the output, you uh you train a model to
+output, you uh you train a model to output, you uh you train a model to
+predict whether the output was correct predict whether the output was
+correct predict whether the output was correct or not. So this is the
+simplest way to or not. So this is the simplest way to or not. So this
+is the simplest way to do this. When we talk about reward do this. When
+we talk about reward do this. When we talk about reward models, um in
+the future classes, this models, um in the future classes, this models,
+um in the future classes, this is an outcome reward model. Um another is
+an outcome reward model. Um another is an outcome reward model. Um
+another way you can do this is uh an outcome way you can do this is uh
+an outcome way you can do this is uh an outcome reward model predicts
+only the out the reward model predicts only the out the reward model
+predicts only the out the final outcome. So you basically predict final
+outcome. So you basically predict final outcome. So you basically
+predict the final outcome. Another way you can the final outcome.
+Another way you can the final outcome. Another way you can do this is um
+come up with some sort of do this is um come up with some sort of do
+this is um come up with some sort of intermediate reward uh step by step
+and intermediate reward uh step by step and intermediate reward uh step
+by step and try to predict how successful each step try to predict how
+successful each step try to predict how successful each step is. Uh this
+is called a process reward is. Uh this is called a process reward is. Uh
+this is called a process reward model, but coming up with a supervision
+model, but coming up with a supervision model, but coming up with a
+supervision for this is much more uh complex and for this is much more
+uh complex and for this is much more uh complex and we'll probably talk
+about that in the we'll probably talk about that in the we'll probably
+talk about that in the reward models class. Cool. Um any questions here?
+Cool. Um any questions here? Cool. Um any questions here? &gt;&gt; Yeah,
+&gt;&gt; Yeah, &gt;&gt; Yeah, &gt;&gt; we can also like just to verify
+if the &gt;&gt; we can also like just to verify if the &gt;&gt; we can
+also like just to verify if the agent solved an issue or not. We can
+agent solved an issue or not. We can agent solved an issue or not. We
+can also use tests. also use tests. also use tests. &gt;&gt; Yeah.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Then like why do we want to like
+why &gt;&gt; Then like why do we want to like why &gt;&gt; Then like why
+do we want to like why don't we generally train models that can don't we
+generally train models that can don't we generally train models that can
+predict tests instead of training a predict tests instead of training a
+predict tests instead of training a models that can like predict from a
+models that can like predict from a models that can like predict from a
+trajectory because that will be system trajectory because that will be
+system trajectory because that will be system agnostic. agnostic.
+agnostic. &gt;&gt; Yeah, that's a great question. So um we &gt;&gt;
+Yeah, that's a great question. So um we &gt;&gt; Yeah, that's a great
+question. So um we can can can um we can tell success from whether unit
+um we can tell success from whether unit um we can tell success from
+whether unit tests pass or not. So why don't we just tests pass or not.
+So why don't we just tests pass or not. So why don't we just train a
+model that's really good at train a model that's really good at train a
+model that's really good at generating unit tests and then use the
+generating unit tests and then use the generating unit tests and then
+use the unit test to decide whether it passed or unit test to decide
+whether it passed or unit test to decide whether it passed or not. Um I
+think we should do that not. Um I think we should do that not. Um I
+think we should do that honestly. I I think that would be uh honestly. I
+I think that would be uh honestly. I I think that would be uh that would
+be great but unfortunately that would be great but unfortunately that
+would be great but unfortunately models are not all that great at models
+are not all that great at models are not all that great at generating
+unit tests. And then like generating unit tests. And then like
+generating unit tests. And then like let's say some unit tests didn't
+pass let's say some unit tests didn't pass let's say some unit tests
+didn't pass you might still be successful. Um there you might still be
+successful. Um there you might still be successful. Um there are some
+tasks that are not necessarily are some tasks that are not necessarily
+are some tasks that are not necessarily easily easily easily unit
+testable like a research task or unit testable like a research task or
+unit testable like a research task or something like that. So like there
+are something like that. So like there are something like that. So like
+there are situations where this would not be an situations where this
+would not be an situations where this would not be an appropriate
+solution but I think overall appropriate solution but I think overall
+appropriate solution but I think overall for software engineering it is
+a very for software engineering it is a very for software engineering it
+is a very appropriate solution and we should work appropriate solution
+and we should work appropriate solution and we should work more on it.
+Um there's a benchmark that more on it. Um there's a benchmark that more
+on it. Um there's a benchmark that I didn't talk about um called SWTB
+which I didn't talk about um called SWTB which I didn't talk about um
+called SWTB which is software testing bench um that tests is software
+testing bench um that tests is software testing bench um that tests and
+also test Genov. There's other and also test Genov. There's other and
+also test Genov. There's other benchmarks like this and I really wish
+benchmarks like this and I really wish benchmarks like this and I really
+wish that these benchmarks get more love. that these benchmarks get more
+love. that these benchmarks get more love. Like I I think software
+testing sounds Like I I think software testing sounds Like I I think
+software testing sounds boring until you realize that if you can boring
+until you realize that if you can boring until you realize that if you
+can write a really good unit test the agent write a really good unit
+test the agent write a really good unit test the agent can usually solve
+the problem for you. can usually solve the problem for you. can usually
+solve the problem for you. And so I think uh we can focus more on And so
+I think uh we can focus more on And so I think uh we can focus more on
+on that sort of stuff. on that sort of stuff. on that sort of stuff.
+Cool. any other Cool. any other Cool. any other Okay, great. I'd like to
+talk a little Okay, great. I'd like to talk a little Okay, great. I'd
+like to talk a little bit about multi- aent systems. Um, bit about
+multi- aent systems. Um, bit about multi- aent systems. Um, and so
+there's a number of reasons why and so there's a number of reasons why
+and so there's a number of reasons why you'd want to use multiple
+agents. Um, you'd want to use multiple agents. Um, you'd want to use
+multiple agents. Um, the first reason, uh, which the first reason, uh,
+which the first reason, uh, which at least until about at least until
+about at least until about 6 to 12 months ago was a very popular 6 to 12
+months ago was a very popular 6 to 12 months ago was a very popular
+reason to use multiple agents is reason to use multiple agents is reason
+to use multiple agents is specialization. Um and the idea is you
+specialization. Um and the idea is you specialization. Um and the idea
+is you can have different agents use uh solve can have different agents
+use uh solve can have different agents use uh solve different tasks. Um
+and different tasks. Um and different tasks. Um and there's a usually an
+analogy which is there's a usually an analogy which is there's a usually
+an analogy which is like um like um like um in a software company you
+don't have one in a software company you don't have one in a software
+company you don't have one person who is person who is person who is
+planning and implementing and doing planning and implementing and doing
+planning and implementing and doing quality assurance and other stuff
+like quality assurance and other stuff like quality assurance and other
+stuff like that. So we should have different agents that. So we should
+have different agents that. So we should have different agents to do
+these things. Um, I kind of agree to do these things. Um, I kind of
+agree to do these things. Um, I kind of agree that this is uh true in a
+software that this is uh true in a software that this is uh true in a
+software company or I definitely agree that it's company or I definitely
+agree that it's company or I definitely agree that it's true in a
+software company. But on the true in a software company. But on the true
+in a software company. But on the other hand, we have an LLM that can do
+other hand, we have an LLM that can do other hand, we have an LLM that
+can do all of these things well and LLM kind of all of these things well
+and LLM kind of all of these things well and LLM kind of like absorb all
+the specialized like absorb all the specialized like absorb all the
+specialized knowledge and can memorize like things knowledge and can
+memorize like things knowledge and can memorize like things that far
+beyond what humans can that far beyond what humans can that far beyond
+what humans can memorize. So I'm a little bit less memorize. So I'm a
+little bit less memorize. So I'm a little bit less convinced that this
+is a good motivation convinced that this is a good motivation convinced
+that this is a good motivation for doing multi- aent systems. uh you for
+doing multi- aent systems. uh you for doing multi- aent systems. uh you
+know especially now that we have know especially now that we have know
+especially now that we have language models that are pretty good at
+language models that are pretty good at language models that are pretty
+good at um at doing individual tasks. um at doing individual tasks. um
+at doing individual tasks. On the other hand, there is a really On the
+other hand, there is a really On the other hand, there is a really
+strong um argument for doing multi- aent strong um argument for doing
+multi- aent strong um argument for doing multi- aent systems when you
+have complex tasks uh systems when you have complex tasks uh systems
+when you have complex tasks uh that can be easily parallelized because
+that can be easily parallelized because that can be easily parallelized
+because you can have one agent do one part of you can have one agent do
+one part of you can have one agent do one part of the task, another
+agent do another part the task, another agent do another part the task,
+another agent do another part of the task, another agent do another of
+the task, another agent do another of the task, another agent do another
+part of the task. So I think this is um part of the task. So I think
+this is um part of the task. So I think this is um a strong argument to
+use multiple a strong argument to use multiple a strong argument to use
+multiple agents. Um, agents. Um, agents. Um, one uh comparison you can
+make if you one uh comparison you can make if you one uh comparison you
+can make if you subscribe to both chat GPT and claude is subscribe to
+both chat GPT and claude is subscribe to both chat GPT and claude is try
+to do a research task for um open on try to do a research task for um
+open on try to do a research task for um open on the open AAI chat deep
+research and then the open AAI chat deep research and then the open AAI
+chat deep research and then also do it on the claude deep research also
+do it on the claude deep research also do it on the claude deep research
+and the cla research does this sort of and the cla research does this
+sort of and the cla research does this sort of task parallelization.
+will have a kind task parallelization. will have a kind task
+parallelization. will have a kind of like master agent delegate a whole
+of like master agent delegate a whole of like master agent delegate a
+whole bunch of different research tasks to bunch of different research
+tasks to bunch of different research tasks to different agents and
+you'll then open AI different agents and you'll then open AI different
+agents and you'll then open AI will be doing everything in serial and
+will be doing everything in serial and will be doing everything in
+serial and you'll see open AAI will look up like 30 you'll see open AAI
+will look up like 30 you'll see open AAI will look up like 30 references
+and claude will look up like references and claude will look up like
+references and claude will look up like 300 references or something like
+this 300 references or something like this 300 references or something
+like this and you can see the results from claude and you can see the
+results from claude and you can see the results from claude are much
+more comprehensive so this is a are much more comprehensive so this is a
+are much more comprehensive so this is a good example this is hard for
+software good example this is hard for software good example this is
+hard for software engineering tasks for instance because engineering
+tasks for instance because engineering tasks for instance because like
+very often it's hard to decompose like very often it's hard to decompose
+like very often it's hard to decompose the task together without having
+like the task together without having like the task together without
+having like conflicts between the code you write and conflicts between
+the code you write and conflicts between the code you write and other
+stuff like that. But it is it's other stuff like that. But it is it's
+other stuff like that. But it is it's still possible there, it's just
+harder. still possible there, it's just harder. still possible there,
+it's just harder. Um, Um, Um, another reason could be for robustness.
+another reason could be for robustness. another reason could be for
+robustness. And so like for example, you might And so like for example,
+you might And so like for example, you might delegate um you might
+delegate four delegate um you might delegate four delegate um you might
+delegate four different tasks to four different agents different tasks
+to four different agents different tasks to four different agents and
+then have another agent like double and then have another agent like
+double and then have another agent like double check. So it's kind of
+like the agent is check. So it's kind of like the agent is check. So
+it's kind of like the agent is um doing uh like um doing uh like um
+doing uh like the agent is uh acting as a critic the agent is uh acting
+as a critic the agent is uh acting as a critic model. So after one agent
+has finished model. So after one agent has finished model. So after one
+agent has finished the task, you go back and and double the task, you go
+back and and double the task, you go back and and double check its work.
+So there are benefits check its work. So there are benefits check its
+work. So there are benefits there as well. Um and so why not use there
+as well. Um and so why not use there as well. Um and so why not use
+multiple agents? There's more components multiple agents? There's more
+components multiple agents? There's more components to manage and
+integrate. Um task to manage and integrate. Um task to manage and
+integrate. Um task composition can be tricky. Um, another composition
+can be tricky. Um, another composition can be tricky. Um, another issue
+is communication difficulties. And issue is communication difficulties.
+And issue is communication difficulties. And what I mean by this is, um,
+when you're what I mean by this is, um, when you're what I mean by this
+is, um, when you're implementing a system with multiple implementing a
+system with multiple implementing a system with multiple agents talking
+to each other, um, you agents talking to each other, um, you agents
+talking to each other, um, you want to make sure that exactly the want
+to make sure that exactly the want to make sure that exactly the correct
+context is passed. So you don't correct context is passed. So you don't
+correct context is passed. So you don't necessarily want to pass too
+much necessarily want to pass too much necessarily want to pass too much
+context because there's kind of an context because there's kind of an
+context because there's kind of an advantage of an agent like advantage
+of an agent like advantage of an agent like um, solving a task and then
+kind of that um, solving a task and then kind of that um, solving a task
+and then kind of that task summary just being passed back to task
+summary just being passed back to task summary just being passed back to
+the main agent. But on the other hand, the main agent. But on the other
+hand, the main agent. But on the other hand, um a very common failure
+case that we um a very common failure case that we um a very common
+failure case that we saw is one like we used to have a web saw is one
+like we used to have a web saw is one like we used to have a web
+browsing agent within open hands that browsing agent within open hands
+that browsing agent within open hands that was separate. Now we just
+have one agent was separate. Now we just have one agent was separate.
+Now we just have one agent that does web browsing and um the web that
+does web browsing and um the web that does web browsing and um the web
+browsing agent would do a whole bunch of browsing agent would do a whole
+bunch of browsing agent would do a whole bunch of information gathering
+and then it would information gathering and then it would information
+gathering and then it would give a very brief report back that give a
+very brief report back that give a very brief report back that wasn't
+like sufficient and like the wasn't like sufficient and like the wasn't
+like sufficient and like the coding agent would be like missing coding
+agent would be like missing coding agent would be like missing
+information that the web browsing agent information that the web
+browsing agent information that the web browsing agent actually
+discovered during its process actually discovered during its process
+actually discovered during its process of web browsing. So you need a
+really of web browsing. So you need a really of web browsing. So you
+need a really good uh effective way of passing context good uh effective
+way of passing context good uh effective way of passing context
+together. Ah yes together. Ah yes together. Ah yes &gt;&gt; context pass
+always informed like you &gt;&gt; context pass always informed like you
+&gt;&gt; context pass always informed like you know tokens and not saves
+like logits or know tokens and not saves like logits or know tokens and
+not saves like logits or even even deeperations. even even deeperations.
+even even deeperations. &gt;&gt; Why is the so good question why is the
+&gt;&gt; Why is the so good question why is the &gt;&gt; Why is the so
+good question why is the context not passed in the form of logets
+context not passed in the form of logets context not passed in the form
+of logets or deeper representations? or deeper representations? or
+deeper representations? Um I there Um I there Um I there I think that
+would be possible. I think I think that would be possible. I think I
+think that would be possible. I think probably the biggest reason why is
+probably the biggest reason why is probably the biggest reason why is
+because um many of the best models for because um many of the best
+models for because um many of the best models for being agents are
+proprietary models and being agents are proprietary models and being
+agents are proprietary models and you're not able to easily do that with
+you're not able to easily do that with you're not able to easily do that
+with proprietary models uh through an API. Um proprietary models uh
+through an API. Um proprietary models uh through an API. Um but I think
+if you could demonstrate but I think if you could demonstrate but I
+think if you could demonstrate that that was very useful with open that
+that was very useful with open that that was very useful with open
+models uh that you could use for models uh that you could use for models
+uh that you could use for something like that then that could be
+something like that then that could be something like that then that
+could be valuable and that might convince people valuable and that might
+convince people valuable and that might convince people who are building
+proprietary models to who are building proprietary models to who are
+building proprietary models to support that &gt;&gt; feedback output
+into the state is always &gt;&gt; feedback output into the state is
+always &gt;&gt; feedback output into the state is always good to feed
+the head state of one state good to feed the head state of one state
+good to feed the head state of one state next one and that's because of
+this next one and that's because of this next one and that's because of
+this information information information loss. So loss. So loss. So
+&gt;&gt; yeah. Yeah, I I agree. Good idea. &gt;&gt; yeah. Yeah, I I
+agree. Good idea. &gt;&gt; yeah. Yeah, I I agree. Good idea. Um, so
+there's a bunch of frameworks. We Um, so there's a bunch of frameworks.
+We Um, so there's a bunch of frameworks. We talked a little bit about
+Ling Graph. talked a little bit about Ling Graph. talked a little bit
+about Ling Graph. Um, I'm going to talk a little bit about Um, I'm going
+to talk a little bit about Um, I'm going to talk a little bit about
+autogen. Um, but basically there are autogen. Um, but basically there
+are autogen. Um, but basically there are frameworks for building multi-
+agent frameworks for building multi-agent frameworks for building multi-
+agent systems. Um, and usually what they do is systems. Um, and usually
+what they do is systems. Um, and usually what they do is they kind of
+give you the scaffolding to they kind of give you the scaffolding to
+they kind of give you the scaffolding to do this sort of context passing
+um, do this sort of context passing um, do this sort of context passing
+um, implementation of tools uh, and other implementation of tools uh,
+and other implementation of tools uh, and other stuff like this. Um so I
+I think for stuff like this. Um so I I think for stuff like this. Um so
+I I think for quickly bootstrapping a system quickly bootstrapping a
+system quickly bootstrapping a system especially an agentic system with
+a very especially an agentic system with a very especially an agentic
+system with a very fixed workflow um not something more fixed workflow
+um not something more fixed workflow um not something more complex like
+you know research or um complex like you know research or um complex
+like you know research or um like arbitrary research or coding but like
+arbitrary research or coding but like arbitrary research or coding but
+something more like I want to process something more like I want to
+process something more like I want to process um um um I want to process
+this file that a user I want to process this file that a user I want to
+process this file that a user has uploaded extract this fixed set of has
+uploaded extract this fixed set of has uploaded extract this fixed set
+of information from it and then upload it information from it and then
+upload it information from it and then upload it to a database. Um then
+these sorts of to a database. Um then these sorts of to a database. Um
+then these sorts of fixed workflows are are quite helpful. fixed
+workflows are are quite helpful. fixed workflows are are quite helpful.
+Um and so they they give you things like Um and so they they give you
+things like Um and so they they give you things like customizable
+agents, flexible customizable agents, flexible customizable agents,
+flexible conversation patterns. Um they can also conversation patterns.
+Um they can also conversation patterns. Um they can also pass things to
+humans if you want.

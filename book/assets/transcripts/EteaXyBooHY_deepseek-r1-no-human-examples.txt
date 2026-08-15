@@ -1,0 +1,127 @@
+# deepseek-r1-no-human-examples
+# video: https://www.youtube.com/watch?v=EteaXyBooHY
+
+Let's break down the core idea behind
+this paper, DeepSeek, R1 from DeepSeek.
+Nobody taught this model to think. They
+just paid it to be right, and it taught
+itself to reason. No worked examples, no
+human solutions, just a reward for the
+correct answer, and a model that slowly,
+on its own, started thinking longer,
+checking itself, and doubling its score
+on the hardest math in the room.
+Here's how everyone else taught
+reasoning. You collect a mountain of
+human-written step-by-step solutions,
+and you make the model copy them,
+supervised fine-tuning. It works, but
+it's expensive, it's slow, and it
+quietly caps the model at human
+reasoning. It can only imitate the paths
+we already wrote down.
+DeepSeek made a bet. Throw that whole
+stage out. Start from the raw base
+model, skip the human demonstrations
+entirely, and just let reinforcement
+learning loose. Try an answer, get
+graded, do more of what worked. That's
+it. They call this one R1-0,
+zero human reasoning data.
+But reinforcement learning usually needs
+a second network, a critic, guessing how
+good each step is. Expensive. GRPO
+throws that out, too. For one question,
+sample a whole group of answers, score
+them, then each answer's advantage is
+dead simple. How far above or below the
+group's own average did it land? Beat
+the pack, get pushed up, drag behind,
+get pushed down. The group grades
+itself, no critic required.
+And the grader is almost insultingly
+simple. Two rules. One, is the final
+answer actually correct? Check it
+against the real solution. Two, did you
+put your thinking inside the tags?
+That's the entire reward. Notice what's
+missing. Nothing tells the model how to
+reason. We only score whether it landed
+the answer.
+And they're blunt about it. The grade is
+nothing but whether the final answer is
+right.
+So, what does a model do when the only
+thing rewarded is being right? It starts
+thinking longer. With zero instruction
+to do so, its answers stretch from a
+couple lines to hundreds, then thousands
+of tokens. It begins to backtrack, try
+another route, double-check itself.
+Reasoning wasn't programmed in. It grew
+because thinking longer got the answer
+right more often.
+And then, mid-solution, it did this, the
+model catching itself.
+The scoreboard backs it up.
+One problem, our 1-0 is a genius that
+mumbles. Unreadable, switching between
+English and Chinese mid-thought. So, the
+full R1 wraps that raw reasoning in a
+four-step polish. A pinch of clean
+example thoughts to fix the voice, then
+the same reasoning RL, then keep only
+its best answers and fine-tune on them.
+Then a final RL pass for everything,
+safety, writing, the works. Same
+emergent brain, now presentable, and it
+ties OpenAI's 01 at 79.8.
+If watching a model teach itself to
+think is your kind of magic, like,
+subscribe, and send this to the friend
+who still thinks you need a million
+labeled examples for everything. Stick
+around because the next part is the
+sneaky clever bit.
+R1 is a 600 billion parameter monster.
+Most people can't run it. So, here's the
+gift. Take R1's answers, those long,
+self-checked reasoning traces, and just
+fine-tune a small, ordinary model on
+them. Plain copying. A 7, 14, 32 billion
+model drinks in R1's thinking. The
+distilled 32B hits 72.6 on AIME,
+out-reasoning models many times its
+size.
+And here's the punchline that flips the
+whole story. They also tried the other
+way. Run that same expensive
+reinforcement learning directly on the
+small model and let it discover
+reasoning from scratch. It barely
+budged. Turns out it's far better to let
+one giant model do the hard exploring,
+then hand the finished thoughts to the
+small one. Discovery is expensive,
+copying discovery is cheap.
+So, the whole recipe, start from the
+base model, reward only the right
+answer, score each try against its group
+with GRPO, no critic, and reasoning
+emerges on its own, aha moment and all.
+Polish it in stages, so it's readable,
+then distill those thoughts down into
+models you can actually run.
+The one-line version, don't teach a
+model to reason, incentivize it. Reward
+correct answers, optimize with group
+relative reinforcement learning, and
+watch the chain of thought grow itself.
+Then copy that thinking into something
+small.
+It leaves a genuinely strange thought.
+If all it took was rewarding the right
+answer, how much reasoning was hiding in
+these models the whole time? Just
+waiting for a reason to show up. That's
+my read. Tell me yours. Until next time.

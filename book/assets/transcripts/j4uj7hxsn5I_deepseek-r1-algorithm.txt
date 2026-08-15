@@ -1,0 +1,506 @@
+# deepseek-r1-algorithm
+# video: https://www.youtube.com/watch?v=j4uj7hxsn5I
+
+Let's break down DeepSeek Math and the
+reinforcement learning trick buried
+inside it, group relative policy
+optimization, GRPO, a way to train a
+model to reason without ever building a
+critic network. This one quietly grew up
+to become the engine behind DeepSeek R1.
+To teach a model math with reinforcement
+learning, the recipe sounds simple. Let
+it write an answer, reward it when it's
+right, nudge it to do more of that. But
+the standard method, PPO, hides a second
+neural network inside it. Not the model
+you care about, a whole extra one,
+roughly the same size, whose only job is
+to guess how good each step was. You
+train it, you store it, you run it every
+single update. Half your reinforcement
+learning compute goes to a network you
+throw away at the end. DeepSeek's
+question was blunt. What if we just
+delete it? Group relative policy
+optimization keeps the policy, kills the
+critic, and replaces its careful per
+step guess with something almost
+embarrassingly simple, a group of
+answers grading themselves against their
+own average. A 7 billion parameter model
+trained this way hits 51.7%
+on competition level math. No
+calculators, no voting. And the exact
+same algorithm later became the
+reinforcement learning core of R1. So
+over the next 20 minutes, we're going to
+build GRPO the honest way. Start from
+PPO, walk its objective term by term,
+plug in real numbers, write out the
+pseudo code, and watch an entire neural
+network disappear.
+Start from the ground floor. We have a
+policy. That's just our language model
+with weights theta. Hand it a math
+question Q, and it samples an answer O
+one token at a time. A reward function
+scores that answer. One if the final
+result is correct, zero if it isn't. Now
+we want to reshape the model so it
+produces more of the good answers. The
+tool is the policy gradient. Push up the
+probability of the tokens inside high
+reward answers. Push down the rest. But
+there's a catch that wrecks the naive
+version, variance. If every correct
+answer just gets a reward of one, the
+gradient can't tell a brilliant solution
+from a lucky guess. They both simply
+look good and the learning signal
+flashes around. The fix is to stop
+asking was this good and start asking
+was this better than expected. Subtract
+a baseline, a reference level of reward
+you'd have gotten anyway, and keep only
+the surplus. That surplus has a name,
+the advantage, written A, and basically
+everything in PPO and GRPO is a single
+fight over one question. Where does that
+baseline come from?
+PPO's answer starts with a clever safety
+rail. We're updating theta right now,
+but we sampled our answers from the
+older weights, theta old, so the two
+policies disagree and we correct for it
+with an importance ratio, rho. The new
+policy's probability of a token divided
+by the old policy's probability of that
+same token. If rho is bigger than one,
+the new model likes that token more than
+the old one did. Multiply rho by the
+advantage and you have the raw
+objective. Reinforce the tokens the new
+model favors in proportion to how much
+better than baseline they turned out.
+But raw importance ratios can explode
+and blow up training. So PPO clips. It
+takes the minimum of two things, the
+honest term, rho times A, and a clipped
+term where rho is pinned between 1 minus
+epsilon and 1 plus epsilon. In plain
+words, you're allowed to move each
+token's probability, but only so far in
+a single update. Step past the fence and
+the gradient flattens and stops pulling
+you further. It's a trust region,
+enforced with one little min simple,
+stable, effective. There's just one
+quietly expensive word sitting in the
+middle of it, the advantage, AT, one
+value per token. Where does PPO actually
+get it?
+From a second network, the critic, also
+called the value model. PPO estimates
+the advantage with generalized advantage
+estimation, GAE, and GAE needs a
+function V that predicts from a
+half-finished answer how much total
+reward to expect from here on. That
+predictor is not free. In language model
+RL, it's typically another transformer
+about the same size as the policy. So,
+now you're training two big models
+locked together. Double the memory to
+hold them. Double the forward and
+backward passes, plus extra machinery to
+keep the critic's targets from drifting.
+And here's the cruel part. The critic's
+job is nearly impossible in this
+setting. The reward only arrives at the
+very end, one number, right or wrong,
+after hundreds of tokens. From that
+single late signal, the value model is
+somehow supposed to assign a sensible
+score to every intermediate token.
+Getting that per token estimate accurate
+is genuinely hard. And when it's off, it
+quietly poisons every advantage computed
+downstream. So, PPO pays for a whole
+extra network and still struggles to
+train it well. That is exactly the tax
+GRPO refuses to pay.
+The authors name the problem directly.
+Here's the move, and it's beautiful in
+how little it needs. Instead of building
+a network to guess the baseline, GRPO
+just samples more answers. For a single
+question Q, draw a whole group G
+outputs, say four for our examples, or
+in the real runs, 64. Score every one of
+them with the reward model, giving a
+little set of rewards, R1 through RG.
+Now, the baseline writes itself. It
+isn't a network's prediction anymore.
+It's the group's own average reward.
+Each answer's advantage is simply how
+far it beat or missed that average. Land
+above the group mean, you get a positive
+advantage and every token in you is
+reinforced. Land below, negative, pushed
+down. And to keep the scales sane across
+easy questions and brutally hard ones,
+they also divide by the group's standard
+deviation. So, the advantage of answer I
+is RI minus the mean all over the
+standard deviation. That's it. It's a
+Z-score. The answers grade themselves on
+a curve and every token in a given
+answer inherits that one number as its
+advantage. No value model, no GA, no
+second transformer. The single most
+expensive component in PPO just got
+replaced by a mean and a standard
+deviation.
+Now, the full objective, built one piece
+at a time, and notice it's really just
+PPO wearing the group idea. Outermost
+layer, average over the group, one over
+G times the sum across all G answers.
+That's the relative in group relative.
+Every answer is judged inside its own
+cohort. Next layer in, for each answer,
+average over its tokens, one over the
+answer's length times the sum over
+positions T. Pure bookkeeping so far,
+average over answers, then over tokens.
+Now, sitting inside those sums is an
+object you already know cold, the
+clipped PPO surrogate. The importance
+ratio row now indexed by answer I and
+token T times the advantage. The minimum
+of row times A hat and its clipped twin,
+exactly the trust region from before.
+The only thing that changed is what
+feeds the advantage, not a critic's
+estimate, but our group Z-score A hat
+sub I shared by every token in answer I.
+And then, tacked onto the very end, one
+new term, minus beta times the KL
+divergence between the current policy
+and a frozen reference model. That's the
+leash. It keeps the model from wandering
+too far from where it started while it
+chases reward. Same skeleton as PPO,
+group baseline in the middle, KL on the
+outside. That entire line is GRPO.
+Let's make it real with actual numbers
+because the whole thing turns on one
+little calculation. One question, a
+group of four answers. The reward model
+scores them. 1.0 for a clean correct
+solution, zero for a flatly wrong one,
+0.8 for a mostly right attempt, and 0.2
+for a mess that stumbled somewhere.
+First, the baseline, the group mean. 1 +
+0 + 0.8 + 0.2 all over 4 = 0.5. Then the
+spread, the standard deviation of those
+four rewards works out to about 0.42.
+Now the advantages, each reward minus
+the mean divided by that spread. Answer
+one, 1 - 0.5 is 0.5 over 0.42 gives +
+1.19. Answer two, 0 - 0.5 over 0.42 -
+1.19. Answer three lands at + 0.71.
+Answer four, - 0.71.
+Now look at what happened. Answers one
+and three came in above average,
+positive advantage, so the gradient
+pushes every token in them upward.
+Answers two and four fell below,
+negative advantage, push down. No
+network judged anything. Four rewards, a
+mean, and a standard deviation, and the
+model already knows which answers to
+become more like. That is the entire
+advantage computation start to finish.
+They stated in a single sentence.
+Back to that KL leash because GRPO does
+something subtly smart with it. In the
+classic PPO recipe for language models,
+the KL penalty gets folded into the
+reward. At every token, you subtract
+beta times the log ratio of policy to
+reference and hand that adjusted reward
+on to the advantage machinery. It works,
+but it tangles the penalty up inside the
+advantage estimate and by extension
+inside the critic. GRPO pulls it back
+out. The KL is not shaped into the
+reward at all anymore. It's added
+directly to the loss as its own clean
+term, so it never touches the advantage.
+And they estimate it with a particular
+unbiased formula, the K3 estimator. Take
+the ratio of reference probability to
+policy probability, subtract the log of
+that same ratio, then subtract one. That
+little expression has two properties you
+want. Its average equals the true KL
+divergence. That's the unbiased part.
+And unlike the naive log ratio, it is
+guaranteed to be greater than or equal
+to zero for every single sample. So, the
+penalty is always a genuine pushback
+toward the reference, never a negative
+fluke that accidentally rewards drifting
+away. Cleaner signal, lower variance,
+and no entanglement with a critic you no
+longer even have.
+Let's write it as an actual loop because
+it's shorter than you'd guess. Outer
+loop over training iterations, set the
+reference model equal to the current
+policy. That's the frozen anchor the KL
+term measures against. Inner loop over
+steps, grab a batch of questions and
+freeze the current weights as the old
+policy, theta old, the one you'll sample
+from. Now, for each question in the
+batch, sample G outputs from that old
+policy. Score all G of them with the
+reward model. Compute the group's mean
+and standard deviation and turn each
+reward into its advantage, reward minus
+mean over standard deviation, the one
+number every token in that answer will
+carry. Then take a few gradient steps
+that maximize the GRPO objective, the
+clipped importance ratio term weighted
+by those advantages, minus beta times
+the KL to the reference. Apply the
+update, move to the next batch, and
+optionally keep refreshing the reward
+model as the policy gets stronger. Now,
+scan the whole loop for a value network.
+Sample, score, normalize, step. There
+isn't one. Every place PPO would have
+spun up a critic, GRPO just computes a
+mean. That absence, that missing box, is
+the entire contribution.
+Put the two side by side and the whole
+paper compresses into one swap. Both
+algorithms share the identical skeleton.
+Sample answers, form an advantage, feed
+it into the same clipped surrogate, take
+a trust region step. Everything is
+shared except one box, how you get the
+advantage. PPO's box is a second neural
+network. Feed it a partial answer, it
+predicts expected future reward. GA
+turns that stream of predictions into a
+per token advantage. Powerful and
+general, and it cost you a whole extra
+model to train, tune, and store. GRPO's
+box is arithmetic. Sample a group,
+subtract the mean, divide by the
+standard deviation. That's the box. Same
+trust region, same importance ratio,
+same clip, a different baseline. And
+because providing that baseline was the
+only reason the critic existed in the
+first place, deleting the critic doesn't
+break anything downstream. The group
+already supplies the reference level the
+value network used to laboriously guess.
+One box changed, and half the compute,
+half the memory, and a big chunk of the
+training instability walked out the door
+with it.
+One refinement worth knowing. So far
+we've used outcome supervision, a single
+reward at the very end, and every token
+in the answer shares that same one
+advantage. That's fine for short
+problems, but a long proof might be
+flawless for 20 steps and then blow it
+on the 21st, and outcome supervision
+blames the entire thing equally. So,
+GRPO also supports process supervision.
+A reward model scores each reasoning
+step, not just the final answer. You
+normalize all of those step rewards
+across the group the same way, and each
+token's advantage becomes the sum of the
+normalized rewards from that step
+onward. Now, credit lands where the good
+reasoning actually happened, and blame
+lands on the step that broke, while the
+group relative baseline carries over
+completely unchanged.
+And there's a longer game, too. A reward
+model is only really trustworthy near
+the kinds of answers it was trained on.
+But, as the policy improves, it starts
+producing solutions the reward model has
+never quite seen, and its scores begin
+to drift. So, GRPO can be run
+iteratively. Every so often, you take
+the policy's fresh samples, use them to
+keep training the reward model, mixing
+in a slice of older data with a replay
+buffer, so it doesn't forget what it
+already knew. Then, you reset the
+reference model to the current policy,
+and continue. The reward model, the
+reference, and the policy all advance
+together in rounds, instead of trusting
+one frozen judge for the entire run.
+That's GRPO, rebuilt from the ground up,
+critic deleted, and the math still
+checks out. Quick breath. If watching a
+whole neural network vanish from an
+algorithm is your idea of a good time,
+like, subscribe, and send this to the
+friend who's still budgeting GPUs for a
+value model. Because we've now explained
+how DeepSeekMath learns, but not yet
+where its raw math talent actually comes
+from. That's next.
+So, where does a 7 billion model get
+world-class math skill? Not from the
+algorithm, from the data, and the way
+they mined it is a small masterpiece of
+bootstrapping. The open web is full of
+mathematics, drowning in noise. Step
+one, grab a seed of known good math
+pages. They used OpenWebMath, and train
+a fast, cheap classifier, fast text, to
+recognize this reads like math. Step
+two, sweep that classifier across common
+crawl, 40 billion deduplicated web
+pages, and recall everything that scores
+high. Step three, rank by score, and
+keep only the top slice. Now the clever
+part, the loop. Look at which web
+domains the classifier keeps pulling
+from. Have humans annotate the genuinely
+mathematical URL patterns on those
+domains. Fold the newly found pages back
+into the seed corpus, and retrain the
+classifier sharper than before. Each
+round recalls the math that the previous
+round missed. After four iterations,
+they'd pulled 120 billion tokens of real
+mathematics out of the web, several
+times larger than any math corpus before
+it. And then, crucially, decontaminate.
+Strip out anything that overlaps the
+benchmarks, so the test scores are
+actually earned, not quietly memorized.
+The paper closes on a genuinely
+clarifying idea. Take all the ways we
+fine-tune language models. Plain
+supervised fine-tuning, rejection
+sampling fine-tuning, its online
+variant, DPO, PPO, and GRPO. And up
+front, they look like a zoo of unrelated
+tricks. But write down each one's
+gradient, and they all share a single
+template, a source of training data, and
+a coefficient sitting out front that
+says how hard to push each example up or
+down. That coefficient is the only thing
+that genuinely differs between them.
+Supervised tuning trusts every example
+equally. The RL methods weight each one
+by a reward-based advantage. Seen
+through this lens, GRPO isn't an ad hoc
+hack at all. It's one principal choice
+of gradient coefficient, with the groups
+serving as its baseline.
+And the payoff is real. The base model,
+before any of this reinforcement
+learning, already scored 36% on
+competition math, beating a 540 billion
+parameter model more than 70 times its
+size. Then instruction tuning, and then
+GRPO, and the numbers climb again. Grade
+school GSM8K goes from 82.9 up to 88.2%
+and competition level math from 46.8 to
+51.7. The first open model over 50, no
+calculators, no majority voting. And
+GRPO matches or beats PPO on these tasks
+while training a single network instead
+of two. Cheaper and better at the same
+time, which is a combination you almost
+never actually get.
+For the record,
+it's worth asking which ingredient
+actually did the work because we changed
+10 things and it got better explains
+nothing. So pull them apart. First, the
+data. Swap the Deep Seek math corpus
+back out for the older math data sets
+and the base model scores collapse. The
+120 billion token pipeline is doing real
+load-bearing work, not decoration.
+Second, the RL step. Start from the
+exact same instruction tune model and
+GRPO lifts every benchmark, including
+out-of-domain ones it never trained on,
+which tells you it's sharpening general
+reasoning, not just memorizing the
+training questions. Third, the
+head-to-head. GRPO holds even with PPO
+on final accuracy while running one
+model instead of two. So you're not
+buying the savings with worse results.
+So this story isn't one magic trick.
+It's a great corpus that builds the raw
+ability and a cheap, stable RL method
+that reliably squeezes more reasoning
+back out of it. Each piece earns its
+place in the pipeline.
+So here's the whole thing in one breath.
+Mine a mountain of real mathematics from
+the open web, 120 billion tokens pulled
+out by a classifier that trained itself
+sharper each round. Instruction tune the
+model, then reinforce its reasoning
+without a critic. For each question,
+sample a group of answers. Reward each
+one. Subtract the group's mean to get
+the baseline. Divide by the standard
+deviation to get the advantage. Feed
+that into the clipped PPO surrogate and
+keep the model honest with a KL leash
+added straight to the loss. No value
+network anywhere. The group is the
+baseline. That is group relative policy
+optimization. PPO with its most
+expensive organ removed and replaced by
+a class curve. It made a 7 billion model
+do competition math at 51.7%
+and not long after that very same idea
+scaled up became the reinforcement
+learning engine inside Deep Sea Car One.
+The one-line version. In PPO, the
+expensive part was never the policy. It
+was the critic, a whole second network
+just to estimate a baseline. GRPO
+realized a group of answers can serve as
+its own baseline. So, it deleted the
+network and kept the learning. Cheaper
+reinforcement learning, sharper
+reasoning.
+And it leaves a strange, good question
+to sit with. This model got better at
+math by comparing itself to other
+versions of itself on the same question
+over and over with no external judge of
+what a good step is supposed to look
+like, just relative standing inside a
+group. How far does that kind of
+self-competition go all on its own?
+That's my read. Tell me yours. Until
+next time.

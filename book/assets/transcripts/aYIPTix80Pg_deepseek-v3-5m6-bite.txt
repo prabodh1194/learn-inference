@@ -1,0 +1,166 @@
+# deepseek-v3-5m6-bite
+# video: https://www.youtube.com/watch?v=aYIPTix80Pg
+
+Let's break down the core idea behind
+this paper, the DeepSeek V3 technical
+report from DeepSeek AI.
+Look at these benchmark bars: math,
+code, reasoning, general knowledge. This
+open model, DeepSeek V3, goes toe-to-toe
+with GPT 4.0 and Claude 3.5 Sonnet, the
+best closed models money could buy. Now,
+the part that made everyone sit up, they
+trained it for about 5 and 1/2 million
+dollars, not the hundreds of millions
+you'd guess for a model this size. 671
+billion parameters, train start to
+finish, and remarkably, not a single
+loss spike, not one rollback the whole
+way. This video is about the stack of
+tricks that made a frontier model that
+cheap and that stable.
+The first reason it's cheap is that most
+of the model is asleep at any moment.
+DeepSeek V3 is a mixture of experts.
+Those 671 billion parameters are split
+into a big crowd of specialist
+sub-networks, experts. For each token, a
+little router picks only a handful of
+them to actually run, about 37 billion
+parameters worth. So, you get the
+knowledge of a giant model, but you only
+pay to run a small one on every token. A
+shared expert always fires for the
+common stuff. The routed experts handle
+the specialties. Cheap to train, cheap
+to serve. But, this trick has a nasty
+failure mode.
+Here's the failure mode. If the router
+is left alone, it plays favorites. A few
+popular experts get swamped with almost
+every token while the rest sit idle.
+That's called routing collapse, and it
+wastes most of your model and jams up
+the hardware. The classic fix is to add
+an extra penalty to the loss, an
+auxiliary loss that punishes imbalance
+and forces the router to spread tokens
+out. It works, but it's a bully. That
+extra loss fights the model's real job
+of predicting the next token, and
+quality quietly suffers. DeepSeek V3's
+fix is wonderfully sneaky. Drop the
+auxiliary loss entirely. Instead, give
+each expert a little bias dial that's
+added to its routing score, but only for
+deciding who gets picked, never touching
+the weights or the gradients. Then run
+it like a thermostat. After every
+training step, check each expert's load.
+If one is overloaded, nudge its dial
+down a hair. If one is starving, nudge
+it up. Overloaded experts quietly become
+less attractive, idle ones more so, and
+the traffic evens out, all without ever
+poisoning the learning signal. Balance,
+for free.
+The second big saving is raw numerical
+precision. Normally, you train these
+models in 16-bit numbers. DeepSeek V3
+does most of the heavy matrix multiplies
+in 8-bit floating point, literally half
+the bits. That halves the memory and
+roughly doubles the math throughput. The
+catch is that 8-bits is a tiny window.
+Numbers that are too big overflow.
+Numbers too small vanish to zero. And a
+single outlier value can wreck a whole
+block. Their answer is fine-grain
+scaling. Instead of one scale factor for
+a giant tensor, they chop it into small
+tiles and blocks, and give each its own
+scale. So every little group of numbers
+sits right in the sweet spot of the
+8-bit range. The running sums are
+accumulated back up in full precision,
+and the few most delicate parts of the
+network are simply kept in higher
+precision. The result was a first. They
+showed that FP8 training actually works
+stably on a model this enormous, where
+everyone else had been too nervous to
+try.
+Two more speedups round it out. One,
+instead of only ever predicting the very
+next token, they train the model to also
+predict the token after that, with small
+extra prediction heads chained on.
+Guessing further ahead is a harder,
+richer exercise. It rings more learning
+out of every token of data, and as a
+bonus, those extra heads let the
+finished model draft several tokens at
+once and run faster. Two, in a mixture
+of experts spread across many GPUs,
+tokens are constantly shipped between
+chips to reach their chosen experts, and
+normally the GPUs sit idle waiting for
+that shipping. They designed the
+pipeline so the communication and the
+computation happen at the same time,
+hiding almost all of that waiting. Fewer
+idle chips, lower cost.
+The two headline ideas, in their words.
+If a frontier model trained for pocket
+change is the kind of thing that makes
+your day, like, subscribe, and send it
+to the friends still quoting hundred
+million-dollar training runs.
+Add it all up, and the numbers are
+staggering. 14.8 trillion tokens of
+training. 2.8 million GPU hours total.
+Around five and a half million dollars.
+An order of magnitude below what a model
+this capable usually costs. The
+strongest open model of its moment,
+matching the top closed models on
+knowledge, math, and code. And the whole
+marathon ran without a single
+unrecoverable loss spike or rollback,
+which, if you've ever baby sat a giant
+training run, is almost the most
+impressive number on the page. They even
+distilled reasoning skill from their own
+R1 model into it afterward.
+The cost in one line.
+So, the recipe for a frontier model on a
+budget starts sparse. A mixture of
+experts where a router wakes only a
+sliver of the network per token. Keep
+those experts balanced with bias dials
+nudged like thermostats, so you never
+pay the auxiliary loss tax. Train in
+eight-bit precision with per-tile
+scaling to halve the cost without the
+numbers blowing up. Predict more than
+one token ahead to ring extra signal
+from your data and overlap the
+cross-ship chatter with real work so no
+GPU sits idle. Frontier quality, a tenth
+of the bill, and not a single rollback.
+The one-line version, DeepSeek V3 is a
+600 billion parameter mixture of experts
+that reaches closed model quality for a
+few million dollars by being sparse,
+balanced without a penalty, trained in
+eight bits, and never wasting a GPU.
+What I love here is that there's no
+single silver bullet. It's a dozen
+careful engineering decisions, each
+shaving off a bit of cost, stacked until
+a frontier model fits a startup's
+budget. The big labs treat that compute
+bill as a moat. Papers like this one
+keep quietly showing the moat is mostly
+cleverness you can copy. That's my read.
+Tell me yours. Until next time.

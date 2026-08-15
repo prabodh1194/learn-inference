@@ -1,0 +1,439 @@
+# deepseek-v3-engineering
+# video: https://www.youtube.com/watch?v=P9hHsrBoHEg
+
+Let's break down the core idea behind
+this paper, the DeepSeek V3 technical
+report from DeepSeek AI. We'll walk
+through four engineering tricks that
+made a frontier class model absurdly
+cheap to train.
+Start with the number that broke
+everyone's brain. DeepSeek V3 is a 671
+billion parameter model that trades
+blows with GPT-4.0
+and Claude 3.5 Sonnet, the best closed
+models on the planet. And it was trained
+start to finish for about 5 and 1/2
+million dollars. For a model this size,
+that's roughly an order of magnitude
+below what you'd expect. And here's the
+part that keeps engineers up at night.
+Across the entire run on 14.8 trillion
+tokens, they never hit a single
+unrecoverable loss spike. No rollbacks.
+It just trained. The backbone isn't
+exotic. It's two ideas from DeepSeek V2,
+multi-head latent attention, which
+crushes the memory cost of the KV cache,
+and DeepSeek MoE, a mixture of experts
+where only 37 billion of those
+parameters fire per token. But the
+backbone isn't why it's cheap. The
+cheapness comes from four engineering
+tricks stacked on top. And in this
+video, we're going to rebuild all four
+from scratch. Balancing the experts with
+no loss function at all, predicting
+several tokens at once, training the
+whole thing in 8-bit floats, and hiding
+the network traffic completely
+underneath the math. Let's go.
+Quick tour of the backbone, because the
+tricks bolt onto it. Attention is
+multi-head latent attention, worth a
+full breakdown on its own, but the
+one-liner. Instead of caching a fat
+key-value vector per token, it caches a
+small compressed latent and rebuilds the
+rest on the fly, so long context
+inference stops drowning in memory. The
+feed-forward layers are DeepSeek MoE,
+not one big dense network, but a crowd
+of small experts plus a couple of shared
+ones that always run. A router reads
+each token and wakes only a handful of
+specialists. 671 billion parameters live
+in the model. Just 37 billion fire for
+any given token. Giant brain, small
+electricity bill. And that routing is
+where our first trick lives.
+Here's the failure mode built into every
+mixture of experts. The router learns
+which experts to trust and left alone,
+it plays favorites hard. A few lucky
+experts get picked for almost every
+token. The rest sit idle, barely
+training, wasting the parameters you
+paid for. That's routing collapse, and
+it's not just wasteful. When your
+experts are scattered across dozens of
+GPUs, a few overloaded experts means a
+few overloaded GPUs, and everyone else
+stalls waiting on them. So, your
+expensive cluster runs at a fraction of
+its speed. The textbook fix is an
+auxiliary loss. You add an extra penalty
+term that measures how lopsided the
+routing is and punishes imbalance,
+forcing the router to spread tokens more
+evenly. And it works, but it's a bully.
+That penalty is fighting the model's
+actual job, which is predicting the next
+token well. Every gradient step becomes
+a tug-of-war. Language quality pulling
+one way, the balance penalty pulling the
+other. Turn the penalty up and load
+evens out, but quality quietly erodes.
+Turn it down and quality recovers, but
+the experts collapse again. You're stuck
+trading one against the other. The whole
+game is, can we get balance without
+paying that tax?
+Deep Seek's answer is elegant because it
+refuses to touch the loss function at
+all. Give every expert one extra number,
+a bias, BI. And here's the surgical
+part. You add that bias to the affinity
+score only when deciding who gets
+selected. Top K routing now picks
+experts by score plus bias, SIT plus BI.
+But, this is the whole trick. The gate
+weight that actually multiplies the
+experts output still uses the raw,
+original affinity untouched. The bias
+steers who gets chosen. It never
+distorts how much their answer counts.
+Zero fingerprints on the model's math.
+So, how do you set the biases? Not with
+gradients, with a thermostat. After
+every step, you check how many tokens
+each expert got. Overloaded? Nudge its
+bias down by a tiny amount, gamma.
+Starved? Nudge it up by gamma. Written
+out, BI becomes BI minus gamma times the
+sign of load minus target. Just the
+sign, plus or minus one, never a
+gradient. An overloaded expert slowly
+turns less attractive. A starving one
+turns more attractive until a token that
+would have been ignored crosses the line
+and lands back in its top K. And because
+it's a side control loop, not a loss
+term, it never pulls against next token
+prediction. Balance and quality stop
+fighting. The tax is just gone.
+The paper stakes the claim in a single
+line.
+Trick two, multi-token prediction. A
+normal language model is trained on one
+thin instruction, given everything so
+far, predict the very next token. One
+token of supervision per position.
+That's a surprisingly sparse signal. The
+model sees a whole context and only ever
+gets graded on the single next word.
+Deep seek, V3 densifies it. Alongside
+the main next token head, it bolts on a
+small chain of extra modules, and each
+one predicts a token further into the
+future. Module one guesses token T plus
+two, module two guesses T plus three,
+and so on. So, now, at every single
+position in the sequence, the model
+isn't graded once. It's graded on the
+next several tokens at the same time.
+Same data, several times the
+supervision. And the crucial design
+choice is how these modules connect.
+They're sequential, not parallel. Each
+module is fed the hidden state of the
+module before it. So, the prediction of
+token T + 3 is conditioned on your best
+guess of T + 2. The full causal chain
+stays intact. You're never cheating by
+predicting the future independently of
+the tokens in between. That richer,
+denser training signal is most of why
+MTP makes the base model measurably
+better. And then it pays a second
+dividend at inference, which is the next
+beat.
+Let's open up one MTP module because the
+wiring is clever. Every module shares
+the main model's embedding table and
+output head, so you're not paying for a
+whole new vocabulary projection per
+module, just one small transformer block
+each. To predict at depth K, the module
+glues together two things, the hidden
+state from the previous depth and the
+embedding of the actual future token
+you're aiming at. It runs those through
+its transformer block, and the shared
+head turns the result into a
+distribution over the token at position
+T + K + 1. Stack a few and you've got a
+little pipeline forecasting several
+steps ahead. Each step honestly
+conditioned on the last. Now, the
+inference payoff. During training, these
+modules sharpened the main model. At
+generation, you repurpose them as a
+speculative decoder. Let the cheap MTP
+heads draft the next few tokens in one
+shot. Then let the main model verify
+them in parallel and keep the ones it
+agrees with. DeepSeek reports the second
+token guess is accepted around 85 to 90%
+of the time, roughly 1.8 tokens out per
+step instead of one. Nearly double the
+decoding speed, free from modules you
+trained anyway.
+Trick three is the one nobody dared ship
+at this scale, train in eight-bit
+floating point. Normally, you train
+these giants in 16-bits. Deep seek V3
+runs the expensive matrix multiplies,
+the big gems, in FP8, 8-bits per number.
+That roughly halves memory and doubles
+throughput on the tensor cores. The
+catch is that 8-bits is a cruelly narrow
+window. In the E4M3 format, you get
+about 4-bits of exponent, tiny dynamic
+range. So numbers a bit too big saturate
+and numbers a bit too small flush to
+zero. And real activations have
+outliers. One freakishly large value in
+a block. Pick one scale factor for that
+whole block and the outlier forces the
+scale so high that every normal value
+underflows into noise. Naive FP8 quietly
+destroys your gradients. The fix has two
+parts. First, fine-grain scaling. Don't
+scale a giant tensor with a single
+number. Chop it into tiles and blocks of
+128, each with its own scale, so every
+little neighborhood sits in FP8 sweet
+spot. Second, high precision
+accumulation. The tensor cores multiply
+in 8-bits, but the running sums get
+promoted to full FP32 before adding. So
+rounding errors don't snowball. Master
+weights and optimizer state stay higher
+precision, too. The payoff was a genuine
+first. FP8 training proven stable on a
+model this enormous.
+Let's make the outlier problem concrete
+because it's the whole reason tiles
+exist. Say you're quantizing a block of
+values that mostly sit around one,
+ordinary numbers, but a single entry is
+500. To fit FP8, you multiply the block
+by a scale, so the biggest value lands
+near the top of the range. But that
+scale is set by the 500 and once you
+apply it, your ordinary values around
+one get divided down to about 0.002. And
+in FP8's coarse spacing, that rounds to
+zero. The outlier survived, everything
+else got erased. One bad apple, whole
+block ruined. Tile-wise scaling breaks
+the coupling. Instead of one scale for
+the block, cut it into small tiles,
+strips of 128, and each tile gets its
+own scale from its own local maximum.
+The tile with the outlier scales around
+500, the calm tiles next door scale
+around one, and keep all their
+precision. The damage is quarantined to
+the tile that actually had the giant.
+Then the second half, accumulation. A
+matrix multiplies hundreds of these
+eight-bit products, and adding many tiny
+numbers in eight bits bleeds precision
+fast. So, the instant products leave the
+tensor core, they're accumulated in full
+FP32. Cheap where you can be, precise
+exactly where it counts.
+Trick four is pure systems engineering,
+and it's the quiet hero behind the cost
+number. When your experts are spread
+across 64 GPUs, every token has to be
+physically shipped to whichever GPUs
+hold its chosen experts, and the results
+shipped back. That's an all-to-all,
+everybody talking to everybody, and in
+cross-node MoE, it's brutal. The compute
+to communication ratio is roughly one to
+one. So, for every second of math, you'd
+spend a second just moving tokens across
+the network. Do that naively, and half
+your absurdly expensive cluster sits
+idle, waiting on the wire. There's a
+second waste, too. Pipeline parallelism
+splits the layers across devices. Device
+one runs the early layers, device two
+the next, but at the start and end of
+each batch, the later devices twiddle
+their thumbs waiting for the earlier
+ones. Those idle gaps are pipeline
+bubbles. Dual pipe attacks both. It
+feeds micro batches in from both ends of
+the pipeline at once, two streams
+flowing in opposite directions, which
+fills the bubbles a one-directional
+pipeline leaves empty. And within each
+chunk, it overlaps the phases. While the
+GPU grinds through the attention and
+expert math for one micro batch, the
+all-to-all traffic for another is flying
+across the network underneath it, hidden
+completely. Communication stops being a
+line on the clock. It disappears behind
+the compute, which is exactly what lets
+them scale experts across nodes almost
+for free.
+Add it all up and the bill lands here.
+For tricks, one suspiciously cheap
+Frontier model. Does it actually hold up
+on the benchmarks? Spoiler, it does. If
+watching a training bill get dismantled
+trick by trick is your idea of fun,
+like, subscribe, and send this to the
+friend still quoting hundred
+million-dollar training runs.
+A word on the iron, because the software
+tricks only pay off if the hardware's
+fed. DeepSeek V3 trained on a cluster of
+2048 H800 GPUs, NVLink inside each node,
+InfiniBand between nodes, with custom
+all-to-all kernels written to squeeze
+every drop of that bandwidth. They also
+went to war on memory. They recompute
+cheap things like RMS norm during the
+backward pass instead of storing them.
+Keep an exponential moving average of
+the weights parked in CPU memory, and
+notably, skip tensor parallelism
+entirely, which is usually mandatory at
+this scale, but eats bandwidth. Stack
+the savings and the whole run came in at
+2.79 million GPU hours start to finish
+without a single roll back.
+What did it eat and what happened after?
+Pre-training ran on 14.8 trillion
+tokens, a bigger, cleaner mix than V2,
+weighted toward math and code, plus a
+two-stage stretch that pushes the
+context window out to 128,000 tokens.
+Then came post-training, supervised
+fine-tuning to teach it to follow
+instructions, and reinforcement learning
+to align it with what people actually
+want. And here's the fun bit. They
+distilled reasoning ability out of
+DeepSeek, R1, their long
+chain-of-thought model, and folded R1's
+step-by-step problem-solving habits in a
+V3, while carefully keeping its answers
+from ballooning into rambling essays. A
+frontier-based model, then polished with
+its own siblings' reasoning.
+So, does it deliver? On the benchmarks,
+DeepSeek V3 came out as the strongest
+open base model of its moment,
+especially in math and code, where it
+posts state-of-the-art numbers among
+non-reasoning models, and even edges
+past some closed systems on tests like
+math 500. Its chat version goes
+toe-to-toe with GPT-4o
+and Claude 3.5 Sonnet across a spread of
+standard and open-ended benchmarks,
+genuinely closing the gap between open
+and closed models. And the whole thing
+cost about 5 and 1/2 million dollars, a
+small fraction of what a comparable
+closed frontier run is rumored to burn.
+Frontier-class results, startup-sized
+budget.
+For the record, straight from the paper.
+Now, is any of this actually causal, or
+just correlation with a big budget? The
+paper runs the controlled experiments,
+and two of them matter. First, the
+load-balancing showdown. Train the same
+model two ways. Once with the classic
+auxiliary loss, once with the auxiliary
+loss-free bias trick, and compare. The
+bias-based version doesn't just balance
+the experts as well. It also scores
+better on validation. That's the key
+result, and it's the whole thesis in one
+chart. The old method was paying a
+quality tax for its balance, and
+removing the tax gives you both. You
+genuinely don't have to choose. Second,
+multi-token prediction. Switch it off,
+and the benchmark scores drop across the
+board on reasoning, on coding, on math.
+The denser training signal isn't
+cosmetic. It moves the numbers. They
+also confirm the modules can be thrown
+away at inference with zero cost to the
+main model or kept around for the
+speculative decoding speed up. So, each
+trick earns its seat for a different
+reason. The bias fixes a problem the old
+fix created and MTP squeezes more model
+out of the same tokens. Not a pile of
+lucky hyper parameters, a set of choices
+that each pay their own way.
+Let's stack the whole recipe back up.
+Start with the backbone, multi-headed
+attention to keep inference memory small
+and a deep seek and we mixture where
+only a sliver of the experts fire per
+token. Keep those experts balanced not
+with a loss that fights your model, but
+with a per expert bias nudge like a
+thermostat after every step, plus or
+minus a hair. So, load evens out and
+quality never pays for it. Densify the
+training signal with multi-token
+prediction, extra sequential heads that
+each forecast a token further ahead,
+which sharpen the model and then double
+as a speculative decoder at inference.
+Cut the arithmetic cost in half by
+training in eight-bit floats,
+quarantining outliers with per tile
+scaling and catching rounding with FP32
+accumulation. And hide the network
+entirely with dual pipe, feeding the
+pipeline from both ends and overlapping
+the all-to-all traffic underneath the
+compute so no GPU sits idle. None of
+these is a silver bullet. It's a dozen
+careful engineering calls, each shaving
+off a slice of cost stacked until
+frontier quality fits a few million
+dollars instead of a few hundred. That's
+the whole magic trick and there wasn't
+any magic, just discipline.
+The one-line version, balance the
+experts without a loss, predict several
+tokens per step, train in eight bits,
+and hide the network under the math. And
+a frontier model suddenly costs a few
+million dollars instead of a few
+hundred.
+Which leaves the real question hanging.
+If a model this good can be trained for
+five and a half million dollars, where's
+the moat? The big labs treat the compute
+bill as the wall around their castle,
+but papers like this keep quietly
+showing the wall is mostly cleverness
+anyone can copy. That's my read. Tell me
+yours. Until next time.

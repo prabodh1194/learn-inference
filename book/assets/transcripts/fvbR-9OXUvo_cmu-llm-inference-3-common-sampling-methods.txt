@@ -1,0 +1,2394 @@
+# cmu-llm-inference-3-common-sampling-methods
+# video: https://www.youtube.com/watch?v=fvbR-9OXUvo
+# captions: manual
+
+Cool. Um, hey folks, welcome back. Um, Cool. Um, hey folks, welcome
+back. Um, Cool. Um, hey folks, welcome back. Um, just as a reminder, I'm
+Amanda. I'll be just as a reminder, I'm Amanda. I'll be just as a
+reminder, I'm Amanda. I'll be giving the next couple of lectures. Um,
+giving the next couple of lectures. Um, giving the next couple of
+lectures. Um, and today we're going to be talking and today we're going
+to be talking and today we're going to be talking about um, sort of the
+first class of about um, sort of the first class of about um, sort of
+the first class of algorithms for sampling from a model. So algorithms
+for sampling from a model. So algorithms for sampling from a model. So
+we're going to start um with this week we're going to start um with this
+week we're going to start um with this week with sampling and some other
+sort of with sampling and some other sort of with sampling and some
+other sort of classical decoding methods and then classical decoding
+methods and then classical decoding methods and then we'll move past
+there into um more we'll move past there into um more we'll move past
+there into um more modern inference algorithms that require modern
+inference algorithms that require modern inference algorithms that
+require reasoning over multiple um decoded reasoning over multiple um
+decoded reasoning over multiple um decoded tokens at once instead of
+sort of these tokens at once instead of sort of these tokens at once
+instead of sort of these token by token decoding. Um and just as token
+by token decoding. Um and just as token by token decoding. Um and just
+as a heads up, I know the website says that a heads up, I know the
+website says that a heads up, I know the website says that homework one
+is coming out today. Um homework one is coming out today. Um homework
+one is coming out today. Um that will actually be out probably that will
+actually be out probably that will actually be out probably Thursday. Um
+and we'll sort of adjust Thursday. Um and we'll sort of adjust Thursday.
+Um and we'll sort of adjust the deadlines to reflect that. the deadlines
+to reflect that. the deadlines to reflect that. Um so today we're going
+to be talking um Um so today we're going to be talking um Um so today
+we're going to be talking um kind of exclusively about sampling. Um kind
+of exclusively about sampling. Um kind of exclusively about sampling. Um
+we'll talk a little bit about models as we'll talk a little bit about
+models as we'll talk a little bit about models as probability
+distributions and some probability distributions and some probability
+distributions and some metrics we can use to reason about that metrics
+we can use to reason about that metrics we can use to reason about that
+and then we'll use that to talk about and then we'll use that to talk
+about and then we'll use that to talk about sort of two different groups
+of uh sort of two different groups of uh sort of two different groups of
+uh sampling methods. The first sort of sampling methods. The first sort
+of sampling methods. The first sort of simple and truncation or
+temperature- simple and truncation or temperature- simple and truncation
+or temperature- based ones and then a more um sort of based ones and
+then a more um sort of based ones and then a more um sort of complex or
+nuance method using some of complex or nuance method using some of
+complex or nuance method using some of these metrics of probability
+these metrics of probability these metrics of probability distributions
+that we'll talk about distributions that we'll talk about distributions
+that we'll talk about first. first. first. So um as we talked about in
+the very So um as we talked about in the very So um as we talked about
+in the very first class, we could think about a first class, we could
+think about a first class, we could think about a model in a couple of
+different framings. model in a couple of different framings. model in a
+couple of different framings. Um but the framing that we're sticking Um
+but the framing that we're sticking Um but the framing that we're
+sticking with, at least for today, is that a with, at least for today,
+is that a with, at least for today, is that a model is just a
+conditional probability model is just a conditional probability model is
+just a conditional probability distribution. We're not particularly
+distribution. We're not particularly distribution. We're not
+particularly concerned today with how we arrived at concerned today with
+how we arrived at concerned today with how we arrived at that
+distribution. Um we just know given that distribution. Um we just know
+given that distribution. Um we just know given some input and the prior
+output tokens, some input and the prior output tokens, some input and
+the prior output tokens, at each step, we have a distribution at each
+step, we have a distribution at each step, we have a distribution over
+the vocabulary space for the next over the vocabulary space for the next
+over the vocabulary space for the next token. token. token. Um and under
+this definition we um can Um and under this definition we um can Um and
+under this definition we um can say a couple of different things about
+say a couple of different things about say a couple of different things
+about this distribution. this distribution. this distribution. Um the
+first is that the models that Um the first is that the models that Um
+the first is that the models that we'll be talking about today are
+locally we'll be talking about today are locally we'll be talking about
+today are locally normalized. Um what this means is that normalized. Um
+what this means is that normalized. Um what this means is that at each
+step we are going to get a at each step we are going to get a at each
+step we are going to get a distribution over tokens for that
+distribution over tokens for that distribution over tokens for that
+individual step rather than getting individual step rather than getting
+individual step rather than getting something at each individual step
+that something at each individual step that something at each individual
+step that may or may not be a distribution and may or may not be a
+distribution and may or may not be a distribution and then having to
+sort of normalize at the then having to sort of normalize at the then
+having to sort of normalize at the end of decoding. Um so one way to
+think end of decoding. Um so one way to think end of decoding. Um so one
+way to think about this is that our scores will be about this is that
+our scores will be about this is that our scores will be monotonically
+non-increasing. Uh right monotonically non-increasing. Uh right
+monotonically non-increasing. Uh right we talked about this in the first
+class we talked about this in the first class we talked about this in
+the first class where if you're multiplying by a number where if you're
+multiplying by a number where if you're multiplying by a number between
+zero and one your probability between zero and one your probability
+between zero and one your probability will decrease with each additional
+will decrease with each additional will decrease with each additional
+token. Um this also means that if you token. Um this also means that if
+you token. Um this also means that if you start with a prefix that maybe
+doesn't start with a prefix that maybe doesn't start with a prefix that
+maybe doesn't look that good. There's no way to add look that good.
+There's no way to add look that good. There's no way to add probability
+mass back in later. Um, so probability mass back in later. Um, so
+probability mass back in later. Um, so in this example, if you were
+decoding in this example, if you were decoding in this example, if you
+were decoding the US president in 2023 was, and you the US president in
+2023 was, and you the US president in 2023 was, and you sort of get the
+start of this um, sort of get the start of this um, sort of get the
+start of this um, continuation, does the top or the bottom continuation,
+does the top or the bottom continuation, does the top or the bottom look
+like a better output so far? The bottom. I see people pointing down. The
+bottom. I see people pointing down. The bottom. I see people pointing
+down. Excellent. Yeah. So, the US president in Excellent. Yeah. So, the
+US president in Excellent. Yeah. So, the US president in 2023 was Joseph
+Biden. Looks like a 2023 was Joseph Biden. Looks like a 2023 was Joseph
+Biden. Looks like a reasonable output. Um, but then maybe if reasonable
+output. Um, but then maybe if reasonable output. Um, but then maybe if
+you like the sentence sort of wrapped you like the sentence sort of
+wrapped you like the sentence sort of wrapped back around Barack Obama's
+former VP, back around Barack Obama's former VP, back around Barack
+Obama's former VP, we'd want to have sort of a higher total we'd want to
+have sort of a higher total we'd want to have sort of a higher total
+probability than Joseph Biden's probability than Joseph Biden's
+probability than Joseph Biden's daughter. Um, does this mean that in a
+daughter. Um, does this mean that in a daughter. Um, does this mean that
+in a locally normalized model, the top could locally normalized model,
+the top could locally normalized model, the top could never have higher
+probability than the never have higher probability than the never have
+higher probability than the bottom? No. Right? Um, models learn a
+bottom? No. Right? Um, models learn a bottom? No. Right? Um, models
+learn a distribution over all kinds of distribution over all kinds of
+distribution over all kinds of sentences. It's entirely possible that
+sentences. It's entirely possible that sentences. It's entirely possible
+that this sort of construction is a pretty this sort of construction is
+a pretty this sort of construction is a pretty common way to talk about
+Joe Biden. And common way to talk about Joe Biden. And common way to
+talk about Joe Biden. And so it's possible that this actually so it's
+possible that this actually so it's possible that this actually winds up
+with a higher score, especially winds up with a higher score, especially
+winds up with a higher score, especially because daughter might have a
+very low because daughter might have a very low because daughter might
+have a very low weight. Um, but there's no way once you weight. Um, but
+there's no way once you weight. Um, but there's no way once you ascribe
+a relatively low probability ascribe a relatively low probability
+ascribe a relatively low probability mass here for this to end up with
+high mass here for this to end up with high mass here for this to end up
+with high probability mass later. It might be probability mass later. It
+might be probability mass later. It might be higher than this other
+relatively low higher than this other relatively low higher than this
+other relatively low probability output, but there's no way probability
+output, but there's no way probability output, but there's no way to
+sort of backtrack and say, actually, to sort of backtrack and say,
+actually, to sort of backtrack and say, actually, I think this should
+have more I think this should have more I think this should have more
+probability mass. Maybe the beginning probability mass. Maybe the
+beginning probability mass. Maybe the beginning was a little misleading.
+Um and we can was a little misleading. Um and we can was a little
+misleading. Um and we can see that as well uh with this see that as well
+uh with this see that as well uh with this visualization where the top
+here is how visualization where the top here is how visualization where
+the top here is how um our models uh our locally normalized um our
+models uh our locally normalized um our models uh our locally normalized
+models work where these two outputs A models work where these two
+outputs A models work where these two outputs A and B um and each beam
+are getting and B um and each beam are getting and B um and each beam
+are getting assigned probabilities that will sum to assigned
+probabilities that will sum to assigned probabilities that will sum to
+one. In a globally normalized model um one. In a globally normalized
+model um one. In a globally normalized model um you get a score at each
+step instead and you get a score at each step instead and you get a
+score at each step instead and these scores can be much greater than
+these scores can be much greater than these scores can be much greater
+than one. So here A gets a score of 3.1. Um one. So here A gets a score
+of 3.1. Um one. So here A gets a score of 3.1. Um so this like uplifts A
+over the other so this like uplifts A over the other so this like
+uplifts A over the other candidates in a way that is sort of not
+candidates in a way that is sort of not candidates in a way that is sort
+of not possible with a locally normalized possible with a locally
+normalized possible with a locally normalized model. Um it's we do local
+normalization model. Um it's we do local normalization model. Um it's we
+do local normalization for a number of reasons. For one, it's for a
+number of reasons. For one, it's for a number of reasons. For one, it's
+very easy and fast to train. Um you sort very easy and fast to train. Um
+you sort very easy and fast to train. Um you sort of don't have to worry
+about these of don't have to worry about these of don't have to worry
+about these constraints on a sequence level. Um but constraints on a
+sequence level. Um but constraints on a sequence level. Um but the sort
+of flip side of that is that the sort of flip side of that is that the
+sort of flip side of that is that when you want to impose global when
+you want to impose global when you want to impose global constraints at
+inference time, you need constraints at inference time, you need
+constraints at inference time, you need to do a little more thinking
+about how to do a little more thinking about how to do a little more
+thinking about how to do that. Um and in fact a lot of the to do that.
+Um and in fact a lot of the to do that. Um and in fact a lot of the
+methods that we'll talk about for the methods that we'll talk about for
+the methods that we'll talk about for the rest of the semester will be
+ways of rest of the semester will be ways of rest of the semester will
+be ways of trying to impose global constraints on a trying to impose
+global constraints on a trying to impose global constraints on a model
+that was only trained sort of with model that was only trained sort of
+with model that was only trained sort of with these local normalization.
+Um if you're these local normalization. Um if you're these local
+normalization. Um if you're interested in globally normalized models
+interested in globally normalized models interested in globally
+normalized models um this figure is from a paper that I've um this
+figure is from a paper that I've um this figure is from a paper that
+I've linked at the bottom of the slide um linked at the bottom of the
+slide um linked at the bottom of the slide um which is a good if a
+little bit older which is a good if a little bit older which is a good
+if a little bit older reference um on how to do this for reference um on
+how to do this for reference um on how to do this for sequence models.
+Uh you can also take uh sequence models. Uh you can also take uh
+sequence models. Uh you can also take uh PGMs which has a lot of
+information PGMs which has a lot of information PGMs which has a lot of
+information about how to do this for graphical about how to do this for
+graphical about how to do this for graphical models where this is a sort
+of more models where this is a sort of more models where this is a sort
+of more common setting. common setting. common setting. Um what else can
+we say about a Um what else can we say about a Um what else can we say
+about a probability distribution? Um we also probability distribution?
+Um we also probability distribution? Um we also care about some other
+features of the care about some other features of the care about some
+other features of the distribution and one that we'll touch on
+distribution and one that we'll touch on distribution and one that we'll
+touch on a little bit here is calibration. Um so a little bit here is
+calibration. Um so a little bit here is calibration. Um so you may have
+seen a plot kind of like you may have seen a plot kind of like you may
+have seen a plot kind of like this before. We say a model is this
+before. We say a model is this before. We say a model is calibrated if
+the model's confidence calibrated if the model's confidence calibrated
+if the model's confidence score is well correlated with the score is
+well correlated with the score is well correlated with the probability
+of correctness. So if we probability of correctness. So if we
+probability of correctness. So if we have a multiple choice question,
+the have a multiple choice question, the have a multiple choice
+question, the model puts 50% of the probability mass model puts 50% of
+the probability mass model puts 50% of the probability mass on
+outputting B. We would like that B to on outputting B. We would like
+that B to on outputting B. We would like that B to be the correct answer
+about 50% of the be the correct answer about 50% of the be the correct
+answer about 50% of the time. Um, and this is useful because time. Um,
+and this is useful because time. Um, and this is useful because then you
+can take the look at the logits then you can take the look at the logits
+then you can take the look at the logits and use that as sort of a
+direct measure and use that as sort of a direct measure and use that as
+sort of a direct measure of confidence. Um, is this a property of
+confidence. Um, is this a property of confidence. Um, is this a property
+that our models normally have? Does that our models normally have? Does
+that our models normally have? Does anyone know? They're pretty
+reasonable I think now, They're pretty reasonable I think now, They're
+pretty reasonable I think now, but I think makes it worse or I think it
+but I think makes it worse or I think it but I think makes it worse or I
+think it makes it better and then it used to be makes it better and then
+it used to be makes it better and then it used to be pretty bad like the
+earlier models like pretty bad like the earlier models like pretty bad
+like the earlier models like it could be scorious like the confidence it
+could be scorious like the confidence it could be scorious like the
+confidence of model could be spurious but the of model could be spurious
+but the of model could be spurious but the actual performance and
+correctness. actual performance and correctness. actual performance and
+correctness. &gt;&gt; Yeah. So they they used to be um worse &gt;&gt;
+Yeah. So they they used to be um worse &gt;&gt; Yeah. So they they used
+to be um worse they're better now but Rohf does they're better now but
+Rohf does they're better now but Rohf does something to the calibration.
+Yeah. something to the calibration. Yeah. something to the calibration.
+Yeah. Exactly. So this is actually um this Exactly. So this is actually
+um this Exactly. So this is actually um this graph is BERT um and you
+can see this is graph is BERT um and you can see this is graph is BERT
+um and you can see this is sort of this is reasonable calibration. sort
+of this is reasonable calibration. sort of this is reasonable
+calibration. Um this is GPD4 Um this is GPD4 Um this is GPD4 um on MMLU
+in particular. Um and this is um on MMLU in particular. Um and this is
+um on MMLU in particular. Um and this is a really nice calibration
+curve. Um this a really nice calibration curve. Um this a really nice
+calibration curve. Um this is the model before RLHF. is the model before
+RLHF. is the model before RLHF. This is the model after RLHF. This is
+the model after RLHF. This is the model after RLHF. Um so yeah, so uh
+our pre-trained models Um so yeah, so uh our pre-trained models Um so
+yeah, so uh our pre-trained models if they're relatively strong, if
+they're if they're relatively strong, if they're if they're relatively
+strong, if they're trained over a good data set, the trained over a good
+data set, the trained over a good data set, the likelihood corresponds
+reasonably well likelihood corresponds reasonably well likelihood
+corresponds reasonably well um with uh the the truth or the um with uh
+the the truth or the um with uh the the truth or the likelihood of that
+being the true likelihood of that being the true likelihood of that
+being the true answer. um when we do these answer. um when we do these
+answer. um when we do these post-training steps which are super post-
+training steps which are super post-training steps which are super
+useful and which generally give us useful and which generally give us
+useful and which generally give us better outputs um they mess with this
+better outputs um they mess with this better outputs um they mess with
+this property of the distribution. So if property of the distribution.
+So if property of the distribution. So if you're looking at a model that
+is you're looking at a model that is you're looking at a model that is
+post-trained um you don't have really a post-trained um you don't have
+really a post-trained um you don't have really a lot of guarantee of
+calibration. Um another feature of probability Um another feature of
+probability Um another feature of probability distributions is that
+we're generally distributions is that we're generally distributions is
+that we're generally putting nonzero mass um on a pretty wide putting
+nonzero mass um on a pretty wide putting nonzero mass um on a pretty
+wide variety of things. um in particular in variety of things. um in
+particular in variety of things. um in particular in these sort of
+situations where we have a these sort of situations where we have a
+these sort of situations where we have a semi-obvious ground truth,
+we're putting semi-obvious ground truth, we're putting semi-obvious
+ground truth, we're putting at least some probability mass on at least
+some probability mass on at least some probability mass on incorrect
+outputs. Um so your model is incorrect outputs. Um so your model is
+incorrect outputs. Um so your model is not putting 100% probability on 2
+plus 2 not putting 100% probability on 2 plus 2 not putting 100%
+probability on 2 plus 2 equals 4. Um this is this can be good, equals 4.
+Um this is this can be good, equals 4. Um this is this can be good, this
+can be bad. Um there's some this can be bad. Um there's some this can be
+bad. Um there's some interesting um ML theory work on whether
+interesting um ML theory work on whether interesting um ML theory work
+on whether this is possible to eliminate entirely. this is possible to
+eliminate entirely. this is possible to eliminate entirely. Um and the
+answer here is that if you Um and the answer here is that if you Um and
+the answer here is that if you want your model to also have this want
+your model to also have this want your model to also have this property
+of being calibrated, it is not property of being calibrated, it is not
+property of being calibrated, it is not possible to also uh to eliminate
+this possible to also uh to eliminate this possible to also uh to
+eliminate this sort of putting some mass on things that sort of putting
+some mass on things that sort of putting some mass on things that are
+not act that are not factual. Um and are not act that are not factual.
+Um and are not act that are not factual. Um and this is a there's a sort
+of like this is a there's a sort of like this is a there's a sort of
+like detailed theory result behind this. Um detailed theory result
+behind this. Um detailed theory result behind this. Um which I'll just
+sort of point you at the which I'll just sort of point you at the which
+I'll just sort of point you at the paper for here. paper for here. paper
+for here. Um so those are a couple of properties Um so those are a
+couple of properties Um so those are a couple of properties of our
+distribution. We'd now like to of our distribution. We'd now like to of
+our distribution. We'd now like to compute maybe some statistics about
+the compute maybe some statistics about the compute maybe some
+statistics about the distribution. Um, and these will be distribution.
+Um, and these will be distribution. Um, and these will be useful for the
+methods that we talk useful for the methods that we talk useful for the
+methods that we talk about later. Um, so the first and one about later.
+Um, so the first and one about later. Um, so the first and one that I
+think you've probably likely seen that I think you've probably likely
+seen that I think you've probably likely seen before, um, is the entropy
+of a before, um, is the entropy of a before, um, is the entropy of a
+distribution. Um, which we're just going distribution. Um, which we're
+just going distribution. Um, which we're just going to do generally at a
+single, um, step in to do generally at a single, um, step in to do
+generally at a single, um, step in decoding. So over the vocabulary
+space decoding. So over the vocabulary space decoding. So over the
+vocabulary space at a single time step by computing the at a single time
+step by computing the at a single time step by computing the sum of the
+probability multiplied by the sum of the probability multiplied by the
+sum of the probability multiplied by the log probability. Um, if this is
+log probability. Um, if this is log probability. Um, if this is
+relatively high, does anyone know if if relatively high, does anyone
+know if if relatively high, does anyone know if if if we have a sort of
+perfectly uniform if we have a sort of perfectly uniform if we have a
+sort of perfectly uniform model distribution, would we expect model
+distribution, would we expect model distribution, would we expect
+entropy to be relatively high or entropy to be relatively high or
+entropy to be relatively high or relatively low? &gt;&gt; All right, we
+got both answers. Um, high &gt;&gt; All right, we got both answers. Um,
+high &gt;&gt; All right, we got both answers. Um, high entropy means
+that we need um, this is entropy means that we need um, this is entropy
+means that we need um, this is entropy in sort of the information
+entropy in sort of the information entropy in sort of the information
+theory sense, u, Shannon's entropy. And theory sense, u, Shannon's
+entropy. And theory sense, u, Shannon's entropy. And so high entropy
+means that we need more so high entropy means that we need more so high
+entropy means that we need more bits to encode the information that bits
+to encode the information that bits to encode the information that
+there's sort of less um of a of a prior there's sort of less um of a of
+a prior there's sort of less um of a of a prior or a bias towards what
+the most likely or a bias towards what the most likely or a bias towards
+what the most likely outcome would be. So if the distribution outcome
+would be. So if the distribution outcome would be. So if the
+distribution is perfectly uniform, we would need a is perfectly uniform,
+we would need a is perfectly uniform, we would need a lot of bits to
+sort of specify any lot of bits to sort of specify any lot of bits to
+sort of specify any individual thing in the distribution. So individual
+thing in the distribution. So individual thing in the distribution. So
+entropy would be high. Um if entropy is entropy would be high. Um if
+entropy is entropy would be high. Um if entropy is really low, it means
+that there's um the really low, it means that there's um the really low,
+it means that there's um the distribution is really peaky. So for
+distribution is really peaky. So for distribution is really peaky. So
+for instance, if the distribution was 100% instance, if the distribution
+was 100% instance, if the distribution was 100% of the probability mass
+on one token and of the probability mass on one token and of the
+probability mass on one token and 0% on anything else, um you could 0%
+on anything else, um you could 0% on anything else, um you could specify
+sort of your outputs of that specify sort of your outputs of that
+specify sort of your outputs of that distribution very short in like a
+very distribution very short in like a very distribution very short in
+like a very brief representation because you would brief representation
+because you would brief representation because you would say it's it's
+always token X. And so say it's it's always token X. And so say it's
+it's always token X. And so that would be very low entropy. that would
+be very low entropy. that would be very low entropy. Um we care sort of
+not about entropy Um we care sort of not about entropy Um we care sort
+of not about entropy just in the abstract. We also care about just in
+the abstract. We also care about just in the abstract. We also care
+about entropy relative to some ground truth. entropy relative to some
+ground truth. entropy relative to some ground truth. Um, and here when
+we say truth, we Um, and here when we say truth, we Um, and here when we
+say truth, we usually mean we're looking at some kind usually mean we're
+looking at some kind usually mean we're looking at some kind of self-
+supervised um, objective or of self-supervised um, objective or of self-
+supervised um, objective or semi-supervised objective, excuse me. semi-
+supervised objective, excuse me. semi-supervised objective, excuse me.
+Um, and so here we calculate something Um, and so here we calculate
+something Um, and so here we calculate something called cross entropy,
+which is entropy called cross entropy, which is entropy called cross
+entropy, which is entropy relative to some true distribution. Um,
+relative to some true distribution. Um, relative to some true
+distribution. Um, what do we mean by the true what do we mean by the
+true what do we mean by the true distribution? Um, in language models,
+distribution? Um, in language models, distribution? Um, in language
+models, we're usually looking at uh, next token we're usually looking at
+uh, next token we're usually looking at uh, next token prediction. And
+so we look at what the prediction. And so we look at what the
+prediction. And so we look at what the actual next token was in whatever
+actual next token was in whatever actual next token was in whatever
+document that we're training on. Um and document that we're training on.
+Um and document that we're training on. Um and we look at the um we sort
+of set our a we look at the um we sort of set our a we look at the um we
+sort of set our a vector where it's one if that is the vector where it's
+one if that is the vector where it's one if that is the actual next
+token and zero otherwise. Um actual next token and zero otherwise. Um
+actual next token and zero otherwise. Um there's also variants of this
+where you there's also variants of this where you there's also variants
+of this where you could sort of smooth that probability could sort of
+smooth that probability could sort of smooth that probability mass out.
+Um so if you have ever trained mass out. Um so if you have ever trained
+mass out. Um so if you have ever trained a model, you've probably seen
+the cross a model, you've probably seen the cross a model, you've
+probably seen the cross entropy loss. Um and this is um exactly entropy
+loss. Um and this is um exactly entropy loss. Um and this is um exactly
+this computed over a large set of tokens this computed over a large set
+of tokens this computed over a large set of tokens in a batch. Um so we
+multiply a one hot in a batch. Um so we multiply a one hot in a batch.
+Um so we multiply a one hot probability vector with um the log
+probability vector with um the log probability vector with um the log
+probability which means that this is probability which means that this
+is probability which means that this is functionally the negative log
+likelihood functionally the negative log likelihood functionally the
+negative log likelihood of the correct next token. of the correct next
+token. of the correct next token. Um and if you've ever read a paper
+about Um and if you've ever read a paper about Um and if you've ever
+read a paper about somebody else training a model you've somebody else
+training a model you've somebody else training a model you've certainly
+seen perplexity which is just certainly seen perplexity which is just
+certainly seen perplexity which is just two to the power of the cross
+entropy. two to the power of the cross entropy. two to the power of the
+cross entropy. Um this is exactly that. uh there's a Um this is exactly
+that. uh there's a Um this is exactly that. uh there's a sort of
+interesting connection between sort of interesting connection between
+sort of interesting connection between perplexity cross entropy um and
+the kale perplexity cross entropy um and the kale perplexity cross
+entropy um and the kale divergence um between the true divergence um
+between the true divergence um between the true distribution and the
+model distribution distribution and the model distribution distribution
+and the model distribution which is something that you guys will which
+is something that you guys will which is something that you guys will
+see on your first homework. see on your first homework. see on your
+first homework. Um there's a Um there's a Um there's a interpretation of
+perplexity which is interpretation of perplexity which is interpretation
+of perplexity which is presented as intuitive and may may or presented
+as intuitive and may may or presented as intuitive and may may or may
+not be intuitive to you. Um which is may not be intuitive to you. Um
+which is may not be intuitive to you. Um which is that perplexity
+represents the odds of that perplexity represents the odds of that
+perplexity represents the odds of correctly predicting the next token.
+If correctly predicting the next token. If correctly predicting the next
+token. If you had a a die or a coin that has as you had a a die or a
+coin that has as you had a a die or a coin that has as many sides as
+your perplexity number. So many sides as your perplexity number. So many
+sides as your perplexity number. So if you have your perplexity over
+some if you have your perplexity over some if you have your perplexity
+over some corpus is six, that means that when the corpus is six, that
+means that when the corpus is six, that means that when the model is
+predicting the next token, you model is predicting the next token, you
+model is predicting the next token, you could roll like a six-sided die
+and could roll like a six-sided die and could roll like a six-sided die
+and every time it rolled a one, it would get every time it rolled a one,
+it would get every time it rolled a one, it would get the token right.
+Every time it rolled the token right. Every time it rolled the token
+right. Every time it rolled another number, it would predict some
+another number, it would predict some another number, it would predict
+some other token. Um, so that's a couple of different sort Um, so that's
+a couple of different sort Um, so that's a couple of different sort of
+properties of models we'll be working of properties of models we'll be
+working of properties of models we'll be working with today. Um, I will
+pause there for a with today. Um, I will pause there for a with today.
+Um, I will pause there for a quick second. Does anyone have any quick
+second. Does anyone have any quick second. Does anyone have any
+questions so far? Sweet. Uh feel free to interrupt me if Sweet. Uh feel
+free to interrupt me if Sweet. Uh feel free to interrupt me if you do.
+Um so now we have this you do. Um so now we have this you do. Um so now
+we have this distribution. We know a few things about distribution. We
+know a few things about distribution. We know a few things about it. We
+would like to get some output. Um it. We would like to get some output.
+Um it. We would like to get some output. Um and the easiest thing to do
+here, we and the easiest thing to do here, we and the easiest thing to
+do here, we have a probability distribution. We know have a probability
+distribution. We know have a probability distribution. We know how to
+sample from distributions. Um and how to sample from distributions. Um
+and how to sample from distributions. Um and this is called ancestral
+sampling. Um this is called ancestral sampling. Um this is called
+ancestral sampling. Um and specifically here we're sampling and
+specifically here we're sampling and specifically here we're sampling
+from the unmodified model distribution. from the unmodified model
+distribution. from the unmodified model distribution. we are just going
+to draw a sample um we are just going to draw a sample um we are just
+going to draw a sample um according to this distribution according to
+this distribution according to this distribution parameterized by our
+model. Um this is parameterized by our model. Um this is parameterized
+by our model. Um this is great. This is the property that we're great.
+This is the property that we're great. This is the property that we're
+recovering the model distribution recovering the model distribution
+recovering the model distribution exactly. And if this is a model we
+exactly. And if this is a model we exactly. And if this is a model we
+trained, we likely went into quite a bit trained, we likely went into
+quite a bit trained, we likely went into quite a bit of effort to get
+that distribution. So of effort to get that distribution. So of effort
+to get that distribution. So this seems like a kind of reasonable this
+seems like a kind of reasonable this seems like a kind of reasonable
+thing to do. Um and so we're done for thing to do. Um and so we're done
+for thing to do. Um and so we're done for the day and we can leave,
+right? But the day and we can leave, right? But the day and we can
+leave, right? But unfortunately there's a number of unfortunately
+there's a number of unfortunately there's a number of pathologies of
+sampling directly from pathologies of sampling directly from pathologies
+of sampling directly from the model distribution. Um, the one that the
+model distribution. Um, the one that the model distribution. Um, the one
+that we're going to spend probably the most we're going to spend
+probably the most we're going to spend probably the most time thinking
+about today is the time thinking about today is the time thinking about
+today is the longtail. So, I originally made a longtail. So, I
+originally made a longtail. So, I originally made a variant of this
+slide in 2022 or 2023, variant of this slide in 2022 or 2023, variant of
+this slide in 2022 or 2023, um, where it started by saying Llama has um,
+where it started by saying Llama has um, where it started by saying
+Llama has 32,000 vocabulary tokens. That's so many 32,000 vocabulary
+tokens. That's so many 32,000 vocabulary tokens. That's so many there's
+so many tokens in this space. there's so many tokens in this space.
+there's so many tokens in this space. There's so many things that have
+like There's so many things that have like There's so many things that
+have like small probability mass. Um, and since small probability mass.
+Um, and since small probability mass. Um, and since then, this has only
+gotten um to be sort then, this has only gotten um to be sort then, this
+has only gotten um to be sort of more of a problem. So, now the slide of
+more of a problem. So, now the slide of more of a problem. So, now the
+slide starts at Llama 3 has 128k vocabulary starts at Llama 3 has 128k
+vocabulary starts at Llama 3 has 128k vocabulary tokens. And this is
+sort of um an I tokens. And this is sort of um an I tokens. And this is
+sort of um an I think a relatively reasonable median for think a
+relatively reasonable median for think a relatively reasonable median
+for like the vocabulary space of a modern like the vocabulary space of a
+modern like the vocabulary space of a modern model. Um if every
+individual token that model. Um if every individual token that model. Um
+if every individual token that is sort of not in the reasonable 100 or
+is sort of not in the reasonable 100 or is sort of not in the reasonable
+100 or 500 tokens to predict next has a tiny 500 tokens to predict next
+has a tiny 500 tokens to predict next has a tiny amount of probability,
+these small amount of probability, these small amount of probability,
+these small probabilities add up really really probabilities add up
+really really probabilities add up really really quickly. Um and so this
+is a quickly. Um and so this is a quickly. Um and so this is a
+visualization of that. um where if you visualization of that. um where
+if you visualization of that. um where if you can see this little thin
+line here that can see this little thin line here that can see this
+little thin line here that represents the 50% point in the represents
+the 50% point in the represents the 50% point in the probability mass
+distribution. So the probability mass distribution. So the probability
+mass distribution. So the the tail from that point onwards is half the
+tail from that point onwards is half the tail from that point onwards is
+half of the probability mass. So if you're of the probability mass. So
+if you're of the probability mass. So if you're sampling at every step
+and maybe you're sampling at every step and maybe you're sampling at
+every step and maybe you're sampling 100 or 200 times to get a sampling
+100 or 200 times to get a sampling 100 or 200 times to get a decent
+little bit of text, um the odds decent little bit of text, um the odds
+decent little bit of text, um the odds of pulling something really
+really weird of pulling something really really weird of pulling
+something really really weird from this really long tail um can be from
+this really long tail um can be from this really long tail um can be
+pretty nasty. pretty nasty. pretty nasty. So what do we do to get around
+that? Um So what do we do to get around that? Um So what do we do to get
+around that? Um we saw one option on Thursday which is we saw one option
+on Thursday which is we saw one option on Thursday which is to just make
+the tail sort of flatter, to just make the tail sort of flatter, to just
+make the tail sort of flatter, narrower. Um and so this is the idea of
+narrower. Um and so this is the idea of narrower. Um and so this is the
+idea of using a temperature to reshape the using a temperature to
+reshape the using a temperature to reshape the distribution. Um so
+temperature one is distribution. Um so temperature one is distribution.
+Um so temperature one is the the original distribution. the the original
+distribution. the the original distribution. Temperatures less than one
+sharpen the Temperatures less than one sharpen the Temperatures less
+than one sharpen the distribution. So now we have a a higher
+distribution. So now we have a a higher distribution. So now we have a a
+higher peak and a sort of flatter tail or less peak and a sort of
+flatter tail or less peak and a sort of flatter tail or less probability
+mass in the long tail. probability mass in the long tail. probability
+mass in the long tail. Temperatures greater than one flatten
+Temperatures greater than one flatten Temperatures greater than one
+flatten the distribution back out. So if you're the distribution back
+out. So if you're the distribution back out. So if you're looking for
+sort of more diverse outputs looking for sort of more diverse outputs
+looking for sort of more diverse outputs um or if uh yeah I mean if
+you're um or if uh yeah I mean if you're um or if uh yeah I mean if
+you're looking for more diverse outputs um you looking for more diverse
+outputs um you looking for more diverse outputs um you can flatten the
+distribution to increase can flatten the distribution to increase can
+flatten the distribution to increase the odds of pulling something that
+would the odds of pulling something that would the odds of pulling
+something that would otherwise slightly less likely. otherwise slightly
+less likely. otherwise slightly less likely. Um the other sort of broad
+class of Um the other sort of broad class of Um the other sort of broad
+class of approaches is if we think the longtail approaches is if we
+think the longtail approaches is if we think the longtail is a problem
+we should just cut it off. is a problem we should just cut it off. is a
+problem we should just cut it off. Um and so there's a variety of ways
+of Um and so there's a variety of ways of Um and so there's a variety of
+ways of doing this. I know most of you have doing this. I know most of
+you have doing this. I know most of you have probably seen a number of
+these before probably seen a number of these before probably seen a
+number of these before so we'll move through them relatively so we'll
+move through them relatively so we'll move through them relatively
+quickly. Um the first is top k sampling. quickly. Um the first is top k
+sampling. quickly. Um the first is top k sampling. So we only sample
+from the k most So we only sample from the k most So we only sample from
+the k most probable tokens. Um depending on how probable tokens. Um
+depending on how probable tokens. Um depending on how peaky your
+probability distribution is. peaky your probability distribution is.
+peaky your probability distribution is. This could be quite a few tokens
+or or This could be quite a few tokens or or This could be quite a few
+tokens or or this could be quite a bit of the this could be quite a bit
+of the this could be quite a bit of the probability mass or just a
+little. So probability mass or just a little. So probability mass or
+just a little. So here um this sort of running example here um this sort
+of running example here um this sort of running example we're decoding
+the first token is the we're decoding the first token is the we're
+decoding the first token is the and we're decoding the next token. Um
+and we're decoding the next token. Um and we're decoding the next token.
+Um there's a variety of things that could there's a variety of things
+that could there's a variety of things that could go reasonably after
+the and so the go reasonably after the and so the go reasonably after
+the and so the probability mass in the top six is only probability mass
+in the top six is only probability mass in the top six is only 68. Um if
+we then decode car and then 68. Um if we then decode car and then 68. Um
+if we then decode car and then we're looking for the next token after
+we're looking for the next token after we're looking for the next token
+after that. Um the space of things that could that. Um the space of
+things that could that. Um the space of things that could reasonably
+come after the car is a reasonably come after the car is a reasonably
+come after the car is a little smaller and so the top six tokens little
+smaller and so the top six tokens little smaller and so the top six
+tokens captures 99% of the probability mass. captures 99% of the
+probability mass. captures 99% of the probability mass. Um, this is a
+little bit weird that the Um, this is a little bit weird that the Um,
+this is a little bit weird that the amount of probability is sort of
+amount of probability is sort of amount of probability is sort of
+shifting over time that sometimes we're shifting over time that
+sometimes we're shifting over time that sometimes we're capturing just a
+tiny set of the capturing just a tiny set of the capturing just a tiny
+set of the reasonable options and sometimes we're reasonable options and
+sometimes we're reasonable options and sometimes we're capturing even
+some tokens that have capturing even some tokens that have capturing
+even some tokens that have relatively small probability. Um, and so
+relatively small probability. Um, and so relatively small probability.
+Um, and so an alternative to this is to um define an alternative to this
+is to um define an alternative to this is to um define an amount of
+probability mass you want an amount of probability mass you want an
+amount of probability mass you want to capture in your sample instead.
+So we to capture in your sample instead. So we to capture in your sample
+instead. So we could say we want uh 94% of the could say we want uh 94%
+of the could say we want uh 94% of the probability mass. And so for this
+probability mass. And so for this probability mass. And so for this
+particular for the first token here, particular for the first token
+here, particular for the first token here, that's almost all of the
+tokens in this that's almost all of the tokens in this that's almost all
+of the tokens in this little graph. For the second token, this little
+graph. For the second token, this little graph. For the second token,
+this is only the first three. Um, and this is is only the first three.
+Um, and this is is only the first three. Um, and this is called top p
+sampling or this is also called top p sampling or this is also called
+top p sampling or this is also sometimes called nucleus sampling. And
+sometimes called nucleus sampling. And sometimes called nucleus
+sampling. And the intuition is that you start by sort the intuition is
+that you start by sort the intuition is that you start by sort of
+seeding with the most probable token of seeding with the most probable
+token of seeding with the most probable token and then you add on more
+and more tokens and then you add on more and more tokens and then you
+add on more and more tokens into your sample until you've hit that into
+your sample until you've hit that into your sample until you've hit that
+much probability mass. Um, and for any much probability mass. Um, and
+for any much probability mass. Um, and for any one of these, once we've
+cut off a good one of these, once we've cut off a good one of these,
+once we've cut off a good chunk of our probability distribution, chunk
+of our probability distribution, chunk of our probability distribution,
+we no longer have a normalized we no longer have a normalized we no
+longer have a normalized probability distribution. So, you probability
+distribution. So, you probability distribution. So, you renormalize and
+then sample from within renormalize and then sample from within
+renormalize and then sample from within your subset. your subset. your
+subset. Um, the other another intuition is that Um, the other another
+intuition is that Um, the other another intuition is that maybe we don't
+care about having just maybe we don't care about having just maybe we
+don't care about having just the highest probability things. Maybe the
+highest probability things. Maybe the highest probability things. Maybe
+what we're really worried about is only what we're really worried about
+is only what we're really worried about is only not having the very low
+probability not having the very low probability not having the very low
+probability things. And so this is the concept things. And so this is
+the concept things. And so this is the concept behind epsilon sampling
+which is only behind epsilon sampling which is only behind epsilon
+sampling which is only cutting which is cutting off the cutting which is
+cutting off the cutting which is cutting off the proportion of the tail
+that has a proportion of the tail that has a proportion of the tail that
+has a probability less than or equal to some probability less than or
+equal to some probability less than or equal to some small epsilon. Um
+so here if everything small epsilon. Um so here if everything small
+epsilon. Um so here if everything is at least is at least is at least uh
+some reasonable amount of probability uh some reasonable amount of
+probability uh some reasonable amount of probability mass you could
+sample from the full mass you could sample from the full mass you could
+sample from the full distribution. distribution. distribution. Here if
+there's a number of things that Here if there's a number of things that
+Here if there's a number of things that don't have that sort of
+reasonable don't have that sort of reasonable don't have that sort of
+reasonable amount of probability mass you would cut amount of
+probability mass you would cut amount of probability mass you would cut
+those out of the distribution. those out of the distribution. those out
+of the distribution. Um, of course this is not exactly Um, of course
+this is not exactly Um, of course this is not exactly uh a language
+model here because we have uh a language model here because we have uh a
+language model here because we have a distribution over just like five a
+distribution over just like five a distribution over just like five
+tokens and the tokens we have tokens and the tokens we have tokens and
+the tokens we have distributions over change but um just distributions
+over change but um just distributions over change but um just for
+intuition for intuition for intuition and uh so I figured we could take
+a look and uh so I figured we could take a look and uh so I figured we
+could take a look at what this looks like um in hugging at what this
+looks like um in hugging at what this looks like um in hugging face
+which is probably one of the first face which is probably one of the
+first face which is probably one of the first places that you would go
+to experiment places that you would go to experiment places that you
+would go to experiment with a model. Um and this is these are with a
+model. Um and this is these are with a model. Um and this is these are
+all pretty intuitive parameters. Um, you all pretty intuitive
+parameters. Um, you all pretty intuitive parameters. Um, you set
+sampling to true. You set the number set sampling to true. You set the
+number set sampling to true. You set the number of beams to one. You set
+top K or top P of beams to one. You set top K or top P of beams to one.
+You set top K or top P or epsilon or temperature. Um, there's a or
+epsilon or temperature. Um, there's a or epsilon or temperature. Um,
+there's a little bit of a caveat to this. Um, does little bit of a
+caveat to this. Um, does little bit of a caveat to this. Um, does anyone
+know what the default values of anyone know what the default values of
+anyone know what the default values of these settings are in these
+settings are in these settings are in &gt;&gt; head? Top 95. Top 95. Top
+95. &gt;&gt; Top P is often 95. &gt;&gt; Top P is often 95. &gt;&gt; Top
+P is often 95. &gt;&gt; Top K is 50. &gt;&gt; Top K is 50. &gt;&gt; Top
+K is 50. &gt;&gt; Top K is often 50. Yep. Um, &gt;&gt; Top K is often
+50. Yep. Um, &gt;&gt; Top K is often 50. Yep. Um, there's a this is kind
+of a this is 50% there's a this is kind of a this is 50% there's a this
+is kind of a this is 50% a trick question and that like I think a trick
+question and that like I think a trick question and that like I think
+these are actually the the defaults if these are actually the the
+defaults if these are actually the the defaults if you don't specify a
+parameter, but most you don't specify a parameter, but most you don't
+specify a parameter, but most models will also specify. Um, so I have
+models will also specify. Um, so I have models will also specify. Um, so
+I have here Llama 3.1 and Quen 3. Um, and if here Llama 3.1 and Quen 3.
+Um, and if here Llama 3.1 and Quen 3. Um, and if you go into the model,
+um, the model you go into the model, um, the model you go into the
+model, um, the model files and you look at the generation files and you
+look at the generation files and you look at the generation config
+config config and you wait a couple minutes to load. and you wait a
+couple minutes to load. and you wait a couple minutes to load. Um,
+models will give you a sort of uh, Um, models will give you a sort of
+uh, Um, models will give you a sort of uh, model provider defined
+version of these model provider defined version of these model provider
+defined version of these decoding parameters. So, llama's decoding
+parameters. So, llama's decoding parameters. So, llama's temperature is
+6, top p is 0.9. Um, Quen temperature is 6, top p is 0.9. Um, Quen
+temperature is 6, top p is 0.9. Um, Quen I think sets a top P and a top
+K and sets do sample to true. So if you're and sets do sample to true.
+So if you're and sets do sample to true. So if you're specifying some
+generation parameters, specifying some generation parameters, specifying
+some generation parameters, um, it's a good idea to check what the um,
+it's a good idea to check what the um, it's a good idea to check what
+the defaults are are, check what the model defaults are are, check what
+the model defaults are are, check what the model config says they are,
+um, and then config says they are, um, and then config says they are,
+um, and then override everything that you care about. override
+everything that you care about. override everything that you care about.
+um model model providers do this because um model model providers do
+this because um model model providers do this because different models
+work best with slightly different models work best with slightly
+different models work best with slightly different settings and they've
+done some different settings and they've done some different settings
+and they've done some kind of exhaustive hyperparameter sweep kind of
+exhaustive hyperparameter sweep kind of exhaustive hyperparameter sweep
+at some point to figure out what looks at some point to figure out what
+looks at some point to figure out what looks best for their evaluation.
+Um so this best for their evaluation. Um so this best for their
+evaluation. Um so this gives you a sense of what is like gives you a
+sense of what is like gives you a sense of what is like commonly used um
+and also what might commonly used um and also what might commonly used
+um and also what might work well with that particular model. So that was
+a couple of um more So that was a couple of um more So that was a couple
+of um more classical decoding algorithms. I want to classical decoding
+algorithms. I want to classical decoding algorithms. I want to talk
+about um one example of an talk about um one example of an talk about um
+one example of an algorithm that is a little more complex algorithm that
+is a little more complex algorithm that is a little more complex and
+maybe a little less widely used and maybe a little less widely used and
+maybe a little less widely used because I think it has a nice intuition
+because I think it has a nice intuition because I think it has a nice
+intuition on sort of a different way to think on sort of a different way
+to think on sort of a different way to think about sampling. Um and to
+do this I want about sampling. Um and to do this I want about sampling.
+Um and to do this I want to frame a question. So say I have a to frame a
+question. So say I have a to frame a question. So say I have a um unfair
+coin, right? I I flip it and um unfair coin, right? I I flip it and um
+unfair coin, right? I I flip it and it's 60% of the time it lands on
+heads. it's 60% of the time it lands on heads. it's 60% of the time it
+lands on heads. Um I flip my coin a 100 times in a row Um I flip my coin
+a 100 times in a row Um I flip my coin a 100 times in a row and I sort
+of write down the sequence of and I sort of write down the sequence of
+and I sort of write down the sequence of results. Does anyone know what
+the results. Does anyone know what the results. Does anyone know what
+the single most likely sequence of results single most likely sequence
+of results single most likely sequence of results is from from this
+flipping the coin a is from from this flipping the coin a is from from
+this flipping the coin a 100 times? What would be the single most likely
+What would be the single most likely What would be the single most
+likely result of flipping the coin once? result of flipping the coin
+once? result of flipping the coin once? heads. heads. heads. What would
+be the single most likely What would be the single most likely What
+would be the single most likely sequence of flipping it twice? &gt;&gt;
+Yep. Two heads. Uh, what about the &gt;&gt; Yep. Two heads. Uh, what
+about the &gt;&gt; Yep. Two heads. Uh, what about the single most likely
+sequence of flipping single most likely sequence of flipping single most
+likely sequence of flipping it three times? it three times? it three
+times? Three heads. So, if I flip it a 100 Three heads. So, if I flip it
+a 100 Three heads. So, if I flip it a 100 times, the single most likely
+sequence times, the single most likely sequence times, the single most
+likely sequence out of all the sequences you could out of all the
+sequences you could out of all the sequences you could enumerate
+enumerate enumerate is a 100 heads in a row. Yeah. Would is a 100 heads
+in a row. Yeah. Would is a 100 heads in a row. Yeah. Would this be a
+surprising output if you if this be a surprising output if you if this
+be a surprising output if you if you flip this coin? you flip this coin?
+you flip this coin? &gt;&gt; Yes. Why? It's the most probable output.
+&gt;&gt; Yeah. Right. So, this is a little bit &gt;&gt; Yeah. Right. So,
+this is a little bit &gt;&gt; Yeah. Right. So, this is a little bit
+counterintuitive. Um the thing that is counterintuitive. Um the thing
+that is counterintuitive. Um the thing that is most likely to happen is
+not sort of the most likely to happen is not sort of the most likely to
+happen is not sort of the the expected or in a very non-rigorous the
+expected or in a very non-rigorous the expected or in a very non-
+rigorous sense the typical output. Um what would sense the typical
+output. Um what would sense the typical output. Um what would sort of
+the typical output look like sort of the typical output look like sort
+of the typical output look like here? What would you expect to get from
+here? What would you expect to get from here? What would you expect to
+get from this coin? this coin? this coin? 60 60 60 &gt;&gt; 40s like
+some &gt;&gt; 40s like some &gt;&gt; 40s like some &gt;&gt; yeah like
+some combination that is &gt;&gt; yeah like some combination that is
+&gt;&gt; yeah like some combination that is roughly 60% heads roughly
+40% tails. Um roughly 60% heads roughly 40% tails. Um roughly 60% heads
+roughly 40% tails. Um so this is the notion that the the thing so this
+is the notion that the the thing so this is the notion that the the
+thing that is most likely in our probability that is most likely in our
+probability that is most likely in our probability distribution is maybe
+not actually distribution is maybe not actually distribution is maybe
+not actually somehow typical of that distribution. Um somehow typical of
+that distribution. Um somehow typical of that distribution. Um to define
+what typical is uh requires a to define what typical is uh requires a to
+define what typical is uh requires a little bit more work. little bit
+more work. little bit more work. Um so to do this we're going to draw in
+Um so to do this we're going to draw in Um so to do this we're going to
+draw in a notion of typicality um as it's a notion of typicality um as
+it's a notion of typicality um as it's defined in the literature
+studying defined in the literature studying defined in the literature
+studying stochastic processes. Um so to do this stochastic processes. Um
+so to do this stochastic processes. Um so to do this in we're going to
+think about our in we're going to think about our in we're going to
+think about our language model as a process that at each language model
+as a process that at each language model as a process that at each step
+emits a um token according to the step emits a um token according to the
+step emits a um token according to the probability distribution at that
+step probability distribution at that step probability distribution at
+that step and then it is now parameterized um and then it is now
+parameterized um and then it is now parameterized um excuse me it's now
+um excuse me it's now um excuse me it's now um it's now conditioned on
+an additional it's now conditioned on an additional it's now conditioned
+on an additional token and the process sort of continues. token and the
+process sort of continues. token and the process sort of continues. So
+we're taking some kind of walk So we're taking some kind of walk So
+we're taking some kind of walk through the space of vocabulary by
+through the space of vocabulary by through the space of vocabulary by
+sampling at each step according to our sampling at each step according
+to our sampling at each step according to our language model. Um so to
+define a notion language model. Um so to define a notion language model.
+Um so to define a notion of typicality and to have it be well of
+typicality and to have it be well of typicality and to have it be well
+defined um according to this literature defined um according to this
+literature defined um according to this literature we need a couple of
+properties from this we need a couple of properties from this we need a
+couple of properties from this uh process. We need the process to be uh
+process. We need the process to be uh process. We need the process to be
+discreet which means the output space is discreet which means the output
+space is discreet which means the output space is finite. Um, we need
+the process to be finite. Um, we need the process to be finite. Um, we
+need the process to be stationary, which means that the stationary,
+which means that the stationary, which means that the probabilities
+output by the distribution probabilities output by the distribution
+probabilities output by the distribution don't change based on some
+notion of don't change based on some notion of don't change based on
+some notion of absolute position. Um, it's okay if they absolute
+position. Um, it's okay if they absolute position. Um, it's okay if they
+change based on some conditioning from change based on some conditioning
+from change based on some conditioning from prior tokens, but they
+shouldn't change prior tokens, but they shouldn't change prior tokens,
+but they shouldn't change based on whether we're like 300 steps based on
+whether we're like 300 steps based on whether we're like 300 steps into
+the process versus zero steps into into the process versus zero steps
+into into the process versus zero steps into the process. And we need it
+to satisfy the process. And we need it to satisfy the process. And we
+need it to satisfy this property um called being erotic this property um
+called being erotic this property um called being erotic which means
+functionally that you can which means functionally that you can which
+means functionally that you can infer the prop the properties of the
+infer the prop the properties of the infer the prop the properties of
+the distribution based on a single long distribution based on a single
+long distribution based on a single long sample instead of a number of
+small sample instead of a number of small sample instead of a number of
+small samples that you've aggregated. samples that you've aggregated.
+samples that you've aggregated. Functionally if I if I took this process
+Functionally if I if I took this process Functionally if I if I took
+this process and I took a very long random walk just and I took a very
+long random walk just and I took a very long random walk just continuing
+to sample from it. I would at continuing to sample from it. I would at
+continuing to sample from it. I would at the end of that know sort of
+all of the the end of that know sort of all of the the end of that know
+sort of all of the properties of this distribution that I properties of
+this distribution that I properties of this distribution that I care
+about. Um, for this to be the case, care about. Um, for this to be the
+case, care about. Um, for this to be the case, there's one particular
+thing that has to there's one particular thing that has to there's one
+particular thing that has to happen, which is that you must be able
+happen, which is that you must be able happen, which is that you must be
+able to get to any emission or any output to get to any emission or any
+output to get to any emission or any output from any state. If I want to
+know the from any state. If I want to know the from any state. If I want
+to know the properties of the distribution, I need properties of the
+distribution, I need properties of the distribution, I need to be able
+to sort of look at to be able to sort of look at to be able to sort of
+look at everything. everything. everything. Um, Um, Um, once we have
+these three properties, if once we have these three properties, if once
+we have these three properties, if we assume that we meet these
+criteria, we assume that we meet these criteria, we assume that we meet
+these criteria, um, you can define a couple of things um, you can define
+a couple of things um, you can define a couple of things and get to this
+notion of typicality. and get to this notion of typicality. and get to
+this notion of typicality. Um, so we want to know something called Um,
+so we want to know something called Um, so we want to know something
+called the entropy rate of this process. Um the entropy rate of this
+process. Um the entropy rate of this process. Um what this means is
+rather than looking what this means is rather than looking what this
+means is rather than looking at the entropy at each individual time at
+the entropy at each individual time at the entropy at each individual
+time step, we'll take a limit as we sort of step, we'll take a limit as
+we sort of step, we'll take a limit as we sort of generate from this
+process infinitely um generate from this process infinitely um generate
+from this process infinitely um and average over it. So if your process
+and average over it. So if your process and average over it. So if your
+process has the same entropy at every time step, has the same entropy at
+every time step, has the same entropy at every time step, if you're
+drawing iid samples from the if you're drawing iid samples from the if
+you're drawing iid samples from the same distribution, um this would be
+the same distribution, um this would be the same distribution, um this
+would be the same as the entropy of that same as the entropy of that
+same as the entropy of that distribution. Um because we have
+distribution. Um because we have distribution. Um because we have
+something like a language model where something like a language model
+where something like a language model where our conditioning is changing
+at each our conditioning is changing at each our conditioning is
+changing at each time step. This would not actually be time step. This
+would not actually be time step. This would not actually be that. Yeah.
+that. Yeah. that. Yeah. &gt;&gt; Yeah. Yeah. So if we &gt;&gt; Yeah.
+Yeah. So if we &gt;&gt; Yeah. Yeah. So if we at every time step um in
+this process we at every time step um in this process we at every time
+step um in this process we have a distribution and we can calculate have
+a distribution and we can calculate have a distribution and we can
+calculate the entropy of that distribution. Um we the entropy of that
+distribution. Um we the entropy of that distribution. Um we so that's
+like the notion of entropy we so that's like the notion of entropy we so
+that's like the notion of entropy we talked about before. What we care
+about talked about before. What we care about talked about before. What
+we care about here is not the entropy at any here is not the entropy at
+any here is not the entropy at any individual step but sort of the
+average individual step but sort of the average individual step but sort
+of the average entropy over time. Um, so if our entropy over time. Um,
+so if our entropy over time. Um, so if our distribution stayed the same
+at every distribution stayed the same at every distribution stayed the
+same at every step, um, like that coin that we were step, um, like that
+coin that we were step, um, like that coin that we were flipping, right,
+that's always 60% flipping, right, that's always 60% flipping, right,
+that's always 60% heads, then the entropy over time would heads, then
+the entropy over time would heads, then the entropy over time would be
+exactly the same as the entropy at be exactly the same as the entropy at
+be exactly the same as the entropy at any step. But because our language
+any step. But because our language any step. But because our language
+model, the entropy of the distribution model, the entropy of the
+distribution model, the entropy of the distribution changes at every
+step because we've now changes at every step because we've now changes
+at every step because we've now conditioned on some different text. Um,
+conditioned on some different text. Um, conditioned on some different
+text. Um, this is like a measure of entropy over this is like a measure
+of entropy over this is like a measure of entropy over the course of
+decoding. this with the definition of stationity this with the
+definition of stationity this with the definition of stationity that you
+have that is probably doesn't that you have that is probably doesn't
+that you have that is probably doesn't change based on position. change
+based on position. change based on position. &gt;&gt; Yeah, that's a
+really good question. Um, &gt;&gt; Yeah, that's a really good question.
+Um, &gt;&gt; Yeah, that's a really good question. Um, sorry. So, the
+question was um how does sorry. So, the question was um how does sorry.
+So, the question was um how does this reconcile with like the definition
+this reconcile with like the definition this reconcile with like the
+definition of stationary if the entropy could of stationary if the
+entropy could of stationary if the entropy could change over time? Um,
+and this is a change over time? Um, and this is a change over time? Um,
+and this is a little bit harder to see with a a little bit harder to see
+with a a little bit harder to see with a a language model because we
+assume that language model because we assume that language model because
+we assume that they're sort of conditioned on they're sort of
+conditioned on they're sort of conditioned on everything that's been
+generated before everything that's been generated before everything
+that's been generated before and with a modern model, but you can and
+with a modern model, but you can and with a modern model, but you can
+think about this is with something like think about this is with
+something like think about this is with something like a sliding window
+or say a bagram a sliding window or say a bagram a sliding window or say
+a bagram language model. Um, like you have you language model. Um, like
+you have you language model. Um, like you have you care about the maybe
+the X things that care about the maybe the X things that care about the
+maybe the X things that came before. Um, and so at step came before. Um,
+and so at step came before. Um, and so at step 20, you're conditioned on
+like maybe the 20, you're conditioned on like maybe the 20, you're
+conditioned on like maybe the X things that came before. At step X
+things that came before. At step X things that came before. At step
+2,000, you're conditioned on the X 2,000, you're conditioned on the X
+2,000, you're conditioned on the X things that came before. Um, but if
+you things that came before. Um, but if you things that came before. Um,
+but if you but it doesn't matter to the model but it doesn't matter to
+the model but it doesn't matter to the model whether like past the sort
+of window of whether like past the sort of window of whether like past
+the sort of window of things we care about, like maybe past things we
+care about, like maybe past things we care about, like maybe past the
+the 20 things if we're a 20 gram the the 20 things if we're a 20 gram
+the the 20 things if we're a 20 gram model, it doesn't matter how many
+things model, it doesn't matter how many things model, it doesn't matter
+how many things happened before that point. So you could happened before
+that point. So you could happened before that point. So you could think
+about this as like if you think about this as like if you think about
+this as like if you truncated the context for a sliding truncated the
+context for a sliding truncated the context for a sliding window or
+something. window or something. window or something. &gt;&gt; It makes
+sense under that definition. &gt;&gt; It makes sense under that
+definition. &gt;&gt; It makes sense under that definition. But like I'm
+struggling to see like But like I'm struggling to see like But like I'm
+struggling to see like under the like if you take a model under the like
+if you take a model under the like if you take a model language model
+how we can have both language model how we can have both language model
+how we can have both station and station and station and I I can't see
+how both of them can I I can't see how both of them can I I can't see
+how both of them can coexist. coexist. coexist. &gt;&gt; Um how both
+stationary station being &gt;&gt; Um how both stationary station being
+&gt;&gt; Um how both stationary station being stationary and being
+erotic can coexist. stationary and being erotic can coexist. stationary
+and being erotic can coexist. &gt;&gt; Yes. something like in a
+practical sense &gt;&gt; Yes. something like in a practical sense
+&gt;&gt; Yes. something like in a practical sense unless you're assuming
+unless you're assuming unless you're assuming certain sequences become
+functionally certain sequences become functionally certain sequences
+become functionally impossible once you reach a certain impossible once
+you reach a certain impossible once you reach a certain &gt;&gt; um hold
+on to the stop for like 20 &gt;&gt; um hold on to the stop for like 20
+&gt;&gt; um hold on to the stop for like 20 seconds. This is a really
+good point. Um seconds. This is a really good point. Um seconds. This is
+a really good point. Um so so so when if we're so if we assume we meet
+when if we're so if we assume we meet when if we're so if we assume we
+meet these criteria and we'll come back to these criteria and we'll come
+back to these criteria and we'll come back to them in just a second. Um
+we can say we them in just a second. Um we can say we them in just a
+second. Um we can say we can define something called the typical can
+define something called the typical can define something called the
+typical set for a length and some cutoff set for a length and some
+cutoff set for a length and some cutoff epsilon. Um and the typical set
+for some epsilon. Um and the typical set for some epsilon. Um and the
+typical set for some length of sequence is all sequences that length of
+sequence is all sequences that length of sequence is all sequences that
+are exactly that length and that have an are exactly that length and
+that have an are exactly that length and that have an average per symbol
+or per emission average per symbol or per emission average per symbol or
+per emission negative log probability close to the negative log
+probability close to the negative log probability close to the entropy
+rate of the process. Um what entropy rate of the process. Um what
+entropy rate of the process. Um what that means if you kind of stare at
+this that means if you kind of stare at this that means if you kind of
+stare at this a little is we're going to calculate the a little is we're
+going to calculate the a little is we're going to calculate the log
+probability. we're going to average log probability. we're going to
+average log probability. we're going to average it over all um symbols
+and we want that it over all um symbols and we want that it over all um
+symbols and we want that average to be close to the entropy of average
+to be close to the entropy of average to be close to the entropy of the
+distribution or to the entropy rate the distribution or to the entropy
+rate the distribution or to the entropy rate of the process. of the
+process. of the process. Um and here close just means less than Um and
+here close just means less than Um and here close just means less than
+epsilon. epsilon. epsilon. So this definition of typicality um is So
+this definition of typicality um is So this definition of typicality um
+is well maybe like a little weird to wrap well maybe like a little weird
+to wrap well maybe like a little weird to wrap your head around captures
+this notion your head around captures this notion your head around
+captures this notion that we had from the coin flip that some that we
+had from the coin flip that some that we had from the coin flip that
+some things that are very probable are maybe things that are very
+probable are maybe things that are very probable are maybe not typical.
+So if you think about the not typical. So if you think about the not
+typical. So if you think about the uh 100 heads in a row, 100 heads in a
+uh 100 heads in a row, 100 heads in a uh 100 heads in a row, 100 heads
+in a row is um like a very sort of row is um like a very sort of row is
+um like a very sort of uh the negative the log prop of that is uh the
+negative the log prop of that is uh the negative the log prop of that is
+actually like fairly high, right? This actually like fairly high, right?
+This actually like fairly high, right? This is fairly probable. Um but
+in the uh is fairly probable. Um but in the uh is fairly probable. Um
+but in the uh it's sort of not close to the entropy of it's sort of not
+close to the entropy of it's sort of not close to the entropy of the
+distribution where the entropy in the distribution where the entropy in
+the distribution where the entropy in the distribution would suggest
+that we the distribution would suggest that we the distribution would
+suggest that we get something that is a little more like get something
+that is a little more like get something that is a little more like 60%
+40%. 60% 40%. 60% 40%. Um, this is a really nice definition of Um, this
+is a really nice definition of Um, this is a really nice definition of
+typicality. Yeah. &gt;&gt; Oh, sorry. My head is in the way. &gt;&gt;
+Yeah, of course. Um, this is a really &gt;&gt; Yeah, of course. Um, this
+is a really &gt;&gt; Yeah, of course. Um, this is a really nice
+definition. Um, it's got like a nice definition. Um, it's got like a
+nice definition. Um, it's got like a really clear uh formalism. It's got
+um really clear uh formalism. It's got um really clear uh formalism.
+It's got um some guarantees as we as the length of some guarantees as we
+as the length of some guarantees as we as the length of our sequence
+goes to infinity. Um, can our sequence goes to infinity. Um, can our
+sequence goes to infinity. Um, can we apply it to language models? Um,
+and we apply it to language models? Um, and we apply it to language
+models? Um, and so to apply to language models, we need so to apply to
+language models, we need so to apply to language models, we need to meet
+a couple of criteria. I think we to meet a couple of criteria. I think
+we to meet a couple of criteria. I think we can agree that a language
+model you can can agree that a language model you can can agree that a
+language model you can treat as a stochcastic process. Um, treat as a
+stochcastic process. Um, treat as a stochcastic process. Um, we're
+sampling at every step from a we're sampling at every step from a we're
+sampling at every step from a distribution. So that seems pretty
+distribution. So that seems pretty distribution. So that seems pretty
+reasonable. Um, is a language model reasonable. Um, is a language model
+reasonable. Um, is a language model discrete? Um, right. We have an
+output discrete? Um, right. We have an output discrete? Um, right. We
+have an output space that's finite, um, which is our space that's
+finite, um, which is our space that's finite, um, which is our
+vocabulary space. So that seems good. Is vocabulary space. So that seems
+good. Is vocabulary space. So that seems good. Is a language model
+stationary? Um we we a language model stationary? Um we we a language
+model stationary? Um we we kind of just talked about this. Um maybe kind
+of just talked about this. Um maybe kind of just talked about this. Um
+maybe it's a little bit complicated if you're it's a little bit
+complicated if you're it's a little bit complicated if you're assuming
+you can condition on infinite assuming you can condition on infinite
+assuming you can condition on infinite context. Um but if you think
+about a context. Um but if you think about a context. Um but if you
+think about a wind a model that has sort of a finite wind a model that
+has sort of a finite wind a model that has sort of a finite context
+window um at some point you're context window um at some point you're
+context window um at some point you're going to get hit something where
+there's going to get hit something where there's going to get hit
+something where there's some past context that is outside of some past
+context that is outside of some past context that is outside of your
+finite window and it doesn't matter your finite window and it doesn't
+matter your finite window and it doesn't matter to your model whether
+that past context to your model whether that past context to your model
+whether that past context um exists or not. It's only caring about um
+exists or not. It's only caring about um exists or not. It's only caring
+about the things within sort of its finite the things within sort of its
+finite the things within sort of its finite space. Um so we'll say sure
+maybe it's space. Um so we'll say sure maybe it's space. Um so we'll say
+sure maybe it's stationary. you know the pos the stationary. you know
+the pos the stationary. you know the pos the probabilities don't really
+matter based probabilities don't really matter based probabilities don't
+really matter based on position they just matter based on on position
+they just matter based on on position they just matter based on what
+you've conditioned on. Um is the what you've conditioned on. Um is the
+what you've conditioned on. Um is the language model erotic? Um so we
+said language model erotic? Um so we said language model erotic? Um so
+we said that the requirement for this was that that the requirement for
+this was that that the requirement for this was that you have to be able
+to get to any you have to be able to get to any you have to be able to
+get to any emission from any state. Um and you seem emission from any
+state. Um and you seem emission from any state. Um and you seem to think
+that this is maybe not to think that this is maybe not to think that
+this is maybe not possible. possible. possible. &gt;&gt; I mean it's
+technically true because &gt;&gt; I mean it's technically true because
+&gt;&gt; I mean it's technically true because everything has a nonzero
+probability everything has a nonzero probability everything has a
+nonzero probability mass attached to it. mass attached to it. mass
+attached to it. &gt;&gt; Right? So anything has a non-zero &gt;&gt;
+Right? So anything has a non-zero &gt;&gt; Right? So anything has a non-
+zero probability mass attached to it. So that probability mass attached
+to it. So that probability mass attached to it. So that seems
+reasonable, right? Maybe you could seems reasonable, right? Maybe you
+could seems reasonable, right? Maybe you could babble forever. Does
+anyone see a babble forever. Does anyone see a babble forever. Does
+anyone see a problem with this though? It could be like it's a really
+low It could be like it's a really low It could be like it's a really
+low probability, but if if we've got probability, but if if we've got
+probability, but if if we've got infinite amount of time, eventually
+infinite amount of time, eventually infinite amount of time, eventually
+we'll wrap back around, right? What we'll wrap back around, right? What
+we'll wrap back around, right? What happens if we generate an end of
+happens if we generate an end of happens if we generate an end of
+sequence token? So, at least the way that we generally So, at least the
+way that we generally So, at least the way that we generally decode from
+models, if you generate an decode from models, if you generate an decode
+from models, if you generate an end of sequence token, you stop, right?
+end of sequence token, you stop, right? end of sequence token, you stop,
+right? Um and so in the language of a Um and so in the language of a Um
+and so in the language of a stochastic process, we would say that
+stochastic process, we would say that stochastic process, we would say
+that this is an absorbing state. Um this is an absorbing state. Um this
+is an absorbing state. Um probability mass falls into end of probability
+mass falls into end of probability mass falls into end of sequence and
+it can't get back out. Um sequence and it can't get back out. Um
+sequence and it can't get back out. Um so if we have an absorbing state,
+if we so if we have an absorbing state, if we so if we have an absorbing
+state, if we have a place that the distribution kind have a place that
+the distribution kind have a place that the distribution kind of stops
+and you can't get anywhere else of stops and you can't get anywhere else
+of stops and you can't get anywhere else from there, then you can't get
+to from there, then you can't get to from there, then you can't get to
+anywhere from anywhere. Um you have you anywhere from anywhere. Um you
+have you anywhere from anywhere. Um you have you hit the end of sequence
+open and you hit the end of sequence open and you hit the end of
+sequence open and you need to stop. Um so this seems like need to stop.
+Um so this seems like need to stop. Um so this seems like maybe we just
+went through kind of a lot maybe we just went through kind of a lot
+maybe we just went through kind of a lot of math for nothing if we can't
+use this of math for nothing if we can't use this of math for nothing if
+we can't use this definition. Um and so the the really definition. Um
+and so the the really definition. Um and so the the really nice um
+intuition or method from this nice um intuition or method from this nice
+um intuition or method from this paper called locally typical sampling
+is paper called locally typical sampling is paper called locally typical
+sampling is that maybe if we have this sort of like that maybe if we
+have this sort of like that maybe if we have this sort of like global
+typicality as as this like north global typicality as as this like north
+global typicality as as this like north star that we would like to reach
+um but star that we would like to reach um but star that we would like
+to reach um but if we can't define this in a principled if we can't
+define this in a principled if we can't define this in a principled way
+maybe we can make like a less way maybe we can make like a less way
+maybe we can make like a less principled local approximation and try
+principled local approximation and try principled local approximation
+and try to get there over time. Um, and so the to get there over time.
+Um, and so the to get there over time. Um, and so the idea here is that
+rather than saying idea here is that rather than saying idea here is
+that rather than saying that everything um over the full that everything
+um over the full that everything um over the full sequence needs to be
+close to the sequence needs to be close to the sequence needs to be
+close to the entropy rate, we're just going to say entropy rate, we're
+just going to say entropy rate, we're just going to say that each new
+token should be close to that each new token should be close to that
+each new token should be close to some kind of expected amount of some
+kind of expected amount of some kind of expected amount of information
+that we thought we'd get out information that we thought we'd get out
+information that we thought we'd get out of that token. Um, what's the
+how do we of that token. Um, what's the how do we of that token. Um,
+what's the how do we tell the expected amount of information tell the
+expected amount of information tell the expected amount of information
+we wanted to get out of a token? Um, we we wanted to get out of a token?
+Um, we we wanted to get out of a token? Um, we look at the entropy of
+the distribution. look at the entropy of the distribution. look at the
+entropy of the distribution. So at every individual time step, we'll So
+at every individual time step, we'll So at every individual time step,
+we'll look at the per token entropy. Um, and look at the per token
+entropy. Um, and look at the per token entropy. Um, and we'll use that
+to determine what we we'll use that to determine what we we'll use that
+to determine what we sample. Um the other advantage of sample. Um the
+other advantage of sample. Um the other advantage of looking at this
+locally is we sample looking at this locally is we sample looking at
+this locally is we sample from our models one token at a time. Um from
+our models one token at a time. Um from our models one token at a time.
+Um so a global constraint would have been a so a global constraint would
+have been a so a global constraint would have been a little bit hard to
+satisfy. Anyway, little bit hard to satisfy. Anyway, little bit hard to
+satisfy. Anyway, how do we achieve local typicality? We how do we
+achieve local typicality? We how do we achieve local typicality? We
+follow this um algorithm that looks follow this um algorithm that looks
+follow this um algorithm that looks something like this. So you start by
+something like this. So you start by something like this. So you start
+by calculating the conditional entropy um h calculating the conditional
+entropy um h calculating the conditional entropy um h which is the
+entropy of the logit which is the entropy of the logit which is the
+entropy of the logit distribution at whatever time step we're
+distribution at whatever time step we're distribution at whatever time
+step we're at. at. at. Once you have H, you resort the logits Once you
+have H, you resort the logits Once you have H, you resort the logits
+distribution by closeness to H. Um, and distribution by closeness to H.
+Um, and distribution by closeness to H. Um, and when we're working with
+outputs when we're working with outputs when we're working with outputs
+generated from a language model, we're generated from a language model,
+we're generated from a language model, we're usually looking at a log
+probabilities. usually looking at a log probabilities. usually looking
+at a log probabilities. So this is sort of implicitly we sort So this is
+sort of implicitly we sort So this is sort of implicitly we sort the log
+props by closeness to H. Um, the log props by closeness to H. Um, the
+log props by closeness to H. Um, then we use top P to truncate this new
+then we use top P to truncate this new then we use top P to truncate
+this new ordering of the distribution. So um ordering of the
+distribution. So um ordering of the distribution. So um before top P we
+started with our most before top P we started with our most before top P
+we started with our most probable token and we added probability
+probable token and we added probability probable token and we added
+probability on here we're starting with our token on here we're starting
+with our token on here we're starting with our token that has a log prob
+closest to H and that has a log prob closest to H and that has a log
+prob closest to H and adding probability on until we hit some adding
+probability on until we hit some adding probability on until we hit some
+value. Yeah value. Yeah value. Yeah &gt;&gt; we're calculating H and how
+close is to &gt;&gt; we're calculating H and how close is to &gt;&gt;
+we're calculating H and how close is to H like H like H like I the
+symbols. I the symbols. I the symbols. &gt;&gt; Yeah. So H is our
+entropy. So we're &gt;&gt; Yeah. So H is our entropy. So we're &gt;&gt;
+Yeah. So H is our entropy. So we're calculating how close the log
+calculating how close the log calculating how close the log
+probabilities are to the entropy. um and probabilities are to the
+entropy. um and probabilities are to the entropy. um and on a per token
+basis. And the reason on a per token basis. And the reason on a per
+token basis. And the reason that we want to do this is because we're
+that we want to do this is because we're that we want to do this is
+because we're trying to get something implicitly that trying to get
+something implicitly that trying to get something implicitly that is
+close to this, which is um the log is close to this, which is um the log
+is close to this, which is um the log probabilities probabilities
+probabilities on average are to the entropy rate of on average are to
+the entropy rate of on average are to the entropy rate of the process.
+the process. the process. &gt;&gt; So this is sort of like entropy rate
+is &gt;&gt; So this is sort of like entropy rate is &gt;&gt; So this is
+sort of like entropy rate is over time. This is log props over time.
+over time. This is log props over time. over time. This is log props
+over time. We're setting both of those aside and We're setting both of
+those aside and We're setting both of those aside and we're just trying
+to look at an we're just trying to look at an we're just trying to look
+at an individual time step. And the idea is individual time step. And
+the idea is individual time step. And the idea is like if we're close to
+the entropy of like if we're close to the entropy of like if we're close
+to the entropy of that individual time step um then you that individual
+time step um then you that individual time step um then you know as we
+average this over time steps know as we average this over time steps
+know as we average this over time steps we should get close to the
+entropy rate. we should get close to the entropy rate. we should get
+close to the entropy rate. &gt;&gt; So if I understand that correctly we
+&gt;&gt; So if I understand that correctly we &gt;&gt; So if I
+understand that correctly we calcate the average entropy over the
+calcate the average entropy over the calcate the average entropy over
+the distribution at a particular time step. distribution at a particular
+time step. distribution at a particular time step. Let me calculate the
+individual Let me calculate the individual Let me calculate the
+individual condition entropies of each logic sort condition entropies of
+each logic sort condition entropies of each logic sort them in terms of
+how close they are to them in terms of how close they are to them in
+terms of how close they are to this average entropy and this average
+entropy and this average entropy and &gt;&gt; um close but I think not
+quite. So at an &gt;&gt; um close but I think not quite. So at an
+&gt;&gt; um close but I think not quite. So at an individual time step
+we can only get one individual time step we can only get one individual
+time step we can only get one entropy value and because entropy is a
+entropy value and because entropy is a entropy value and because entropy
+is a distribution of level property. Um and distribution of level
+property. Um and distribution of level property. Um and so we get that
+entropy by summing over so we get that entropy by summing over so we get
+that entropy by summing over all individual tokens in the vocabulary all
+individual tokens in the vocabulary all individual tokens in the
+vocabulary space the probability of that token space the probability of
+that token space the probability of that token times the log probability
+of that token. times the log probability of that token. times the log
+probability of that token. So this is what we're getting from the So
+this is what we're getting from the So this is what we're getting from
+the logits. Um once we have that single logits. Um once we have that
+single logits. Um once we have that single value we'll resort the um log
+value we'll resort the um log value we'll resort the um log
+probabilities by how close they are to probabilities by how close they
+are to probabilities by how close they are to that entropy. Um yeah,
+sorry it's a that entropy. Um yeah, sorry it's a that entropy. Um yeah,
+sorry it's a little confusing because we have this little confusing
+because we have this little confusing because we have this notion of
+entropy at every individual notion of entropy at every individual notion
+of entropy at every individual step and then we also have the notion of
+step and then we also have the notion of step and then we also have the
+notion of entropy rate which is like a single entropy rate which is like
+a single entropy rate which is like a single value over the whole
+process. Um but value over the whole process. Um but value over the
+whole process. Um but because we don't satisfy these because we don't
+satisfy these because we don't satisfy these properties um that you need
+to define properties um that you need to define properties um that you
+need to define typicality, we actually won't worry typicality, we
+actually won't worry typicality, we actually won't worry about entropy
+rate at all. We'll just about entropy rate at all. We'll just about
+entropy rate at all. We'll just worry about individual local entropies.
+worry about individual local entropies. worry about individual local
+entropies. Um once we have this new distribution Um once we have this
+new distribution Um once we have this new distribution truncated by
+order uh closeness to h um truncated by order uh closeness to h um
+truncated by order uh closeness to h um we'll sample from that new
+distribution. we'll sample from that new distribution. we'll sample from
+that new distribution. Um and the kind of strange thing about Um and the
+kind of strange thing about Um and the kind of strange thing about this
+is that we might wind up actually this is that we might wind up actually
+this is that we might wind up actually cutting off uh we're no longer
+sort of cutting off uh we're no longer sort of cutting off uh we're no
+longer sort of cutting off the long tail. We could cutting off the long
+tail. We could cutting off the long tail. We could actually be cutting
+off things that are actually be cutting off things that are actually be
+cutting off things that are relatively high probability. Um so if we
+relatively high probability. Um so if we relatively high probability. Um
+so if we you can think about this in terms of if you can think about
+this in terms of if you can think about this in terms of if the
+conditional entropy is high or low. the conditional entropy is high or
+low. the conditional entropy is high or low. So if we say have a if we
+like want to So if we say have a if we like want to So if we say have a
+if we like want to make sure the highest probability token make sure the
+highest probability token make sure the highest probability token is in
+the locally typical set is that is in the locally typical set is that is
+in the locally typical set is that more likely to happen if we have like
+more likely to happen if we have like more likely to happen if we have
+like really high or really low entropy? So really high or really low
+entropy? So really high or really low entropy? So anyone have an
+intuition for this? So if we have really high entropy So if we have
+really high entropy So if we have really high entropy um is our
+distribution peaky or flat? If we have high entropy, then our If we have
+high entropy, then our If we have high entropy, then our distribution is
+flat. Yeah. distribution is flat. Yeah. distribution is flat. Yeah.
+&gt;&gt; Um, if our distribution is relatively &gt;&gt; Um, if our
+distribution is relatively &gt;&gt; Um, if our distribution is
+relatively flat, um, would and maybe, you know, flat, um, would and
+maybe, you know, flat, um, would and maybe, you know, just kind of like
+at a slight angle just kind of like at a slight angle just kind of like
+at a slight angle here, would we be more likely to sample here, would we
+be more likely to sample here, would we be more likely to sample from
+sort of like the the center of this from sort of like the the center of
+this from sort of like the the center of this distribution or from like
+one of the distribution or from like one of the distribution or from
+like one of the edges like the the peak or the tail? Uh if sorry if
+we're doing locally Uh if sorry if we're doing locally Uh if sorry if
+we're doing locally typical sampling would be more likely to typical
+sampling would be more likely to typical sampling would be more likely
+to sample from the center of the edges. sample from the center of the
+edges. sample from the center of the edges. I hear whisperings of center
+sort of I hear whisperings of center sort of I hear whisperings of
+center sort of vaguely hissing in the back. Um and that vaguely hissing
+in the back. Um and that vaguely hissing in the back. Um and that is
+correct. So if we if our distribution is correct. So if we if our
+distribution is correct. So if we if our distribution has high entropy
+and it's relatively has high entropy and it's relatively has high
+entropy and it's relatively uniform, we'd want to sample something
+uniform, we'd want to sample something uniform, we'd want to sample
+something that's sort of in the middle of it um that's sort of in the
+middle of it um that's sort of in the middle of it um for a locally
+typical sampling. If our for a locally typical sampling. If our for a
+locally typical sampling. If our distribution has low entropy um and
+it's distribution has low entropy um and it's distribution has low
+entropy um and it's really peaky, then we want to sample really peaky,
+then we want to sample really peaky, then we want to sample something
+that's kind of close to the something that's kind of close to the
+something that's kind of close to the edge because then the log
+probabilities edge because then the log probabilities edge because then
+the log probabilities of the high the log probabilities of the of the
+high the log probabilities of the of the high the log probabilities of
+the most probable token will be quite low most probable token will be
+quite low most probable token will be quite low because it's a
+relatively high because it's a relatively high because it's a relatively
+high probability token. probability token. probability token. &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Once again, &gt;&gt; Once
+again, &gt;&gt; Once again, &gt;&gt; yes, let me draw this out. &gt;&gt;
+yes, let me draw this out. &gt;&gt; yes, let me draw this out. &gt;&gt;
+Um So we have two distributions So we have two distributions So we have
+two distributions um over the next token. This um over the next token.
+This um over the next token. This distribution is peaky. Uh is the
+entropy high or low? Uh is the entropy high or low? Uh is the entropy
+high or low? [Music] [Music] [Music] Uh and this distribution is latter
+and h is I and h is I and h is I um let's say let's say these are the um
+let's say let's say these are the um let's say let's say these are the
+same tokens in the same order. Um Uh is the probability of a relatively
+Uh is the probability of a relatively Uh is the probability of a
+relatively high higher or lower in the top? high higher or lower in the
+top? high higher or lower in the top? Probability is Probability is
+Probability is &gt;&gt; is the is the log probability is the log
+probability is the log probability of a relatively higher or lower in
+the of a relatively higher or lower in the of a relatively higher or
+lower in the topic? topic? topic? &gt;&gt; It's remember a lot of
+probabilities &gt;&gt; It's remember a lot of probabilities &gt;&gt;
+It's remember a lot of probabilities we're taking a log of something
+that's we're taking a log of something that's we're taking a log of
+something that's less than one. So we're going to be less than one. So
+we're going to be less than one. So we're going to be negative. Um so is
+it relatively closer negative. Um so is it relatively closer negative.
+Um so is it relatively closer or further from zero? I guess &gt;&gt;
+closer. Yeah. So it's closer to zero. &gt;&gt; closer. Yeah. So it's
+closer to zero. &gt;&gt; closer. Yeah. So it's closer to zero. Um, which
+is actually gonna be &gt;&gt; there. So here it's going to be closer to
+zero. So here it's going to be closer to zero. So here it's going to be
+closer to zero. So the log probability here is going to So the log
+probability here is going to So the log probability here is going to be
+higher or lower than be higher or lower than be higher or lower than Um
+Um Um higher higher higher &gt;&gt; higher because it's closer to zero.
+So if the um entropy of this So if the um entropy of this So if the um
+entropy of this distribution is relatively low um it's distribution is
+relatively low um it's distribution is relatively low um it's going to
+bias us towards sampling things going to bias us towards sampling things
+going to bias us towards sampling things in locally typical sampling
+that have in locally typical sampling that have in locally typical
+sampling that have relatively low entropy which means it's relatively
+low entropy which means it's relatively low entropy which means it's
+going to bias us towards sampling things going to bias us towards
+sampling things going to bias us towards sampling things that are
+relatively close to the top of that are relatively close to the top of
+that are relatively close to the top of the distribution. the
+distribution. the distribution. Um, if the entropy here is relatively
+Um, if the entropy here is relatively Um, if the entropy here is
+relatively high, it's going to bias us towards um, high, it's going to
+bias us towards um, high, it's going to bias us towards um, sorry, it's
+going to bias us towards sorry, it's going to bias us towards sorry,
+it's going to bias us towards sampling things that have relatively
+sampling things that have relatively sampling things that have
+relatively high probability. Um, which could be high probability. Um,
+which could be high probability. Um, which could be sort of here because
+we're not at the sort of here because we're not at the sort of here
+because we're not at the peak of the distribution, but it's also peak of
+the distribution, but it's also peak of the distribution, but it's also
+going to be include a bunch of things going to be include a bunch of
+things going to be include a bunch of things kind of in the middle of
+the kind of in the middle of the kind of in the middle of the
+distribution like why is it? &gt;&gt; Why is it moving towards the
+middle? &gt;&gt; Why is it moving towards the middle? &gt;&gt; Why is it
+moving towards the middle? &gt;&gt; Yeah. Yeah. So it's gonna we're
+going to &gt;&gt; Yeah. Yeah. So it's gonna we're going to &gt;&gt;
+Yeah. Yeah. So it's gonna we're going to be looking at like a um be
+looking at like a um be looking at like a um the you can think of the
+entropy as the you can think of the entropy as the you can think of the
+entropy as defining kind of like a mark on this defining kind of like a
+mark on this defining kind of like a mark on this curve. And so here if
+the entropy is curve. And so here if the entropy is curve. And so here
+if the entropy is quite high that mark on the curve is quite high that
+mark on the curve is quite high that mark on the curve is going to be
+relatively high up. And so going to be relatively high up. And so going
+to be relatively high up. And so it's going to be likely to be something
+it's going to be likely to be something it's going to be likely to be
+something close to the peak. Here if the entropy close to the peak. Here
+if the entropy close to the peak. Here if the entropy is relatively low
+um that mark on the is relatively low um that mark on the is relatively
+low um that mark on the curve is likely going to actually curve is
+likely going to actually curve is likely going to actually intersect the
+curve somewhere in like intersect the curve somewhere in like intersect
+the curve somewhere in like kind of the middle. &gt;&gt; Yeah. Thank you
+for asking. I think it &gt;&gt; Yeah. Thank you for asking. I think it
+&gt;&gt; Yeah. Thank you for asking. I think it it's helpful to draw
+this out it's helpful to draw this out it's helpful to draw this out um
+covered in Jaka. um covered in Jaka. um covered in Jaka. So the reason I
+keep asking about this So the reason I keep asking about this So the
+reason I keep asking about this is because I think that um like entropy
+is because I think that um like entropy is because I think that um like
+entropy when entropy is high and when entropy is when entropy is high
+and when entropy is when entropy is high and when entropy is low is
+really counterintuitive in my low is really counterintuitive in my low
+is really counterintuitive in my brain because it doesn't line up with
+brain because it doesn't line up with brain because it doesn't line up
+with like when probability is high and low. like when probability is
+high and low. like when probability is high and low. Um and so I think
+it's helpful to like Um and so I think it's helpful to like Um and so I
+think it's helpful to like continue reminding yourself of this continue
+reminding yourself of this continue reminding yourself of this
+intuition. intuition. intuition. So So So this is the notion of how we
+achieve this is the notion of how we achieve this is the notion of how
+we achieve local typicality. Um maybe we should local typicality. Um
+maybe we should local typicality. Um maybe we should take a step back
+and decide if this is take a step back and decide if this is take a step
+back and decide if this is actually something we wanted in the actually
+something we wanted in the actually something we wanted in the first
+place. Um and the argument that first place. Um and the argument that
+first place. Um and the argument that they make for why this is
+something that they make for why this is something that they make for
+why this is something that we want to optimize for um is sort of we want
+to optimize for um is sort of we want to optimize for um is sort of like
+a a cognitive science flavored like a a cognitive science flavored like
+a a cognitive science flavored information theory argument. Um and the
+information theory argument. Um and the information theory argument. Um
+and the argument here is that this is somewhat argument here is that
+this is somewhat argument here is that this is somewhat close to what
+human language is doing. close to what human language is doing. close to
+what human language is doing. So the um to do this they take a bunch So
+the um to do this they take a bunch So the um to do this they take a
+bunch of human language and they calculate um of human language and they
+calculate um of human language and they calculate um these two
+characteristics. Yeah. is closer to lost &gt;&gt; this question. If the
+log probability of &gt;&gt; this question. If the log probability of
+&gt;&gt; this question. If the log probability of a is higher or if the
+probability of a a is higher or if the probability of a a is higher or
+if the probability of a is higher isn't the log closer to zero. is
+higher isn't the log closer to zero. is higher isn't the log closer to
+zero. No log probability because if a is No log probability because if a
+is No log probability because if a is higher then like one by p is
+higher then like one by p is higher then like one by p is &gt;&gt; the
+probability is one. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah.
+&gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; So I had this
+backwards. &gt;&gt; So I had this backwards. &gt;&gt; So I had this
+backwards. &gt;&gt; Let's go back. Okay. So let's go back to what we
+just Okay. So let's go back to what we just Okay. So let's go back to
+what we just said. So said. So said. So here if the entropy is
+relatively low here if the entropy is relatively low here if the entropy
+is relatively low probability to zero probability to zero probability to
+zero um are we going to get into the um are we going to get into the um
+are we going to get into the population? &gt;&gt; I think in this case
+&gt;&gt; I think only the last line was was &gt;&gt; I think only the
+last line was was &gt;&gt; I think only the last line was was &gt;&gt;
+wrong. I think everything else was &gt;&gt; wrong. I think everything
+else was &gt;&gt; wrong. I think everything else was right. right.
+right. Yeah, just kind of just explain the last Yeah, just kind of just
+explain the last Yeah, just kind of just explain the last part with this
+logic. part with this logic. part with this logic. &gt;&gt; Yeah.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt;
+Yeah. &gt;&gt; Because then this H line is going to be &gt;&gt; Because
+then this H line is going to be &gt;&gt; Because then this H line is
+going to be a little bit further down a little bit further down a little
+bit further down &gt;&gt; which means that you are going to sample
+&gt;&gt; which means that you are going to sample &gt;&gt; which means
+that you are going to sample from um possibly not the top of the from um
+possibly not the top of the from um possibly not the top of the
+distribution. &gt;&gt; Is that true? &gt;&gt; If the probability is
+always one, you're &gt;&gt; If the probability is always one, you're
+&gt;&gt; If the probability is always one, you're always going to sample
+from that one. always going to sample from that one. always going to
+sample from that one. Yeah, Yeah, Yeah, &gt;&gt; because that's typical.
+&gt;&gt; because that's typical. &gt;&gt; because that's typical.
+&gt;&gt; So if the probability is close to one, &gt;&gt; So if the
+probability is close to one, &gt;&gt; So if the probability is close to
+one, you're still I think likely to get the you're still I think likely
+to get the you're still I think likely to get the top of the
+distribution. top of the distribution. top of the distribution. &gt;&gt;
+Um but there is more of a chance of &gt;&gt; Um but there is more of a
+chance of &gt;&gt; Um but there is more of a chance of cutting off
+cutting off cutting off &gt;&gt; doesn't reduce to exactly top &gt;&gt;
+doesn't reduce to exactly top &gt;&gt; doesn't reduce to exactly top
+distribution. distribution. distribution. &gt;&gt; Does this reduce to
+exactly top? Yeah, &gt;&gt; Does this reduce to exactly top? Yeah,
+&gt;&gt; Does this reduce to exactly top? Yeah, because um I mean
+because um I mean because um I mean &gt;&gt; um you &gt;&gt; um you
+&gt;&gt; um you the logic function is like a mon you the logic function
+is like a mon you the logic function is like a mon you take the log of
+it doesn't change take the log of it doesn't change take the log of it
+doesn't change anything for the relative ordering the anything for the
+relative ordering the anything for the relative ordering the logic logic
+logic right and using top key to trulate it right and using top key to
+trulate it right and using top key to trulate it you do the same thing
+anyways like the you do the same thing anyways like the you do the same
+thing anyways like the full log full log full log it's the same delution
+it's the same delution it's the same delution &gt;&gt; yeah so the key
+um the reason this isn't &gt;&gt; yeah so the key um the reason this
+isn't &gt;&gt; yeah so the key um the reason this isn't just top key is
+because of this step two just top key is because of this step two just
+top key is because of this step two sorry um where you're going to take
+h sorry um where you're going to take h sorry um where you're going to
+take h wherever it in the graph. Um, and you're wherever it in the
+graph. Um, and you're wherever it in the graph. Um, and you're going to
+like resort your logs by going to like resort your logs by going to like
+resort your logs by closeness to h instead of by absolute closeness to h
+instead of by absolute closeness to h instead of by absolute value.
+value. value. &gt;&gt; And h will always be less than the &gt;&gt; And h
+will always be less than the &gt;&gt; And h will always be less than the
+maximum log. maximum log. maximum log. &gt;&gt; H will always be less
+than the maximum &gt;&gt; H will always be less than the maximum
+&gt;&gt; H will always be less than the maximum log. log. log. &gt;&gt;
+I believe that's true, but I don't it &gt;&gt; I believe that's true,
+but I don't it &gt;&gt; I believe that's true, but I don't it will it
+won't make a difference to the will it won't make a difference to the
+will it won't make a difference to the algorithm because you're
+asserting by algorithm because you're asserting by algorithm because
+you're asserting by closest h, closest h, closest h, &gt;&gt; right?
+&gt;&gt; right? &gt;&gt; right? &gt;&gt; If you if it was if H was like
+at top P, &gt;&gt; If you if it was if H was like at top P, &gt;&gt; If
+you if it was if H was like at top P, then you're right to be exactly
+the same then you're right to be exactly the same then you're right to
+be exactly the same as top B. And I think that's the case as top B. And
+I think that's the case as top B. And I think that's the case scram is
+describing where your entropy scram is describing where your entropy
+scram is describing where your entropy is going. &gt;&gt; Yeah, thank
+you for touching me on that. &gt;&gt; Um, so is this actually how human
+&gt;&gt; Um, so is this actually how human &gt;&gt; Um, so is this
+actually how human language works? Um, language works? Um, language
+works? Um, the um so in this work they measure the the um so in this
+work they measure the the um so in this work they measure the entropy of
+a of a bunch of human text um entropy of a of a bunch of human text um
+entropy of a of a bunch of human text um and then score it um and then
+score it um and then score it um So they measure sort of entropy um over
+So they measure sort of entropy um over So they measure sort of entropy
+um over time and then entropy at individual time time and then entropy
+at individual time time and then entropy at individual time steps and
+they graph sort of how well steps and they graph sort of how well steps
+and they graph sort of how well this lines up. Like you can calculate
+this lines up. Like you can calculate this lines up. Like you can
+calculate given a relatively strong language model given a relatively
+strong language model given a relatively strong language model the
+entropy um of the logic distribution the entropy um of the logic
+distribution the entropy um of the logic distribution and then the log
+props of every and then the log props of every and then the log props of
+every individual token. And they calculate for individual token. And
+they calculate for individual token. And they calculate for actual human
+written text how often is actual human written text how often is actual
+human written text how often is the um human written next token sort of
+the um human written next token sort of the um human written next token
+sort of close to the entropy of the logits close to the entropy of the
+logits close to the entropy of the logits distribution at that step. Um,
+and the distribution at that step. Um, and the distribution at that
+step. Um, and the answer is answer is answer is almost always. Um, so
+there's some almost always. Um, so there's some almost always. Um, so
+there's some variance here by domain, but generally variance here by
+domain, but generally variance here by domain, but generally human
+written text has the next token human written text has the next token
+human written text has the next token relatively close to this like
+entropy of relatively close to this like entropy of relatively close to
+this like entropy of the token distribution. Um, and the the token
+distribution. Um, and the the token distribution. Um, and the argument
+that they make here is that argument that they make here is that
+argument that they make here is that this is actually like a way of um,
+this is actually like a way of um, this is actually like a way of um,
+communicating information effectively communicating information
+effectively communicating information effectively where you don't
+necessarily always want where you don't necessarily always want where
+you don't necessarily always want to say something that is like really
+um, to say something that is like really um, to say something that is
+like really um, unexpected um, because then you would unexpected um,
+because then you would unexpected um, because then you would just be
+blabbering nonsense. But you just be blabbering nonsense. But you just
+be blabbering nonsense. But you also don't want to say always like maybe
+also don't want to say always like maybe also don't want to say always
+like maybe the most obvious next thing because then the most obvious
+next thing because then the most obvious next thing because then you
+wouldn't be conveying any you wouldn't be conveying any you wouldn't be
+conveying any information to your audience at all. Uh information to
+your audience at all. Uh information to your audience at all. Uh yeah,
+yeah, yeah, &gt;&gt; it seems very intuitive for like actual &gt;&gt; it
+seems very intuitive for like actual &gt;&gt; it seems very intuitive
+for like actual language text but isn't this language text but isn't
+this language text but isn't this counterintuitive for actual outputs
+like counterintuitive for actual outputs like counterintuitive for
+actual outputs like a factual output should I would not a factual output
+should I would not a factual output should I would not set like the
+highs were already broken. set like the highs were already broken. set
+like the highs were already broken. Is that something Is that something
+Is that something theory? would yeah like would a factual theory? would
+yeah like would a factual theory? would yeah like would a factual output
+still line up with this theory? output still line up with this theory?
+output still line up with this theory? Um like would a um if there's a
+single Um like would a um if there's a single Um like would a um if
+there's a single like really high probability like really high
+probability like really high probability continuation would this be
+true? Um I continuation would this be true? Um I continuation would this
+be true? Um I think this is a really good question. I think this is a
+really good question. I think this is a really good question. I this
+might be this might be this might be &gt;&gt; guess. &gt;&gt; guess.
+&gt;&gt; guess. &gt;&gt; Yeah, this might be some of the &gt;&gt; Yeah,
+this might be some of the &gt;&gt; Yeah, this might be some of the
+distinction. I think that another part distinction. I think that another
+part distinction. I think that another part of this is that there's very
+rarely of this is that there's very rarely of this is that there's very
+rarely actually like a single valid next thing. actually like a single
+valid next thing. actually like a single valid next thing. Um maybe in
+maybe in something like math Um maybe in maybe in something like math Um
+maybe in maybe in something like math or code this might look different.
+Um or code this might look different. Um or code this might look
+different. Um but in any like sort of natural language but in any like
+sort of natural language but in any like sort of natural language
+description of a fact, there'll be a description of a fact, there'll be
+a description of a fact, there'll be a variety of ways to say it um that
+are variety of ways to say it um that are variety of ways to say it um
+that are more or less typical. Um the does anyone more or less typical.
+Um the does anyone more or less typical. Um the does anyone have a sense
+of whether have a sense of whether have a sense of whether um sort of
+like ancestral sampling from um sort of like ancestral sampling from um
+sort of like ancestral sampling from a model gives you outputs that are
+a model gives you outputs that are a model gives you outputs that are
+higher or lower perplexity than outputs higher or lower perplexity than
+outputs higher or lower perplexity than outputs from something like
+locally typ like from something like locally typ like from something
+like locally typ like locally typical sampling. If you think locally
+typical sampling. If you think locally typical sampling. If you think
+about this sort of like reshaping that about this sort of like reshaping
+that about this sort of like reshaping that we're doing here, we're
+doing here, we're doing here, do your outputs wind up being higher or do
+your outputs wind up being higher or do your outputs wind up being
+higher or lower perplexity with locally typical? &gt;&gt; You think
+higher? Yeah, I see a few &gt;&gt; You think higher? Yeah, I see a few
+&gt;&gt; You think higher? Yeah, I see a few notes. That's exactly
+right. Yeah. So, notes. That's exactly right. Yeah. So, notes. That's
+exactly right. Yeah. So, what we're doing here is we're reshaping what
+we're doing here is we're reshaping what we're doing here is we're
+reshaping to be closer to the entropy, which is to be closer to the
+entropy, which is to be closer to the entropy, which is generally um not
+going to be like the generally um not going to be like the generally um
+not going to be like the the very end of this distribution. And the very
+end of this distribution. And the very end of this distribution. And so
+you wind up with outputs that are so you wind up with outputs that are
+so you wind up with outputs that are slightly higher complexity um
+because of slightly higher complexity um because of slightly higher
+complexity um because of this notion that they're carrying this notion
+that they're carrying this notion that they're carrying slightly higher
+information content. Um slightly higher information content. Um slightly
+higher information content. Um and so this is when we're training a and
+so this is when we're training a and so this is when we're training a
+model, we want complexity to be really model, we want complexity to be
+really model, we want complexity to be really low because it shows we've
+learned the low because it shows we've learned the low because it shows
+we've learned the distribution well, but sometimes when distribution
+well, but sometimes when distribution well, but sometimes when we're
+decoding for a model, we want we're decoding for a model, we want we're
+decoding for a model, we want complexity to be slightly higher. Um
+complexity to be slightly higher. Um complexity to be slightly higher.
+Um there's a method in sort of the same there's a method in sort of the
+same there's a method in sort of the same family of entropy manipulation
+of models family of entropy manipulation of models family of entropy
+manipulation of models um that we won't talk very much about um that we
+won't talk very much about um that we won't talk very much about called
+murat decoding which is based on called murat decoding which is based on
+called murat decoding which is based on the same principle but kind of
+in the the same principle but kind of in the the same principle but kind
+of in the opposite direction that you should opposite direction that you
+should opposite direction that you should specify a perplexity you want
+your text specify a perplexity you want your text specify a perplexity
+you want your text to be and then use a continuously to be and then use
+a continuously to be and then use a continuously updating update to try
+to generate updating update to try to generate updating update to try to
+generate tokens that you think will result in tokens that you think will
+result in tokens that you think will result in that final perplexity
+being close to that final perplexity being close to that final
+perplexity being close to that value. Um and so these both come that
+value. Um and so these both come that value. Um and so these both come
+from the notion that what we want to from the notion that what we want
+to from the notion that what we want to optimize is actually some
+measure of optimize is actually some measure of optimize is actually
+some measure of information over time rather than information over time
+rather than information over time rather than perplexity itself.
+perplexity itself. perplexity itself. Um there's also to go back to our
+Um there's also to go back to our Um there's also to go back to our
+truncation sampling for a moment a truncation sampling for a moment a
+truncation sampling for a moment a truncation sampling method that uses
+truncation sampling method that uses truncation sampling method that
+uses this principle. So this is something this principle. So this is
+something this principle. So this is something called ADA sampling. Um
+and the idea is called ADA sampling. Um and the idea is called ADA
+sampling. Um and the idea is to impose both epsilon sampling and then to
+impose both epsilon sampling and then to impose both epsilon sampling
+and then some like approximation of locally some like approximation of
+locally some like approximation of locally typical sampling at the same
+time. So typical sampling at the same time. So typical sampling at the
+same time. So you'll define one threshold based on you'll define one
+threshold based on you'll define one threshold based on epsilon just
+like a as you did in epsilon just like a as you did in epsilon just like
+a as you did in epsilon sampling and then you'll also epsilon sampling
+and then you'll also epsilon sampling and then you'll also define a
+threshold that moves around define a threshold that moves around define
+a threshold that moves around with the probability. Um so this with the
+probability. Um so this with the probability. Um so this threshold is
+ADA this is um within ADA threshold is ADA this is um within ADA
+threshold is ADA this is um within ADA distance from the entropy of the
+distance from the entropy of the distance from the entropy of the
+distribution calculated at that step. Um distribution calculated at that
+step. Um distribution calculated at that step. Um and so this is in
+practice not often and so this is in practice not often and so this is
+in practice not often terribly different from uh either terribly
+different from uh either terribly different from uh either locally
+typical or epsilon sampling but locally typical or epsilon sampling but
+locally typical or epsilon sampling but it's a little bit faster to
+compute. it's a little bit faster to compute. it's a little bit faster
+to compute. Um, Um, Um, so this is a whole lot of different ways so this
+is a whole lot of different ways so this is a whole lot of different
+ways to sample from the same model. How do to sample from the same
+model. How do to sample from the same model. How do you choose? Um, and
+I really wish that I you choose? Um, and I really wish that I you
+choose? Um, and I really wish that I could just give you an answer here
+like could just give you an answer here like could just give you an
+answer here like always use this and never use this. But always use this
+and never use this. But always use this and never use this. But of
+course, um, we wouldn't be here if of course, um, we wouldn't be here if
+of course, um, we wouldn't be here if things were so easy. Um, so
+there's a things were so easy. Um, so there's a things were so easy. Um,
+so there's a number of different ways to think about number of different
+ways to think about number of different ways to think about this. Um,
+the first is I think uh, this. Um, the first is I think uh, this. Um,
+the first is I think uh, pretty intuitive to think about how pretty
+intuitive to think about how pretty intuitive to think about how open-
+ended the problem is. Um, if you open-ended the problem is. Um, if you
+open-ended the problem is. Um, if you have a problem like write a
+creative have a problem like write a creative have a problem like write
+a creative story about a frog, maybe there's a a story about a frog,
+maybe there's a a story about a frog, maybe there's a a huge range of
+correct answers to that. huge range of correct answers to that. huge
+range of correct answers to that. Um, and what you care about is maybe
+Um, and what you care about is maybe Um, and what you care about is
+maybe diversity um of your outputs more than diversity um of your
+outputs more than diversity um of your outputs more than the having like
+the single absolute best the having like the single absolute best the
+having like the single absolute best story about frog. Um, if you have
+story about frog. Um, if you have story about frog. Um, if you have
+something that's like explain the solar something that's like explain
+the solar something that's like explain the solar system to a 5-year-
+old, maybe this is um system to a 5-year-old, maybe this is um system to
+a 5-year-old, maybe this is um in the relatively same boat where in the
+relatively same boat where in the relatively same boat where there's
+some range of correct answers there's some range of correct answers
+there's some range of correct answers that is really really variable.
+Um, if that is really really variable. Um, if that is really really
+variable. Um, if your question is like, uh, what's the your question is
+like, uh, what's the your question is like, uh, what's the capital of
+Massachusetts? Maybe your capital of Massachusetts? Maybe your capital
+of Massachusetts? Maybe your options are a little bit more well options
+are a little bit more well options are a little bit more well scoped.
+Um, I think there's also a lot scoped. Um, I think there's also a lot
+scoped. Um, I think there's also a lot of value in anything in inference
+time of value in anything in inference time of value in anything in
+inference time algorithms and just trying it. These are algorithms and
+just trying it. These are algorithms and just trying it. These are super
+super simple manipulations. super super simple manipulations. super
+super simple manipulations. They're literally like eight characters
+They're literally like eight characters They're literally like eight
+characters of code um to change. And so you can of code um to change.
+And so you can of code um to change. And so you can generate a bunch
+from a small model and generate a bunch from a small model and generate
+a bunch from a small model and try. Um, the caveat here is that smaller
+try. Um, the caveat here is that smaller try. Um, the caveat here is
+that smaller and larger models behave very and larger models behave very
+and larger models behave very differently. Um, in particular, if you
+differently. Um, in particular, if you differently. Um, in particular,
+if you think about model versus search errors, think about model versus
+search errors, think about model versus search errors, um, your search
+errors will be the same um, your search errors will be the same um, your
+search errors will be the same for the same decoding method, but your
+for the same decoding method, but your for the same decoding method, but
+your model errors will change radically model errors will change
+radically model errors will change radically depending on how well fit
+your model is depending on how well fit your model is depending on how
+well fit your model is to training data that looks like the to training
+data that looks like the to training data that looks like the problem
+you're trying to solve. Um, so problem you're trying to solve. Um, so
+problem you're trying to solve. Um, so in particular, like smaller
+models will in particular, like smaller models will in particular, like
+smaller models will display a lot of pathologies of sampling display a
+lot of pathologies of sampling display a lot of pathologies of sampling
+that you might not see in a larger that you might not see in a larger
+that you might not see in a larger model. Um, so try these on the model
+model. Um, so try these on the model model. Um, so try these on the
+model that you're interested in studying. Um, that you're interested in
+studying. Um, that you're interested in studying. Um, and then look at
+the outputs. If you see and then look at the outputs. If you see and
+then look at the outputs. If you see outputs that look particularly
+outputs that look particularly outputs that look particularly repetitive
+or degenerate, if you see repetitive or degenerate, if you see
+repetitive or degenerate, if you see outputs that start going in a very
+weird outputs that start going in a very weird outputs that start going
+in a very weird direction, maybe you're sampling from direction, maybe
+you're sampling from direction, maybe you're sampling from the long
+tail. Um if you see outputs the long tail. Um if you see outputs the
+long tail. Um if you see outputs that are degenerating into sort of that
+are degenerating into sort of that are degenerating into sort of
+absolute nonsense, um you're definitely absolute nonsense, um you're
+definitely absolute nonsense, um you're definitely sampling from the
+long tail. Um, and if sampling from the long tail. Um, and if sampling
+from the long tail. Um, and if you see outputs that um, maybe if you you
+see outputs that um, maybe if you you see outputs that um, maybe if you
+sample a hundred things and you get the sample a hundred things and you
+get the sample a hundred things and you get the same thing a h 100 times
+or you get very same thing a h 100 times or you get very same thing a h
+100 times or you get very similar things, uh, maybe you want to similar
+things, uh, maybe you want to similar things, uh, maybe you want to
+prioritize diversity and then you would prioritize diversity and then
+you would prioritize diversity and then you would look at um, expanding
+the amount of the look at um, expanding the amount of the look at um,
+expanding the amount of the tail you're sampling from or something tail
+you're sampling from or something tail you're sampling from or something
+like this. like this. like this. Um, and this is kind of as I said Um,
+and this is kind of as I said Um, and this is kind of as I said before,
+um, as models have gotten better before, um, as models have gotten
+better before, um, as models have gotten better over time, it's become
+less crucial over time, it's become less crucial over time, it's become
+less crucial where you can sort of take the defaults, where you can sort
+of take the defaults, where you can sort of take the defaults, um,
+either specified by that model or um, either specified by that model or
+um, either specified by that model or specified, um, uh, by a library
+like specified, um, uh, by a library like specified, um, uh, by a
+library like HuggingFace and generally get sort of HuggingFace and
+generally get sort of HuggingFace and generally get sort of reasonable
+outputs. Um, if you're reasonable outputs. Um, if you're reasonable
+outputs. Um, if you're working with smaller models or older working with
+smaller models or older working with smaller models or older models,
+it's like more important to models, it's like more important to models,
+it's like more important to spend some time here. spend some time here.
+spend some time here. Um, and then the last caveat here is to Um, and
+then the last caveat here is to Um, and then the last caveat here is to
+be very careful what you evaluate your be very careful what you evaluate
+your be very careful what you evaluate your model with. um because
+performance can model with. um because performance can model with. um
+because performance can look very different um with different look very
+different um with different look very different um with different
+characteristics. Here I talked to um characteristics. Here I talked to
+um characteristics. Here I talked to um some friends of mine who work on
+model some friends of mine who work on model some friends of mine who
+work on model evaluation to try to find like a a nice evaluation to try
+to find like a a nice evaluation to try to find like a a nice uniform
+answer here. Um and what they uniform answer here. Um and what they
+uniform answer here. Um and what they said was essentially what my guess
+would said was essentially what my guess would said was essentially what
+my guess would have been anyway, which is that you have been anyway,
+which is that you have been anyway, which is that you should just try a
+bunch and see. Um in should just try a bunch and see. Um in should just
+try a bunch and see. Um in particular, um I have some friends that
+particular, um I have some friends that particular, um I have some
+friends that are working on training a language model are working on
+training a language model are working on training a language model who
+went and sort of swept through a who went and sort of swept through a
+who went and sort of swept through a number of parameters for their val
+number of parameters for their val number of parameters for their val
+suite. um settled on a sort of range in suite. um settled on a sort of
+range in suite. um settled on a sort of range in which the the
+performance of the model which the the performance of the model which
+the the performance of the model was relatively stable across
+checkpoints was relatively stable across checkpoints was relatively
+stable across checkpoints and then set that as the range for all and
+then set that as the range for all and then set that as the range for
+all of the evaluations. Um so it could be of the evaluations. Um so it
+could be of the evaluations. Um so it could be like there's often like a
+region of like there's often like a region of like there's often like a
+region of performance in which um these parameters performance in which
+um these parameters performance in which um these parameters are
+relative like performance is are relative like performance is are
+relative like performance is relatively stable with respect to these
+relatively stable with respect to these relatively stable with respect
+to these parameters. for them in particular I parameters. for them in
+particular I parameters. for them in particular I think it was like
+temperature under think it was like temperature under think it was like
+temperature under seven top P or temperature under 7 um seven top P or
+temperature under 7 um seven top P or temperature under 7 um top P under
+like above 7 or something. top P under like above 7 or something. top P
+under like above 7 or something. Um but if you find a range where your
+Um but if you find a range where your Um but if you find a range where
+your model behaves relatively predictably model behaves relatively
+predictably model behaves relatively predictably um you pick one
+strategy you standardize um you pick one strategy you standardize um you
+pick one strategy you standardize it across all of your evaluations um
+it across all of your evaluations um it across all of your evaluations
+um because if you overfit to the best because if you overfit to the best
+because if you overfit to the best decoding strategy for each evaluation
+um decoding strategy for each evaluation um decoding strategy for each
+evaluation um the users who then pick up your model the users who then
+pick up your model the users who then pick up your model are unlikely to
+do you the same favor. are unlikely to do you the same favor. are
+unlikely to do you the same favor. Um, Um, Um, so this is sort of a
+caveat for both if so this is sort of a caveat for both if so this is
+sort of a caveat for both if you're picking up somebody else's model,
+you're picking up somebody else's model, you're picking up somebody
+else's model, but especially if you're evaluating your but especially if
+you're evaluating your but especially if you're evaluating your own to
+kind of think a little bit about own to kind of think a little bit about
+own to kind of think a little bit about how you do this setup. Um,
+because those how you do this setup. Um, because those how you do this
+setup. Um, because those numbers in those generation configs did numbers
+in those generation configs did numbers in those generation configs did
+not come from GX. not come from GX. not come from GX. So um sort of the
+overarching message So um sort of the overarching message So um sort of
+the overarching message here um we can think about decisions um here um
+we can think about decisions um here um we can think about decisions um
+on each step of decoding as ways of on each step of decoding as ways of
+on each step of decoding as ways of manipulating or reshaping or
+resampling manipulating or reshaping or resampling manipulating or
+reshaping or resampling from a probability distribution over the from a
+probability distribution over the from a probability distribution over
+the vocabulary space. Um it's really easy to vocabulary space. Um it's
+really easy to vocabulary space. Um it's really easy to sample directly
+from this distribution. sample directly from this distribution. sample
+directly from this distribution. Um but reshaping it in various ways
+kind Um but reshaping it in various ways kind Um but reshaping it in
+various ways kind of avoids undesirable or degenerate of avoids
+undesirable or degenerate of avoids undesirable or degenerate outputs.
+Um, and then do we have any outputs. Um, and then do we have any
+outputs. Um, and then do we have any questions before we turn over to
+student questions before we turn over to student questions before we
+turn over to student presentations? Yes. presentations? Yes.
+presentations? Yes. &gt;&gt; Is it possible parameters parameters
+parameters of basic open question that by more random. that by more
+random. that by more random. &gt;&gt; Yeah. So is it possible that the
+&gt;&gt; Yeah. So is it possible that the &gt;&gt; Yeah. So is it
+possible that the language model can like choose a language model can
+like choose a language model can like choose a decoding strategy like um
+for itself decoding strategy like um for itself decoding strategy like
+um for itself based on like the type of problem? Um I based on like the
+type of problem? Um I based on like the type of problem? Um I have two
+answers to this I think which have two answers to this I think which
+have two answers to this I think which is I think implicitly language
+models is I think implicitly language models is I think implicitly
+language models kind of do this. So if you think about kind of do this.
+So if you think about kind of do this. So if you think about like what
+the probability distribution like what the probability distribution like
+what the probability distribution looks like for over next tokens for 2
+looks like for over next tokens for 2 looks like for over next tokens
+for 2 plus two equals blank versus like plus two equals blank versus
+like plus two equals blank versus like Graham's favorite color is blank.
+Um one Graham's favorite color is blank. Um one Graham's favorite color
+is blank. Um one of those distributions is going to be of those
+distributions is going to be of those distributions is going to be
+really really sharply peaked at a single really really sharply peaked at
+a single really really sharply peaked at a single output and the other
+is going to be output and the other is going to be output and the other
+is going to be flatter. Um and so this is like in some flatter. Um and
+so this is like in some flatter. Um and so this is like in some sense
+the model has learned a sense the model has learned a sense the model
+has learned a distribution that is like adjusted distribution that is
+like adjusted distribution that is like adjusted differently to the
+open-endedness of the differently to the open-endedness of the
+differently to the open-endedness of the problem. Um the other answer is
+that problem. Um the other answer is that problem. Um the other answer
+is that this is absolutely something you can this is absolutely
+something you can this is absolutely something you can decide on like a
+system level. um like decide on like a system level. um like decide on
+like a system level. um like if you're receiving prompts from users if
+you're receiving prompts from users if you're receiving prompts from
+users and then you're passing them to the and then you're passing them
+to the and then you're passing them to the model, you can change the um
+like model, you can change the um like model, you can change the um like
+generation settings under the hood in generation settings under the hood
+in generation settings under the hood in between like serving each
+request. Um between like serving each request. Um between like serving
+each request. Um and I think that's like a really and I think that's
+like a really and I think that's like a really reasonable thing to do. I
+don't know reasonable thing to do. I don't know reasonable thing to do.
+I don't know actually of any actually of any actually of any work or
+system that does that, but I work or system that does that, but I work
+or system that does that, but I wouldn't be surprised if like some of
+wouldn't be surprised if like some of wouldn't be surprised if like some
+of the model APIs do. &gt;&gt; Yeah. How is the curious about the shape
+&gt;&gt; Yeah. How is the curious about the shape &gt;&gt; Yeah. How is
+the curious about the shape of the distribution of the assets for of the
+distribution of the assets for of the distribution of the assets for
+public disting? I'm curious about like you know if there I'm curious
+about like you know if there I'm curious about like you know if there
+are any are any are any extremely sharply curved in certain sub
+extremely sharply curved in certain sub extremely sharply curved in
+certain sub regions but are there any specific regions but are there any
+specific regions but are there any specific properties which we can
+which we can properties which we can which we can properties which we
+can which we can study about this solution itself? Yeah, study about
+this solution itself? Yeah, study about this solution itself? Yeah, like
+are there any like are there any like are there any &gt;&gt; very
+quickly while you answer um for the &gt;&gt; very quickly while you
+answer um for the &gt;&gt; very quickly while you answer um for the
+people who are presenting could you come people who are presenting could
+you come people who are presenting could you come up uh and like start
+setting up your up uh and like start setting up your up uh and like
+start setting up your computer and we'll continue. computer and we'll
+continue. computer and we'll continue. &gt;&gt; Yeah, I think it's just
+one. So the the &gt;&gt; Yeah, I think it's just one. So the the
+&gt;&gt; Yeah, I think it's just one. So the the person who is person
+who is person who is &gt;&gt; Yeah. Um yeah so this is the question
+&gt;&gt; Yeah. Um yeah so this is the question &gt;&gt; Yeah. Um yeah so
+this is the question was are there any properties like that was are
+there any properties like that was are there any properties like that we
+know of ancestral of like the we know of ancestral of like the we know
+of ancestral of like the unmodified model distribution. Um I unmodified
+model distribution. Um I unmodified model distribution. Um I think the
+the immediate one that stands think the the immediate one that stands
+think the the immediate one that stands out is is calibration. Um, so we
+expect out is is calibration. Um, so we expect out is is calibration.
+Um, so we expect the distribution to be peakier um, if the distribution
+to be peakier um, if the distribution to be peakier um, if the model is
+sort of more likely to get the model is sort of more likely to get the
+model is sort of more likely to get that answer correct. Um, because
+then that answer correct. Um, because then that answer correct. Um,
+because then that would mean that there's like more that would mean that
+there's like more that would mean that there's like more probability
+placed on the single correct probability placed on the single correct
+probability placed on the single correct answer. Um, it's in terms of
+like which answer. Um, it's in terms of like which answer. Um, it's in
+terms of like which portion portions of like the space are portion
+portions of like the space are portion portions of like the space are
+more or less likely to be peaky. I would more or less likely to be
+peaky. I would more or less likely to be peaky. I would place a personal
+bet that like if you're place a personal bet that like if you're place a
+personal bet that like if you're doing something related to math or code
+doing something related to math or code doing something related to math
+or code where there's maybe like a more where there's maybe like a more
+where there's maybe like a more constrained space of answers that you
+constrained space of answers that you constrained space of answers that
+you would see a distribution that's peakier. would see a distribution
+that's peakier. would see a distribution that's peakier. Um, but that
+would just be like a Um, but that would just be like a Um, but that
+would just be like a property of how the model learned the property of
+how the model learned the property of how the model learned the data.
+That's not necessarily guaranteed. data. That's not necessarily
+guaranteed. data. That's not necessarily guaranteed. &gt;&gt; Quantify
+the jaggedness of &gt;&gt; Quantify the jaggedness of &gt;&gt; Quantify
+the jaggedness of no matter what you prompt this model, no matter what
+you prompt this model, no matter what you prompt this model, there's
+going to be some jaggedness in there's going to be some jaggedness in
+there's going to be some jaggedness in the distribution. There's a way
+to the distribution. There's a way to the distribution. There's a way to
+measure that and probably mitigate that measure that and probably
+mitigate that measure that and probably mitigate that through some sort
+of decoding structure. through some sort of decoding structure. through
+some sort of decoding structure. &gt;&gt; There's going to be some
+jaggedness in &gt;&gt; There's going to be some jaggedness in &gt;&gt;
+There's going to be some jaggedness in the distribution. What by no
+matter the distribution. What by no matter the distribution. What by no
+matter what, what do you mean by jaggedness? what, what do you mean by
+jaggedness? what, what do you mean by jaggedness? &gt;&gt; It's a
+distribution. Bunch of &gt;&gt; It's a distribution. Bunch of &gt;&gt;
+It's a distribution. Bunch of histograms. These histograms are all
+histograms. These histograms are all histograms. These histograms are
+all pretty crooked and jagged. There will be pretty crooked and jagged.
+There will be pretty crooked and jagged. There will be there will also
+be peaks which you don't there will also be peaks which you don't there
+will also be peaks which you don't expect and some pretty interesting
+expect and some pretty interesting expect and some pretty interesting
+behaviors which I'm just curious about behaviors which I'm just curious
+about behaviors which I'm just curious about like how you quantify
+various peaks and like how you quantify various peaks and like how you
+quantify various peaks and if you make a measure of like howy the if you
+make a measure of like howy the if you make a measure of like howy the
+tail is how tail is how tail is how &gt;&gt; yeah like measure this
+distribution &gt;&gt; yeah like measure this distribution &gt;&gt; yeah
+like measure this distribution &gt;&gt; um I think entropy is going to
+give you &gt;&gt; um I think entropy is going to give you &gt;&gt; um I
+think entropy is going to give you at least some measure of this where
+at least some measure of this where at least some measure of this where
+entropy will give you some kind of hint entropy will give you some kind
+of hint entropy will give you some kind of hint as to like how jagged
+the distribution as to like how jagged the distribution as to like how
+jagged the distribution is. Um you could also like certainly is. Um you
+could also like certainly is. Um you could also like certainly look at
+any other statistical property look at any other statistical property
+look at any other statistical property of a distribution. So you could
+look at of a distribution. So you could look at of a distribution. So
+you could look at things like the mean or median things like the mean or
+median things like the mean or median probability mass to a random
+token. Um probability mass to a random token. Um probability mass to a
+random token. Um in practice I think people are usually in practice I
+think people are usually in practice I think people are usually looking
+at these um distributions sort looking at these um distributions sort
+looking at these um distributions sort of like several steps of like of
+like several steps of like of like several steps of like granularity
+further up where you're granularity further up where you're granularity
+further up where you're looking at something like a measure of looking
+at something like a measure of looking at something like a measure of
+perplexity over a corpus um or a measure perplexity over a corpus um or
+a measure perplexity over a corpus um or a measure of like cross entropy
+over an entire of like cross entropy over an entire of like cross
+entropy over an entire batch. And so you're not necessarily batch. And
+so you're not necessarily batch. And so you're not necessarily like
+looking at individual like looking at individual like looking at
+individual distributions. uh but particularly if distributions. uh but
+particularly if distributions. uh but particularly if you're doing some
+kind of task like you're doing some kind of task like you're doing some
+kind of task like constrained decoding of like a label in constrained
+decoding of like a label in constrained decoding of like a label in ICL
+where you care about like the ICL where you care about like the ICL
+where you care about like the distribution um over a single set of
+distribution um over a single set of distribution um over a single set
+of outputs like or maybe like you know you outputs like or maybe like
+you know you outputs like or maybe like you know you care about the
+distribution over like a care about the distribution over like a care
+about the distribution over like a b and c and d for like some multiple
+b and c and d for like some multiple b and c and d for like some
+multiple choice question then you can certainly choice question then you
+can certainly choice question then you can certainly like try to think
+about properties of like try to think about properties of like try to
+think about properties of that distribution. Thank you so much. that
+distribution. Thank you so much. that distribution. Thank you so much.
+&gt;&gt; Of course. &gt;&gt; Of course. &gt;&gt; Of course. Um, Um, Um,
+&gt;&gt; yeah. One one thing I'll mention in &gt;&gt; yeah. One one
+thing I'll mention in &gt;&gt; yeah. One one thing I'll mention in
+addition to this is like jaggedness is addition to this is like
+jaggedness is addition to this is like jaggedness is not necessarily a
+problem. So like when not necessarily a problem. So like when not
+necessarily a problem. So like when you have a reasoning chain, there's
+like you have a reasoning chain, there's like you have a reasoning
+chain, there's like many correct ways to reason about many correct ways
+to reason about many correct ways to reason about something. And so just
+because something something. And so just because something something.
+And so just because something is jagged doesn't necessarily mean it's is
+jagged doesn't necessarily mean it's is jagged doesn't necessarily mean
+it's bad. Um, and so like because of this bad. Um, and so like because
+of this bad. Um, and so like because of this you would think that oh
+like maybe the you would think that oh like maybe the you would think
+that oh like maybe the places with high entropy are like the places with
+high entropy are like the places with high entropy are like the
+dangerous places where you might make a dangerous places where you might
+make a dangerous places where you might make a mistake, but that's not
+necessarily the mistake, but that's not necessarily the mistake, but
+that's not necessarily the case. Like sometimes the dangerous like case.
+Like sometimes the dangerous like case. Like sometimes the dangerous
+like the the places with high entropy are the the the places with high
+entropy are the the the places with high entropy are the places where
+you just have many places where you just have many places where you just
+have many different ways of saying a particular different ways of saying
+a particular different ways of saying a particular like word or like
+forming a sentence like word or like forming a sentence like word or
+like forming a sentence structure. And then um the the places structure.
+And then um the the places structure. And then um the the places where
+you make a mistake, there's where you make a mistake, there's where you
+make a mistake, there's actually just two options. It's like 533
+actually just two options. It's like 533 actually just two options. It's
+like 533 and 534 or something like that. And then and 534 or something
+like that. And then and 534 or something like that. And then that
+actually doesn't have super high that actually doesn't have super high
+that actually doesn't have super high entropy. It's just, you know, log
+two. entropy. It's just, you know, log two. entropy. It's just, you
+know, log two. &gt;&gt; Um but uh it's still a problem, right? &gt;&gt;
+Um but uh it's still a problem, right? &gt;&gt; Um but uh it's still a
+problem, right? So So So &gt;&gt; uh yeah, &gt;&gt; uh yeah, &gt;&gt; uh
+yeah, &gt;&gt; you can actually get kind of a notion of &gt;&gt; you can
+actually get kind of a notion of &gt;&gt; you can actually get kind of a
+notion of this if you um compute perplexity over this if you um compute
+perplexity over this if you um compute perplexity over like a document
+and you and you graph it like a document and you and you graph it like a
+document and you and you graph it over time. You'll see the perplexity
+for over time. You'll see the perplexity for over time. You'll see the
+perplexity for the very first couple of tokens will be the very first
+couple of tokens will be the very first couple of tokens will be
+extremely high to the point where most extremely high to the point where
+most extremely high to the point where most graphs of perplexity kind of
+cut off the graphs of perplexity kind of cut off the graphs of
+perplexity kind of cut off the first hundred tokens or so or the first
+first hundred tokens or so or the first first hundred tokens or so or
+the first 10 or 20 because the the options in like 10 or 20 because the
+the options in like 10 or 20 because the the options in like starting
+from nothing are are so vast starting from nothing are are so vast
+starting from nothing are are so vast and then perplexity kind of
+declines and then perplexity kind of declines and then perplexity kind
+of declines over time and then flattens out. Um, but over time and then
+flattens out. Um, but over time and then flattens out. Um, but that
+certainly doesn't mean that the that certainly doesn't mean that the
+that certainly doesn't mean that the most mistakes that language models
+make most mistakes that language models make most mistakes that language
+models make are in the very first few tokens, right? are in the very
+first few tokens, right? are in the very first few tokens, right? It
+just means that there's more valid It just means that there's more valid
+It just means that there's more valid options in that space. &gt;&gt;
+Sounds great. And yeah, starting this &gt;&gt; Sounds great. And yeah,
+starting this &gt;&gt; Sounds great. And yeah, starting this time, we'll
+have a presentation. Thank time, we'll have a presentation. Thank time,
+we'll have a presentation. Thank you for being brave and being the
+person you for being brave and being the person you for being brave and
+being the person who does it the first time. Uh, and who does it the
+first time. Uh, and who does it the first time. Uh, and everybody,
+please sign up uh on the everybody, please sign up uh on the everybody,
+please sign up uh on the signup sheet. It's

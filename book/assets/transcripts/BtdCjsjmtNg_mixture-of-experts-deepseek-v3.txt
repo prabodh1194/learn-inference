@@ -1,0 +1,503 @@
+# mixture-of-experts-deepseek-v3
+# video: https://www.youtube.com/watch?v=BtdCjsjmtNg
+
+Let's take apart the architecture that
+quietly powers most of Deepseek's
+models, Deepseek Moe towards ultimate
+expert specialization in mixture of
+experts language models from Deepseek
+AI. Over the next 20 minutes, we'll
+build both of its ideas from scratch.
+Work through the load balancing and walk
+the ablations that prove each trick
+earns its keep.
+Here's a fact that should be impossible.
+a 16 billion parameter model going
+head-to-head with a 7 billion parameter
+llama while doing only about 40% of the
+arithmetic per token. Not a smaller
+model that's a bit worse. A bigger model
+that's cheaper to run and just as good.
+The engine behind that is a mixture of
+experts done right because the naive
+version of this idea wastes almost
+everything you pour into it. So here's
+the plan. We'll rebuild a normal mixture
+of experts. Watch exactly where it leaks
+its capacity. Then add Deep Seek's two
+moves. One about the size of the
+experts, one about what they're allowed
+to forget until every parameter is
+finally pulling its weight. First, the
+thing we're fixing. In a transformer,
+every block has a feed forward network,
+a big dense layer that every single
+token passes through. A mixture of
+experts replaces that one block with a
+whole room of them, call them experts,
+plus a small router. For each token, the
+router scores every expert with a dot
+product, runs those scores through a
+soft max to get an affinity for each
+one, and keeps only the top few, say the
+top two. The token flows through just
+those two, and their outputs get
+blended, weighted by the scores. Every
+other expert stays dark. So, the token
+only pays for two experts, but the layer
+as a whole holds the knowledge of
+dozens. That's the entire appeal. cheap
+for each token, enormous in total. Why
+go to all this trouble? Because it snaps
+a link everyone assumed was welded shut.
+The one between how much a model knows
+and how much it costs to run. In a dense
+model, doubling the parameters doubles
+the compute for every token. Full stop.
+In a mixture of experts, you can pour in
+10 times the parameters and still light
+up only two experts per token. So, the
+bill barely moves. Total capacity scales
+with the number of experts. Cost scales
+only with how many you actually wake.
+That's the promise that makes people
+tolerate the extra machinery. But the
+promise comes with a catch. And that
+catch is what this entire paper is
+about. Here's the catch. Suppose your
+room has only eight or 16 experts and
+each token wakes two of them. Look at
+the traffic that implies. With so few
+experts, every one of them is a fire
+hose destination. poetry, Python,
+protein folding, tax law, it all gets
+funneled into the same tiny handful of
+blocks. So each expert is forced to be a
+generalist. It has to cram wildly
+unrelated kinds of knowledge into one
+set of weights, and those skills don't
+cooperate. The parameters that help
+write a sonnet actively fight the ones
+that help write a for loop. The authors
+call this knowledge hybridity, a jack of
+all trades, expert, master of none. You
+wanted specialists. You got a room full
+of overworked generalists.
+The authors named the problem plainly.
+There's a second leak and it's sneakier.
+A lot of what any token needs is just
+common basic grammar, word meanings, how
+a clause hangs together. Nearly every
+token, whatever its topic, needs that
+boilerplate. But under ordinary routing,
+that common knowledge has no home of its
+own. So every expert quietly learns its
+own private copy of the basics just to
+be usable at all. Multiply that by
+dozens of experts and you've paid for
+the same foundational knowledge dozens
+of times over. That's knowledge
+redundancy parameters spent relearning
+what everyone already knows instead of
+on the rare distinctive material that
+would actually make an expert worth the
+name. Between hybridity and redundancy,
+a conventional MO is leaking capacity
+from both ends. So, let's name the
+target precisely because both of Deep
+Seek's moves aim straight at it. What
+you want is expert specialization. Every
+expert holding knowledge that's focused
+and non-over overlapping, its own lane,
+nothing duplicated, nothing muddled.
+Hybridity muddles it. Redundancy
+duplicates it. And there's a ceiling
+worth knowing about. If your experts
+specialized perfectly, a mixture of
+experts would match a dense model with
+the very same total parameter count.
+you'd get all that capacity for a sliver
+of the compute. In practice, nobody
+reaches that ceiling. The waste we just
+described is why the two tricks coming
+up are Deep Seek's attempt to get within
+touching distance of it. And spoiler,
+they nearly do. Move one, fine-trained
+expert segmentation. It sounds fancy.
+It's almost aggressively simple. Take
+each expert and slice it into smaller
+ones. Cut the hidden dimension of that
+feed forward block down to say a quarter
+of its size. So one expert becomes four
+thin slivers. Do that to all of them.
+And instead of 16 fat experts, you now
+have 64 skinny ones. Then to keep the
+compute bill exactly the same. Wake four
+times as many top eight instead of top
+two. Add it up. Same total parameters,
+same activated parameters, same flops.
+Nothing about the budget moved. What
+moved is the granularity. Knowledge no
+longer has to be shoved into a few
+coarse bins. It can settle into narrow,
+precise ones. A sliver can afford to be
+about just one thing. And here's the
+part that turns a simple slice into a
+real gain. It isn't only that the
+experts got smaller. It's how many ways
+a token can now be routed. With 16
+experts in top two, there are 120
+possible pairs a token could go to. 120
+little committees to choose from. slice
+into 64 and pick eight. And the number
+of possible combinations isn't a bit
+bigger. It's 4.4 billion. Same
+parameters, same cost. And the router
+went from 120 options to over 4 billion.
+That combinatorial blow up is the actual
+mechanism. Every token can be handed a
+bespoke committee assembled for exactly
+its mixture of needs instead of one of a
+dozen off-the-shelf teams. The number is
+real, straight from the paper.
+Move two goes after the other leak,
+redundancy, and it's the elegant one. If
+the problem is that every expert wastes
+weights relearning the common basics,
+then give the basics a dedicated home.
+Peel off a couple of experts and make
+them shared, always on for every single
+token with no routing decision involved.
+Their entire job is to absorb the common
+everyday knowledge that everyone needs.
+Now watch what happens to the routed
+experts. They no longer have to carry a
+private copy of the basics. The shared
+experts handle that. So they're free to
+spend all their parameters on the rare
+distinctive stuff. Shared experts hold
+the foundation. Routed specialists hold
+the edge. And to keep compute fixed, you
+simply wake that many fewer routed ones.
+The always on expert wasn't brand new.
+An earlier system used one as an
+engineering convenience, but deepseek is
+who turned it into a deliberate
+principle. Put both moves into one layer
+and you get the full deepseamoi block.
+Picture it as a progression. Start with
+the conventional version. A router
+picking two of 16. Now segment the 16
+becomes 64 slivers and the router picks
+eight. Now isolate. Set two of those
+aside as always on shared experts and
+let the router pick six of the remaining
+62. A token's output is then the sum of
+three things. the shared experts, which
+it always gets, the handful of routed
+specialists the router chose for it.
+Each scaled by its gate value, and the
+residual carrying the token itself
+forward. Three architectures, one after
+another. And here's the whole point. The
+parameter count and the compute are
+identical across all three. Same budget,
+progressively less waste. Let's route
+one token through it concretely. The
+token arrives and the two shared experts
+fire automatically. No decision, they
+always run. Then the router scores all
+62 routed experts, one dot product each
+against their learned centroidids,
+squashes those scores through a soft max
+into affinities and takes the top six.
+Say it lands on experts 9, 41, and a few
+others with affinities like 3,2 and so
+on down. Those six run. The other 56
+stay completely dark and cost nothing.
+Finally, the layer blends each activated
+experts output scaled by its gate value
+all summed together with the two shared
+experts stacked on top. One token, eight
+experts firing out of 64, a custom
+mixture, and the very next token might
+pick an entirely different six. But
+letting the router learn freely invites
+a nasty failure. Early in training, a
+few experts happen to get picked
+slightly more often. Getting picked
+means getting trained. Getting trained
+means getting better. Getting better
+means getting picked even more. It's a
+rich get-richer spiral. And left alone,
+it ends in routing collapse. A tiny
+clique of experts handling everything
+while the rest sit idle, never trained,
+dead weight you paid for, and can't use.
+And there's a second imbalance once you
+spread experts across many GPUs. If the
+popular experts all happen to live on
+one device, that GPU gets swamped while
+the other's idle and your whole batch
+waits on the slowest one. Two different
+imbalances, both fatal to the promise we
+started with. Deepseek's fix is a gentle
+penalty added to the training loss. And
+the way it's built is clever. For each
+expert, track two numbers over a batch.
+what fraction of tokens it actually
+handled. Call that its load and how much
+affinity on average the router assigned
+it. Call that its importance. The
+balance loss is the sum over all experts
+of load times importance. Think about
+what that penalizes. An expert that's
+both hogging tokens and being scored
+highly makes that product large. So, the
+gradient leans on its scores and pushes
+them down. An underused expert has a
+tiny load, leaving room to send it more.
+The pressure evens the distribution out
+without ever hard forcing it. The router
+can still favor a genuinely better
+expert. It just can't run away with the
+whole room. There's a subtlety though.
+Strictly forcing every individual expert
+to get identical load actually hurts the
+model. Sometimes a token really does
+belong with one specific expert and
+fighting that cost you quality. What you
+truly care about isn't per expert
+fairness. It's that no single GPU
+becomes the bottleneck. So, Deepseek
+adds a second coarser penalty. Group the
+experts by which device they sit on and
+balance the load across those groups
+instead of across individuals. Then they
+tune the two knobs differently. A very
+small weight on the per expert term,
+just enough to prevent outright collapse
+and a larger weight on the per device
+term to keep the hardware evenly fed.
+Balance where it pays for itself,
+freedom where it actually matters. If
+watching an architecture get engineered
+down to the last wasted parameter is
+your idea of a good time, do the thing.
+Like, subscribe, and send this to the
+friend who still thinks bigger model is
+the only lever anyone ever pulls. Now,
+for the part that actually convinced me,
+the proof that each of these tricks does
+what it claims. So, does any of this
+actually work, or is it just a nice
+story? The authors built a ladder to
+find out adding one idea at a time and
+holding everything else fixed. Same
+parameters, same compute at every rung.
+Start at plain G-Shard, a conventional
+two of 16 router. Add shared expert
+isolation on its own. Performance ticks
+up. Now add fine grain segmentation on
+top. Splitting into 32 experts up again.
+Push the granularity further. 64 experts
+up again. Every single rung improves and
+the gains stack. That's about the
+cleanest evidence you can ask for. Each
+move helps by itself and together they
+help more. Neither trick is secretly
+carrying the other. Both are doing real
+work. Here's my favorite experiment
+because the result looks like bad news
+and is actually the opposite. Take a
+train model and start switching off its
+most used routed experts. Then measure
+how much worse the loss gets. Deepsemo's
+loss shoots up dramatically. far more
+than a conventional mode tuned to the
+exact same starting quality. At first,
+that sounds like fragility. It's the
+reverse. If knocking out an expert Rex
+performance, that expert was holding
+something no one else had. It was
+irreplaceable. The conventional model
+barely flinches because its experts are
+redundant. Knock one out and its
+neighbors were keeping a copy anyway.
+So, fragility here is proof of
+specialization. Deepseek Mo's experts
+genuinely divided the labor between
+them. Now test the shared expert the
+same way. Just delete it. And to be
+fair, wake one extra routed expert so
+the compute stays identical. If the
+shared expert were redundant, the routed
+ones would cover for it and nothing much
+would change. Instead, the pile loss
+jumps from 1.81 all the way to 2.41.
+That's not a wobble. That's a cliff. It
+means the shared expert had been quietly
+holding fundamental knowledge that none
+of the routed experts had bothered to
+learn precisely because they trusted it
+to which is exactly the division of
+labor the design was chasing. The routed
+experts specialized so hard they
+offloaded the basics entirely onto the
+shared one. The jump in their own
+numbers.
+One more on precision. The claim was
+that all those routing combinations let
+the model find the right knowledge using
+less of itself. So the authors dialed
+down how many routed experts each token
+is allowed to use and deepsee
+activating just four routed experts
+matches a conventional MO that's using
+its full top two aotment of much larger
+experts. Then they go further and train
+a fresh model from scratch that
+permanently activates only half the
+usual expert parameters and it still
+beats the conventional baseline
+outright. Same total knowledge sitting
+on the shelf, far less of it pulled down
+per token and the answer is just as
+good. So the specialization isn't
+cosmetic. It makes the parameters you do
+activate genuinely more effective. Which
+brings us to the headline result at the
+small scale they use to validate all of
+this. two billion parameters. Two
+comparisons matter. First, Deep Seek Moa
+matches a version of G-Shard built with
+one and a half times the expert
+parameters in compute. It's keeping pace
+with a competitor allowed to spend 50%
+more. Second, and this is the one I find
+striking, they compare it against a
+dense model holding 16 times the feed
+forward parameters, which is exactly
+that theoretical ceiling we talked
+about, the best any mo on this budget
+could ever hope to match. Deepseek MOE
+lands right up against it. At this
+scale, the specialization is close
+enough to perfect that you're getting
+nearly dense model quality for sparse
+model money. That ceiling, in the
+author's words,
+now scale it up and see whether it holds
+16 billion total parameters trained on
+two trillion tokens with two shared
+experts and six of 64 routed lighting up
+per token. That's around 2.8 8 billion
+active parameters and it lands where the
+small experiments promised comparable to
+deepsek's own dense 7 billion model and
+to llama 27 billion while spending only
+about 40% of the compute but the honest
+footnote matters it's noticeably weaker
+on multiplechoice tests like MMLU and
+the authors are candid about why in a
+mixture of experts almost all the
+parameters live in the experts the feed
+forward part which is where factual
+knowledge gets stored The attention
+which does the actual reasoning and look
+up across a question is comparatively
+tiny here. Great long-term memory,
+thinner working memory, a real named
+limitation not swept under the rug. The
+headline claim on the first page.
+They pushed it one step further into
+openly preliminary territory. 145
+billion parameter version for shared
+experts and 12 of 128 routed. Even only
+partway trained, it rivals deepseeks
+dense 67 billion model while using under
+30% of the compute and a variant that
+activates only half the experts still
+keeps pace at under 20%. The efficiency
+doesn't decay as you scale. If anything,
+it compounds. And there's a practical
+kicker, the 16 billion model because
+only 2.8 8 billion parameters are ever
+active, fits on a single 40 GB GPU, and
+runs about 2 and 1/2 times faster than a
+dense 7 billion model. Cheaper to train
+and cheaper to serve. A quick but
+important aside, because it was a
+genuine open worry at the time, there
+was folklore that mixture of experts
+models don't fine-tune well, that all
+that sparsity makes them awkward to
+align into a helpful chat model. Deep
+Seek just tried it. ordinary supervised
+fine-tuning on the 16 billion model. The
+result is a chat model that holds its
+own against the aligned 7 billion dense
+models still at about 40% of the
+compute. So the efficiency survives
+alignment. The sparse structure isn't a
+liability you quietly pay for later. It
+carries all the way through to the
+deployed assistant. And this is where
+the paper stops being a clever one-off
+and becomes a foundation. So let me
+connect the dots. The paper itself
+couldn't yet because it came first.
+Fine-trained experts plus an isolated
+shared expert didn't stay a two billion
+parameter experiment. This exact recipe
+became Deep Seek's house style. It's the
+mixture of experts sitting inside
+Deepseek V2 and Deepseek V3, the models
+that later made headlines for matching
+Frontier systems at a fraction of the
+training cost. So when you hear that a
+Deepseek model is shockingly cheap to
+run for its quality, a big part of the
+answer is right here. Small specialized
+experts, isolated shared knowledge, and
+a balance loss keeping every one of them
+employed. A 2024 architecture choice
+that kept paying off for years. So the
+whole thing start to finish. A mixture
+of experts swaps a dense block for a
+room of experts and a router that wakes
+a few per token. Cheap compute, huge
+capacity. But with few fat experts, you
+leak that capacity two ways. Each one
+becomes an overworked generalist and
+they all waste weights relearning the
+basics. Move one, slice the experts thin
+and wake more of them. Same budget,
+billions of routing combinations,
+knowledge sorted into precise bins. Move
+two, set a couple of experts always on
+to hold the common knowledge, freeing
+the rest to truly specialize. Keep the
+load balanced with a gentle two-level
+penalty so no expert and no GPU goes to
+waste and the payoff proven by every
+ablation is experts that genuinely
+specialize brushing the dense model
+ceiling at a fraction of the cost. The
+oneline version make the experts small
+and many so knowledge sorts precisely
+and give the common stuff its own always
+on home so every parameter ends up
+either a sharp specialist or a shared
+foundation never a wasted generalist.
+What I keep turning over is that ceiling
+specialization kept paying off the finer
+they sliced. Smaller experts, more of
+them, better results every single time.
+So how far down does that go? Is there a
+floor where an expert gets too small to
+be worth routing to at all? Or does the
+logic run all the way to something
+absurd like one expert per concept?
+Nobody's found the bottom yet. That's my
+read. Tell me yours. Until next time.

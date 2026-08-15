@@ -1,0 +1,113 @@
+# vllm-bite
+# video: https://www.youtube.com/watch?v=OxYX8WPpypA
+
+Let's break down the core idea behind
+this paper, vLLM and page attention from
+Berkeley.
+Same GPU, same model, two to four times
+as many users served for free. No new
+hardware, no smaller model, no quality
+drop. The trick that pulls this off
+isn't some new attention math. It's a
+memory management idea operating systems
+have used since the 1960s. Let's see why
+serving a language model was wasting
+most of its memory and how paging fixes
+it.
+First, what fills that memory? A
+language model writes one token at a
+time and each new token has to look back
+at every token before it. To avoid
+recomputing the past on every single
+step, the model caches it, the keys and
+values for every token so far. That's
+the KV cache. And here's the thing, it
+grows by one slot for every token you
+generate for every request in flight. It
+gets big fast.
+So, look at where a GPU's memory
+actually goes. On a 13 billion model,
+the weights eat about 2/3 and never
+move. Almost all the rest is KV cache,
+dynamic, per request, which means the
+real question isn't how fast is the GPU,
+it's how many requests KV caches can I
+fit at once. Fit more, batch more,
+higher throughput. The KV cache is the
+bottleneck.
+Now, the crime. Old systems store each
+request's KV cache in one solid
+contiguous block and because they don't
+know how long the answer will be, they
+reserve enough for the maximum, say
+2,000 tokens up front. A request that
+stops after 10 tokens still holds all
+2,000 slots hostage. That's internal
+waste. The reserved but not yet written
+slots are more waste. And the odd-sized
+leftovers between requests, external
+waste. Add it up and most of the memory
+is sitting empty.
+The profiling is brutal.
+But computers solved this exact problem
+decades ago. A program wants one big
+contiguous stretch of memory. Physical
+RAM is a mess of scattered free space.
+The operating system's answer, virtual
+memory. Chop memory into fixed-size
+pages, scatter them wherever they fit,
+and keep a page table that maps the tidy
+logical view onto the messy physical
+one. The program never knows. That's the
+whole idea page detention steals.
+Here it is. Take a request KV cache and
+cut it into fixed-size blocks, say 16
+tokens each. Those blocks do not have to
+sit next to each other in GPU memory.
+They can be anywhere. A block table, one
+per request, remembers which physical
+block holds each logical chunk. The
+attention kernel just follows the table
+to gather the keys and values it needs.
+Contiguous view, scattered reality.
+And because blocks are handed out on
+demand, you never reserve for a future
+that might not come. A sequence gets a
+fresh block only when its current one
+fills up. The only wasted space is the
+tail end of the last block, a few slots
+at most. Utilization jumps from a third
+to nearly all of it. Same GPU, suddenly
+room for far more requests.
+If treat the GPU like an operating
+system is the kind of idea you're here
+for, like, subscribe, and send this to
+the friend paying an AWS bill to serve a
+chatbot. One more trick, and it's the
+best one.
+Because blocks are just mapped, they can
+be shared. Ask a model for five
+variations of one answer, and all five
+start from the identical prompt. So,
+store that prompt blocks once and point
+all five block tables at them. Beam
+search, parallel sampling, same deal.
+Only when one sequence writes something
+different do you copy that single block
+and let it diverge. It's copy-on-write,
+the same trick that makes forking a
+process cheap. Shared memory for free.
+And it all cashes out here.
+So, the whole idea, the KV cache, not
+compute, limits LLM serving. Old systems
+wasted on contiguous max length
+reservations. Page detention borrows OS
+paging. Fixed blocks, a block table,
+allocate on demand, killing the waste,
+and letting sequences share blocks copy
+on right. Same hardware, two to four
+times the throughput. Which leaves a fun
+question. How many other GPU problems
+are just classic systems problems we
+forgot we already solved? That's my
+read. Tell me yours. Until next time.

@@ -1,0 +1,2147 @@
+# cmu-llm-inference-9-reasoning-models
+# video: https://www.youtube.com/watch?v=6-mSbIPI4tc
+# captions: manual
+
+Okay. Hi. Hi everyone. Sorry uh we were Okay. Hi. Hi everyone. Sorry uh
+we were Okay. Hi. Hi everyone. Sorry uh we were a little late. We were
+discussing a little late. We were discussing a little late. We were
+discussing homework two and uh had uh had to have homework two and uh
+had uh had to have homework two and uh had uh had to have some
+discussion items. Um cool. Are some discussion items. Um cool. Are some
+discussion items. Um cool. Are there any questions about homework one
+there any questions about homework one there any questions about
+homework one at the moment? I know we're getting at the moment? I know
+we're getting at the moment? I know we're getting close to it being
+finished. close to it being finished. close to it being finished. Yeah.
+&gt;&gt; Is what &gt;&gt; Is what &gt;&gt; Is what extension? I mean you
+have three days to extension? I mean you have three days to extension? I
+mean you have three days to extend if you would like. So yeah. extend if
+you would like. So yeah. extend if you would like. So yeah. &gt;&gt; Um,
+&gt;&gt; Um, &gt;&gt; Um, &gt;&gt; do you mean extending the deadline by
+&gt;&gt; do you mean extending the deadline by &gt;&gt; do you mean
+extending the deadline by one or two days? one or two days? one or two
+days? &gt;&gt; Yeah, I mean you you have permission to &gt;&gt; Yeah, I
+mean you you have permission to &gt;&gt; Yeah, I mean you you have
+permission to extend the deadline by one or two days extend the deadline
+by one or two days extend the deadline by one or two days by using your
+late days. Uh, so Uh, so Uh, so uh any any other ones? &gt;&gt; Yeah.
+&gt;&gt; So the graph &gt;&gt; So the graph &gt;&gt; So the graph find
+we have to find we have to find we have to part of the output part of
+the output part of the output like as far as I've read or do have to use
+something like agent or do have to use something like agent or do have
+to use something like agent or or or &gt;&gt; um you &gt;&gt; um you
+&gt;&gt; um you shouldn't have to use an external shouldn't have to use
+an external shouldn't have to use an external library. Um you can uh use
+library. Um you can uh use library. Um you can uh use uh uh uh like we
+we talked about a number of ways like we we talked about a number of
+ways like we we talked about a number of ways of doing constraint
+decoding if you need of doing constraint decoding if you need of doing
+constraint decoding if you need to. You could also output it in JSON if
+to. You could also output it in JSON if to. You could also output it in
+JSON if you'd like. Um, so uh you can uh be be you'd like. Um, so uh you
+can uh be be you'd like. Um, so uh you can uh be be creative there. If
+you can't uh if you creative there. If you can't uh if you creative
+there. If you can't uh if you can't do that, I I think it should be
+can't do that, I I think it should be can't do that, I I think it should
+be okay to also just parse the output and okay to also just parse the
+output and okay to also just parse the output and and feed it out. and
+feed it out. and feed it out. Yeah. &gt;&gt; Y it's annoying, isn't it?
+it's annoying, isn't it? it's annoying, isn't it? That's why we need
+that's why we need That's why we need that's why we need That's why we
+need that's why we need inference algorithms. So like some of inference
+algorithms. So like some of inference algorithms. So like some of the
+stuff we uh some of the stuff we the stuff we uh some of the stuff we
+the stuff we uh some of the stuff we talked about here um would uh would
+help talked about here um would uh would help talked about here um would
+uh would help solve those problems. solve those problems. solve those
+problems. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Like for
+what &gt;&gt; Like for what &gt;&gt; Like for what questions we have to
+submit our code and questions we have to submit our code and questions
+we have to submit our code and like what are the results? like what are
+the results? like what are the results? &gt;&gt; Yeah. Um so for the
+problems where you &gt;&gt; Yeah. Um so for the problems where you
+&gt;&gt; Yeah. Um so for the problems where you submit the code like
+submit the code like submit the code like you you specified the format,
+right? you you specified the format, right? you you specified the
+format, right? &gt;&gt; Yeah. everything together. &gt;&gt; Yeah.
+everything together. &gt;&gt; Yeah. everything together. &gt;&gt; So
+like say 2.3 2.4 because nothing's &gt;&gt; So like say 2.3 2.4 because
+nothing's &gt;&gt; So like say 2.3 2.4 because nothing's mentioned
+except just the prompts like mentioned except just the prompts like
+mentioned except just the prompts like do for that or do I just need do
+for that or do I just need do for that or do I just need &gt;&gt; um if
+it asks for submit your code I &gt;&gt; um if it asks for submit your
+code I &gt;&gt; um if it asks for submit your code I think think think
+&gt;&gt; so that's that's the phase submit your &gt;&gt; so that's
+that's the phase submit your &gt;&gt; so that's that's the phase submit
+your code. code. code. &gt;&gt; Um I mean if you if you're not sure I
+&gt;&gt; Um I mean if you if you're not sure I &gt;&gt; Um I mean if you
+if you're not sure I can submit it just in case. can submit it just in
+case. can submit it just in case. &gt;&gt; Yeah. Yeah. And ba basically
+if it says &gt;&gt; Yeah. Yeah. And ba basically if it says &gt;&gt;
+Yeah. Yeah. And ba basically if it says submit your code you need to
+submit your submit your code you need to submit your submit your code
+you need to submit your code. Um like honestly we're probably code. Um
+like honestly we're probably code. Um like honestly we're probably going
+to be looking at the code this going to be looking at the code this
+going to be looking at the code this time and not actually running it.
+When time and not actually running it. When time and not actually
+running it. When we will be running the code is uh we will be running
+the code is uh we will be running the code is uh especially for the very
+last assignment. especially for the very last assignment. especially for
+the very last assignment. Um and so like you need to be building Um and
+so like you need to be building Um and so like you need to be building
+up to the last assignment. But we want up to the last assignment. But we
+want up to the last assignment. But we want to make sure that we have
+like proof to make sure that we have like proof to make sure that we
+have like proof that you actually did the thing. So that that you
+actually did the thing. So that that you actually did the thing. So that
+that's why we'll have you submit the that's why we'll have you submit
+the that's why we'll have you submit the code and we'll browse through
+it but code and we'll browse through it but code and we'll browse
+through it but probably won't be running it ourselves. probably won't be
+running it ourselves. probably won't be running it ourselves. So So So
+&gt;&gt; generally if you're not sure it's a good &gt;&gt; generally if
+you're not sure it's a good &gt;&gt; generally if you're not sure it's a
+good idea. idea. idea. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. You
+don't need to submit like models or You don't need to submit like models
+or You don't need to submit like models or stuff like that. So, please
+don't please stuff like that. So, please don't please stuff like that.
+So, please don't please don't upload qu 32B or stuff like that don't
+upload qu 32B or stuff like that don't upload qu 32B or stuff like that
+together with your code, but we we would together with your code, but we
+we would together with your code, but we we would like to see the code.
+Cool. Um, any like to see the code. Cool. Um, any like to see the code.
+Cool. Um, any other any other things? Okay, cool. Um, so now I'd like to
+talk Okay, cool. Um, so now I'd like to talk Okay, cool. Um, so now I'd
+like to talk about reasoning models. Um, so yeah, about reasoning
+models. Um, so yeah, about reasoning models. Um, so yeah, let's get
+started. let's get started. let's get started. So, what do I mean when I
+say reasoning So, what do I mean when I say reasoning So, what do I mean
+when I say reasoning models? Um, models? Um, models? Um, essentially
+essentially essentially you could argue about definitions, but you could
+argue about definitions, but you could argue about definitions, but the
+definition that most people use the definition that most people use the
+definition that most people use nowadays is a model trained usually
+nowadays is a model trained usually nowadays is a model trained usually
+using reinforcement learning to leverage using reinforcement learning to
+leverage using reinforcement learning to leverage long chains of thought
+to perform better long chains of thought to perform better long chains
+of thought to perform better on particular tasks. And these long on
+particular tasks. And these long on particular tasks. And these long
+chains of thought, the it's not just chains of thought, the it's not
+just chains of thought, the it's not just that they're long, um, but
+they have that they're long, um, but they have that they're long, um,
+but they have particular properties. And I'm going to particular
+properties. And I'm going to particular properties. And I'm going to
+talk specifically about those particular talk specifically about those
+particular talk specifically about those particular properties later in
+the class. Um but properties later in the class. Um but properties later
+in the class. Um but they're extended reasoning sequences. they're
+extended reasoning sequences. they're extended reasoning sequences. They
+have traits like selfcorrection. So They have traits like
+selfcorrection. So They have traits like selfcorrection. So it's like
+going back and reexamining it's like going back and reexamining it's
+like going back and reexamining uh previous you know assumptions uh
+previous you know assumptions uh previous you know assumptions and in
+general uh with reasoning models and in general uh with reasoning models
+and in general uh with reasoning models longer sequences are correlated
+with longer sequences are correlated with longer sequences are
+correlated with better performance. And so I talked better performance.
+And so I talked better performance. And so I talked about even short
+chains of thought about even short chains of thought about even short
+chains of thought longer uh you know longer sequences longer uh you know
+longer sequences longer uh you know longer sequences tended to be
+correlated with better tended to be correlated with better tended to be
+correlated with better performance but that correlation is you
+performance but that correlation is you performance but that correlation
+is you know even more pronounced for reasoning know even more pronounced
+for reasoning know even more pronounced for reasoning models models
+models and typically but again not always these and typically but again
+not always these and typically but again not always these are trained
+with verifiable rewards and are trained with verifiable rewards and are
+trained with verifiable rewards and I'll you know talk about the
+difference I'll you know talk about the difference I'll you know talk
+about the difference between that in a second. So the first paper uh
+that did this kind So the first paper uh that did this kind So the first
+paper uh that did this kind of from the point of view of LLMs is a of
+from the point of view of LLMs is a of from the point of view of LLMs is
+a paper called star and this uh and all of paper called star and this uh
+and all of paper called star and this uh and all of these are in the
+references but these are in the references but these are in the
+references but basically the idea of star and you know basically the
+idea of star and you know basically the idea of star and you know other
+similar models is that you have a other similar models is that you have
+a other similar models is that you have a question you run it through
+the language question you run it through the language question you run
+it through the language model you generate a rationale and an model you
+generate a rationale and an model you generate a rationale and an answer
+and the rationale is essentially answer and the rationale is essentially
+answer and the rationale is essentially your chain of your chain of your
+chain of And given the answer um you run a And given the answer um you
+run a And given the answer um you run a verifiable reward uh and check
+whether verifiable reward uh and check whether verifiable reward uh and
+check whether it's correct or whether it's wrong. And it's correct or
+whether it's wrong. And it's correct or whether it's wrong. And the most
+typical verifiable reward um is the most typical verifiable reward um is
+the most typical verifiable reward um is either math or code. And in the
+case of either math or code. And in the case of either math or code. And
+in the case of math, this means that you extract the math, this means
+that you extract the math, this means that you extract the answer to the
+math problem. uh you know answer to the math problem. uh you know answer
+to the math problem. uh you know often it's written in the latex like
+often it's written in the latex like often it's written in the latex
+like boxed uh you know uh command um and you boxed uh you know uh
+command um and you boxed uh you know uh command um and you you check
+whether it matches. This is uh you check whether it matches. This is uh
+you check whether it matches. This is uh generally pretty simple. Um but
+it also generally pretty simple. Um but it also generally pretty simple.
+Um but it also can be tricky like what if you say um can be tricky like
+what if you say um can be tricky like what if you say um five uh 500 cm
+or 5 m you know those are five uh 500 cm or 5 m you know those are five
+uh 500 cm or 5 m you know those are equivalent but uh you would need to
+know equivalent but uh you would need to know equivalent but uh you
+would need to know that in order to uh check to make sure that in order
+to uh check to make sure that in order to uh check to make sure it's
+correct but in general you know it's correct but in general you know
+it's correct but in general you know it's much simpler than checking
+whether it's much simpler than checking whether it's much simpler than
+checking whether free form uh text is correct. free form uh text is
+correct. free form uh text is correct. And then um And then um And then
+um one thing that they did in star which one thing that they did in star
+which one thing that they did in star which isn't necessarily done in
+other isn't necessarily done in other isn't necessarily done in other
+reasoning models is you have a wrong reasoning models is you have a
+wrong reasoning models is you have a wrong answer. If you get a wrong
+answer, it answer. If you get a wrong answer, it answer. If you get a
+wrong answer, it would then uh give a hint. So it would would then uh
+give a hint. So it would would then uh give a hint. So it would
+basically give the correct answer. You basically give the correct
+answer. You basically give the correct answer. You would run that
+through the language would run that through the language would run that
+through the language model and then the language model would model and
+then the language model would model and then the language model would
+generate a rationale that matched with generate a rationale that matched
+with generate a rationale that matched with the answer. So this is an
+extra thing the answer. So this is an extra thing the answer. So this is
+an extra thing that was added in star but actually that was added in
+star but actually that was added in star but actually isn't added in all
+uh language models isn't added in all uh language models isn't added in
+all uh language models nowadays. nowadays. nowadays. So I I kind of went
+through this already So I I kind of went through this already So I I
+kind of went through this already I guess but like generate answers in I
+guess but like generate answers in I guess but like generate answers in
+rationals filter correct chains based on rationals filter correct chains
+based on rationals filter correct chains based on reward if correct keep
+the full chain if reward if correct keep the full chain if reward if
+correct keep the full chain if incorrect generate a rational given an
+incorrect generate a rational given an incorrect generate a rational
+given an answer and then you fine-tune on the answer and then you fine-
+tune on the answer and then you fine-tune on the filtered data. So this
+um is kind of filtered data. So this um is kind of filtered data. So
+this um is kind of reinforcement learning. it's uh you know
+reinforcement learning. it's uh you know reinforcement learning. it's uh
+you know very close to reinforcement learning or very close to
+reinforcement learning or very close to reinforcement learning or even
+maybe a particular variety of even maybe a particular variety of even
+maybe a particular variety of reinforcement learning uh where you know
+reinforcement learning uh where you know reinforcement learning uh where
+you know you roll out you get uh get results and you roll out you get uh
+get results and you roll out you get uh get results and you trade. So um
+another way to think about it is So um another way to think about it is
+So um another way to think about it is uh through a policy gradient
+objective. uh through a policy gradient objective. uh through a policy
+gradient objective. Do peas has everybody heard of policy Do peas has
+everybody heard of policy Do peas has everybody heard of policy gradient
+or some people gradient or some people gradient or some people maybe
+maybe mo most people. Um but maybe maybe mo most people. Um but maybe
+maybe mo most people. Um but basically the way the way a policy
+basically the way the way a policy basically the way the way a policy
+gradient works is you um you get a gradient works is you um you get a
+gradient works is you um you get a reward and based on the reward you
+reward and based on the reward you reward and based on the reward you
+essentially multiply the essentially multiply the essentially multiply
+the um the gradient of the log likelihood of um the gradient of the log
+likelihood of um the gradient of the log likelihood of the output by
+that reward. the output by that reward. the output by that reward. And
+so this is the general form of And so this is the general form of And so
+this is the general form of policy gradient algorithms and the most
+policy gradient algorithms and the most policy gradient algorithms and
+the most famous one is reinforce. famous one is reinforce. famous one is
+reinforce. Um there's a lot of variants on this. Um there's a lot of
+variants on this. Um there's a lot of variants on this. You could almost
+argue that gpo is also You could almost argue that gpo is also You could
+almost argue that gpo is also a variant on this. Uh and uh we'll we'll a
+variant on this. Uh and uh we'll we'll a variant on this. Uh and uh
+we'll we'll talk about gpo in a second. Um but this talk about gpo in a
+second. Um but this talk about gpo in a second. Um but this is like the
+most simple version. It's is like the most simple version. It's is like
+the most simple version. It's basically like if it's correct you get a
+basically like if it's correct you get a basically like if it's correct
+you get a reward of one. If it's incorrect you get reward of one. If
+it's incorrect you get reward of one. If it's incorrect you get a reward
+of zero. Um and so this will discard gradients Um and so this will
+discard gradients Um and so this will discard gradients for incorrect uh
+reasoning shades. Um so so this is you know really simple Um so so this
+is you know really simple Um so so this is you know really simple but
+they demonstrated that even uh you but they demonstrated that even uh
+you but they demonstrated that even uh you know three years ago or so
+this works know three years ago or so this works know three years ago or
+so this works and so they they tested a relatively and so they they
+tested a relatively and so they they tested a relatively small model GPJ
+uh 6B on arithmetic small model GPJ uh 6B on arithmetic small model GPJ
+uh 6B on arithmetic common sense QA and GSM AK. Um so uh common sense QA
+and GSM AK. Um so uh common sense QA and GSM AK. Um so uh arithmetic is
+an arithmetic data set. arithmetic is an arithmetic data set. arithmetic
+is an arithmetic data set. Common sense QA is just QA and GSMAK is
+Common sense QA is just QA and GSMAK is Common sense QA is just QA and
+GSMAK is kind of grade school math problems. And the format that they
+took here was And the format that they took here was And the format that
+they took here was um kind of interesting. They basically um kind of
+interesting. They basically um kind of interesting. They basically uh
+started out with a small amount of uh started out with a small amount of
+uh started out with a small amount of examples in this format. Um so the
+input examples in this format. Um so the input examples in this format.
+Um so the input looked like this and the target looked looked like this
+and the target looked looked like this and the target looked like this
+and they had um this scratch like this and they had um this scratch like
+this and they had um this scratch pad. And so for the scratch pad pad.
+And so for the scratch pad pad. And so for the scratch pad basically uh
+they took this basically uh they took this basically uh they took this
+um they checked how much you would um they checked how much you would um
+they checked how much you would carry. So uh basically this is uh 9
+carry. So uh basically this is uh 9 carry. So uh basically this is uh 9
++ 4 is three carry one and then you + 4 is three carry one and then you
++ 4 is three carry one and then you would have 2 + 5 which is the one in
+the would have 2 + 5 which is the one in the would have 2 + 5 which is
+the one in the middle. Um and so 2 + 5 uh plus carry 1 middle. Um and so
+2 + 5 uh plus carry 1 middle. Um and so 2 + 5 uh plus carry 1 is 8 and
+then you would have zero and uh is 8 and then you would have zero and uh
+is 8 and then you would have zero and uh do this and then uh 8 + 8 + 3
+or 883 is do this and then uh 8 + 8 + 3 or 883 is do this and then uh 8
++ 8 + 3 or 883 is the final answer. And so this was like a the final
+answer. And so this was like a the final answer. And so this was like a
+very structured way of representing very structured way of representing
+very structured way of representing reasoning. And they actually
+generated reasoning. And they actually generated reasoning. And they
+actually generated this in a rule-based fashion to kind of this in a
+rule-based fashion to kind of this in a rule-based fashion to kind of
+like seed the model to be good enough uh like seed the model to be good
+enough uh like seed the model to be good enough uh to later be able to
+be trained using RL. And And And they uh demonstrated that you could
+they uh demonstrated that you could they uh demonstrated that you could
+train the model quite well on one digit train the model quite well on
+one digit train the model quite well on one digit addition um with uh
+without addition um with uh without addition um with uh without
+rationalization. Um but with rational uh rationalization. Um but with
+rational uh rationalization. Um but with rational uh without
+rationalization things like without rationalization things like without
+rationalization things like three-digit and fourdigit just uh didn't
+three-digit and fourdigit just uh didn't three-digit and fourdigit just
+uh didn't work as well because you had very sparse work as well because
+you had very sparse work as well because you had very sparse rewards
+where it wasn't good at uh you rewards where it wasn't good at uh you
+rewards where it wasn't good at uh you know know know it it wasn't able
+to get enough of the it it wasn't able to get enough of the it it wasn't
+able to get enough of the five-digit uh addition ones correct in five-
+digit uh addition ones correct in five-digit uh addition ones correct in
+order to add them to the training data. order to add them to the
+training data. order to add them to the training data. But if you added
+rationalization, you But if you added rationalization, you But if you
+added rationalization, you see a much faster um uptake of uh like see a
+much faster um uptake of uh like see a much faster um uptake of uh like
+how well it is able to do the longer how well it is able to do the
+longer how well it is able to do the longer problems. And one thing I
+should note is problems. And one thing I should note is problems. And
+one thing I should note is um here the iterations uh is four um here the
+iterations uh is four um here the iterations uh is four iterations four
+is here. So like the iterations four is here. So like the iterations
+four is here. So like the x-axis is actually different on these x-axis
+is actually different on these x-axis is actually different on these two
+figures. But you can see that the um two figures. But you can see that
+the um two figures. But you can see that the um uh it does a lot better
+when you uh it does a lot better when you uh it does a lot better when
+you generate uh based the output based on generate uh based the output
+based on generate uh based the output based on hints. It does like early
+hints. It does like early hints. It does like early enough iterations
+with rationalization enough iterations with rationalization enough
+iterations with rationalization will always perform better or is it like
+will always perform better or is it like will always perform better or
+is it like so yeah that's a great question so you so yeah that's a great
+question so you so yeah that's a great question so you see that this
+five is kind of plateauing see that this five is kind of plateauing see
+that this five is kind of plateauing I actually wish they had brought
+this I actually wish they had brought this I actually wish they had
+brought this out farther so we could see that but I out farther so we
+could see that but I out farther so we could see that but I think uh
+indeed it is plateauing earlier think uh indeed it is plateauing earlier
+think uh indeed it is plateauing earlier and this is going to be a
+common theme and this is going to be a common theme and this is going to
+be a common theme in reasoning models actually which is if in reasoning
+models actually which is if in reasoning models actually which is if you
+kind of like overs supervise you kind of like overs supervise you kind
+of like overs supervise reasoning models they bootstrap a lot reasoning
+models they bootstrap a lot reasoning models they bootstrap a lot faster
+but then they end up plateauing faster but then they end up plateauing
+faster but then they end up plateauing at a worse place than if you
+train them at a worse place than if you train them at a worse place than
+if you train them purely with reinforcement learning. &gt;&gt; Oh, these
+are different digits. Uh the &gt;&gt; Oh, these are different digits. Uh
+the &gt;&gt; Oh, these are different digits. Uh the like the number of
+digits in the like the number of digits in the like the number of digits
+in the addition problem addition problem addition problem &gt;&gt; and
+so like just just so I get &gt;&gt; and so like just just so I get
+&gt;&gt; and so like just just so I get terminology rationalizing refers
+to terminology rationalizing refers to terminology rationalizing refers
+to inserting the rational, right? inserting the rational, right?
+inserting the rational, right? &gt;&gt; Correct. Yeah, it's the bottom
+part of &gt;&gt; Correct. Yeah, it's the bottom part of &gt;&gt;
+Correct. Yeah, it's the bottom part of the the figure that I showed. the
+the figure that I showed. the the figure that I showed. &gt;&gt; Yeah.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Only the bottom part, not the the
+top &gt;&gt; Only the bottom part, not the the top &gt;&gt; Only the
+bottom part, not the the top part. Top part just happens. So without
+part. Top part just happens. So without part. Top part just happens. So
+without rationalization, it's only doing the top rationalization, it's
+only doing the top rationalization, it's only doing the top part. part.
+part. &gt;&gt; I see. &gt;&gt; Yep. &gt;&gt; Cool. &gt;&gt; Cool.
+&gt;&gt; Cool. So um yeah, this was a very early So um yeah, this was a
+very early So um yeah, this was a very early attempt at uh doing
+reasoning models. Um attempt at uh doing reasoning models. Um attempt at
+uh doing reasoning models. Um and it it kind of seated a whole bunch and
+it it kind of seated a whole bunch and it it kind of seated a whole
+bunch of uh you know follow-up work. Uh I I'm of uh you know follow-up
+work. Uh I I'm of uh you know follow-up work. Uh I I'm not sure which
+came first. uh OpenAI's not sure which came first. uh OpenAI's not sure
+which came first. uh OpenAI's uh reasoning model efforts or um or this
+uh reasoning model efforts or um or this uh reasoning model efforts or
+um or this but I I feel like certainly it but I I feel like certainly it
+but I I feel like certainly it contributed to DeepCar1 which probably a
+contributed to DeepCar1 which probably a contributed to DeepCar1 which
+probably a lot of people have heard about. Um but lot of people have
+heard about. Um but lot of people have heard about. Um but basically
+DeepCar 1 was a reasoning basically DeepCar 1 was a reasoning basically
+DeepCar 1 was a reasoning model that was trained uh with largecale model
+that was trained uh with largecale model that was trained uh with
+largecale reinforcement learning directly on the reinforcement learning
+directly on the reinforcement learning directly on the base model. Um,
+and one of the big kind base model. Um, and one of the big kind base
+model. Um, and one of the big kind of interesting and in and possibly,
+you of interesting and in and possibly, you of interesting and in and
+possibly, you know, even checking things is they did know, even checking
+things is they did know, even checking things is they did no uh
+supervised fine-tuning at all no uh supervised fine-tuning at all no uh
+supervised fine-tuning at all first. And um they they trained it using
+first. And um they they trained it using first. And um they they trained
+it using pure reinforcement learning objectives. pure reinforcement
+learning objectives. pure reinforcement learning objectives. So no like
+rationalization or anything So no like rationalization or anything So no
+like rationalization or anything like that. Um using an objective that
+like that. Um using an objective that like that. Um using an objective
+that they call uh GRPO. they call uh GRPO. they call uh GRPO. And they
+also had a multi-stage pipeline And they also had a multi-stage pipeline
+And they also had a multi-stage pipeline where they uh did they started
+out with where they uh did they started out with where they uh did they
+started out with nothing did RL and then based on the RL nothing did RL
+and then based on the RL nothing did RL and then based on the RL they
+grabbed a whole bunch of successful they grabbed a whole bunch of
+successful they grabbed a whole bunch of successful trajectories and
+then they um uh trained trajectories and then they um uh trained
+trajectories and then they um uh trained a SFT model on the successful a
+SFT model on the successful a SFT model on the successful trajectories
+and then they did uh RL trajectories and then they did uh RL
+trajectories and then they did uh RL again in the end. So like they both
+again in the end. So like they both again in the end. So like they both
+tested out with doing just like cold tested out with doing just like
+cold tested out with doing just like cold start uh RL where they did you
+know no start uh RL where they did you know no start uh RL where they
+did you know no supervised fine-tuning first and then supervised fine-
+tuning first and then supervised fine-tuning first and then they also uh
+attempted one that did they also uh attempted one that did they also uh
+attempted one that did supervised fine-tuning first. Um so the GRPO
+objective has become very Um so the GRPO objective has become very Um so
+the GRPO objective has become very popular basically because of this
+paper popular basically because of this paper popular basically because
+of this paper but also because it's like just a good but also because
+it's like just a good but also because it's like just a good idea in the
+first place. Um, and it it idea in the first place. Um, and it it idea
+in the first place. Um, and it it puts together like puts together like
+puts together like &gt;&gt; when I saw this objective, I didn't &gt;&gt;
+when I saw this objective, I didn't &gt;&gt; when I saw this objective,
+I didn't think anything was new about it. It's think anything was new
+about it. It's think anything was new about it. It's not like a
+particularly new objective, not like a particularly new objective, not
+like a particularly new objective, but it combines together a lot of uh
+but it combines together a lot of uh but it combines together a lot of
+uh existing good ideas from uh RL. So, it's existing good ideas from uh
+RL. So, it's existing good ideas from uh RL. So, it's very worth knowing
+about. very worth knowing about. very worth knowing about. So, the basic
+idea is you first generate So, the basic idea is you first generate So,
+the basic idea is you first generate outputs in a group where the query
+is outputs in a group where the query is outputs in a group where the
+query is the same. So, the input uh for all of the same. So, the input
+uh for all of the same. So, the input uh for all of these outputs is the
+same. And for each these outputs is the same. And for each these outputs
+is the same. And for each one of them uh you get a reward. So you one of
+them uh you get a reward. So you one of them uh you get a reward. So you
+have all these uh outputs and you have a have all these uh outputs and
+you have a have all these uh outputs and you have a reward. And then you
+use group reward. And then you use group reward. And then you use group
+statistics to compute an advantage statistics to compute an advantage
+statistics to compute an advantage function. And an advantage function
+is function. And an advantage function is function. And an advantage
+function is basically like how much better is this basically like how
+much better is this basically like how much better is this output than
+some other like comparison. output than some other like comparison.
+output than some other like comparison. And And And there's other
+meanings for advantage there's other meanings for advantage there's
+other meanings for advantage function also. So an advantage function
+function also. So an advantage function function also. So an advantage
+function can also be like you have a value can also be like you have a
+value can also be like you have a value function or something like this
+and then function or something like this and then function or something
+like this and then you see how much better a particular you see how much
+better a particular you see how much better a particular output did than
+your value function output did than your value function output did than
+your value function which predict predicts. But the way they which
+predict predicts. But the way they which predict predicts. But the way
+they calculate the advantage function here is calculate the advantage
+function here is calculate the advantage function here is the advantage
+function for the E element the advantage function for the E element the
+advantage function for the E element of this is equal to the reward
+minus the of this is equal to the reward minus the of this is equal to
+the reward minus the mean of all of the rewards in the group mean of all
+of the rewards in the group mean of all of the rewards in the group
+divided by the standard deviation of all divided by the standard
+deviation of all divided by the standard deviation of all of the rewards
+in the group. And so what of the rewards in the group. And so what of
+the rewards in the group. And so what that means is essentially um uh
+that that means is essentially um uh that that means is essentially um
+uh that you're seeing how much better this you're seeing how much better
+this you're seeing how much better this output did than all of the other
+outputs output did than all of the other outputs output did than all of
+the other outputs in the group. And then you're in the group. And then
+you're in the group. And then you're normalizing by the standard
+deviation. Pretty clear. Pretty clear. Pretty clear. Okay. Um and so
+then you you have this Okay. Um and so then you you have this Okay. Um
+and so then you you have this kind of scary looking loss. Um, I kind of
+scary looking loss. Um, I kind of scary looking loss. Um, I promise it's
+not as scary as it actually promise it's not as scary as it actually
+promise it's not as scary as it actually looks, but basically, um, what
+you're looks, but basically, um, what you're looks, but basically, um,
+what you're doing is you're calculating the, doing is you're calculating
+the, doing is you're calculating the, uh, the probability according to
+the uh, the probability according to the uh, the probability according
+to the policy of that output divided by the policy of that output
+divided by the policy of that output divided by the probability
+according to the policy of probability according to the policy of
+probability according to the policy of the old output multiplied by the
+the old output multiplied by the the old output multiplied by the
+advantage function. And so basically advantage function. And so
+basically advantage function. And so basically this is saying if the
+advantage function this is saying if the advantage function this is
+saying if the advantage function is positive you uh probably want to
+make is positive you uh probably want to make is positive you uh
+probably want to make this probability higher and if the this
+probability higher and if the this probability higher and if the
+advantage function is negative you want advantage function is negative
+you want advantage function is negative you want to make this
+probability lower. to make this probability lower. to make this
+probability lower. Then separately from this we also have Then
+separately from this we also have Then separately from this we also have
+this clipping function where you set this clipping function where you
+set this clipping function where you set epsilon and the epsilon is
+basically a epsilon and the epsilon is basically a epsilon and the
+epsilon is basically a range uh of divergent diverging from one range uh
+of divergent diverging from one range uh of divergent diverging from one
+um where the um where basically like if um where the um where basically
+like if um where the um where basically like if you're you're you're 0.1
+above one or 0.01 01 above one. Uh 0.1 above one or 0.01 01 above one.
+Uh 0.1 above one or 0.01 01 above one. Uh you clip this so it doesn't
+exceed this you clip this so it doesn't exceed this you clip this so it
+doesn't exceed this range and then you multiply that by the range and
+then you multiply that by the range and then you multiply that by the
+advantage here. Um and you take the advantage here. Um and you take the
+advantage here. Um and you take the minimum of these two. And so
+basically minimum of these two. And so basically minimum of these two.
+And so basically what this is saying is you either want what this is
+saying is you either want what this is saying is you either want to
+increase the advantage for the you to increase the advantage for the you
+to increase the advantage for the you know positive advantage uh here or
+um or know positive advantage uh here or um or know positive advantage
+uh here or um or you want to take this clipped value so you want to take
+this clipped value so you want to take this clipped value so you're not
+like decreasing you're not like decreasing you're not like decreasing um
+you're not moving in a negative um you're not moving in a negative um
+you're not moving in a negative direction too much. uh basically so like
+direction too much. uh basically so like direction too much. uh
+basically so like actually maybe it's better to draw it on actually
+maybe it's better to draw it on actually maybe it's better to draw it on
+the board. So basically if if a is positive if a is positive if a is
+positive if a is positive you'll have um pi 1 / pi 2 should have
+practiced this before I came should have practiced this before I came
+should have practiced this before I came here. So typically you would
+have um pi theta So typically you would have um pi theta So typically
+you would have um pi theta / pi theta old multiplied by the / pi theta
+old multiplied by the / pi theta old multiplied by the advantage
+function. advantage function. advantage function. And And And here you
+will clip here you will clip here you will clip you will take the
+minimum you will take the minimum you will take the minimum if this is
+lower. You'll take the minimum if this is You'll take the minimum if
+this is You'll take the minimum if this is higher than 1 plus theta.
+Right? So if if this is getting too high you So if if this is getting
+too high you So if if this is getting too high you will clip and then if
+you take if this will clip and then if you take if this will clip and
+then if you take if this is negative is negative is negative you will
+take you will take you will take you will clip if it's less than one you
+will clip if it's less than one you will clip if it's less than one
+minus pi uh sorry 1 minus epsilon. So, minus pi uh sorry 1 minus
+epsilon. So, minus pi uh sorry 1 minus epsilon. So, so basically what
+this is doing is it's so basically what this is doing is it's so
+basically what this is doing is it's preventing like two extreme uh
+values preventing like two extreme uh values preventing like two extreme
+uh values from kind of like messing up your from kind of like messing up
+your from kind of like messing up your gradients. And uh yeah, actually
+I I gradients. And uh yeah, actually I I gradients. And uh yeah,
+actually I I should go back and like actually draw should go back and
+like actually draw should go back and like actually draw that and share
+it on Patza. But the the that and share it on Patza. But the the that
+and share it on Patza. But the the basic idea is to prevent instability
+basic idea is to prevent instability basic idea is to prevent
+instability when you're um when you're getting two when you're um when
+you're getting two when you're um when you're getting two extreme values
+in this ratio here. extreme values in this ratio here. extreme values in
+this ratio here. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Look at the lower extremes
+&gt;&gt; Look at the lower extremes &gt;&gt; Look at the lower extremes
+if we have a multiple. if we have a multiple. if we have a multiple.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. Uh it it kind of looks like
+this. So if Uh it it kind of looks like this. So if Uh it it kind of
+looks like this. So if this goes this goes this goes here, this um can
+go down to zero. here, this um can go down to zero. here, this um can go
+down to zero. Basically Basically Basically &gt;&gt; it could actually
+like if AI is really &gt;&gt; it could actually like if AI is really
+&gt;&gt; it could actually like if AI is really negative and pi theta y
+of q is not too negative and pi theta y of q is not too negative and pi
+theta y of q is not too is not zero maybe. is not zero maybe. is not
+zero maybe. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Then
+you can have like the minimum far &gt;&gt; Then you can have like the
+minimum far &gt;&gt; Then you can have like the minimum far exceeding
+anything else. Maybe 1,000 exceeding anything else. Maybe 1,000
+exceeding anything else. Maybe 1,000 into 1 by 10. into 1 by 10. into 1
+by 10. &gt;&gt; Yeah. So, this this could go um this &gt;&gt; Yeah. So,
+this this could go um this &gt;&gt; Yeah. So, this this could go um this
+could go way down. And basically, you could go way down. And basically,
+you could go way down. And basically, you don't want to don't want to
+don't want to like you want to prevent it from pushing like you want to
+prevent it from pushing like you want to prevent it from pushing it way
+too far down, I guess. And so, it way too far down, I guess. And so, it
+way too far down, I guess. And so, you don't want to remove the gradient
+you don't want to remove the gradient you don't want to remove the
+gradient when it's going really far down. when it's going really far
+down. when it's going really far down. &gt;&gt; See any way to like sort
+of keep the &gt;&gt; See any way to like sort of keep the &gt;&gt; See
+any way to like sort of keep the like, you know, I can see how positive
+like, you know, I can see how positive like, you know, I can see how
+positive changes aren't enforced too much. The changes aren't enforced
+too much. The changes aren't enforced too much. The clip does that. clip
+does that. clip does that. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah.
+&gt;&gt; But I cannot see how the minimum changes &gt;&gt; But I cannot
+see how the minimum changes &gt;&gt; But I cannot see how the minimum
+changes are being enforced because the minimum are being enforced
+because the minimum are being enforced because the minimum is outside
+the clip, right? is outside the clip, right? is outside the clip, right?
+&gt;&gt; Yeah. So the minimum basically like &gt;&gt; Yeah. So the
+minimum basically like &gt;&gt; Yeah. So the minimum basically like
+&gt;&gt; if you what will what will happen? Let's &gt;&gt; if you what
+will what will happen? Let's &gt;&gt; if you what will what will happen?
+Let's focus on the case where advantage is focus on the case where
+advantage is focus on the case where advantage is positive because
+that's like easier positive because that's like easier positive because
+that's like easier easier to parse. So if the advantage is easier to
+parse. So if the advantage is easier to parse. So if the advantage is
+positive, positive, positive, &gt;&gt; no matter how far down this goes,
+the &gt;&gt; no matter how far down this goes, the &gt;&gt; no matter
+how far down this goes, the minimum of this will take this. Right.
+minimum of this will take this. Right. minimum of this will take this.
+Right. Right. Right. Right. &gt;&gt; And so this could go like to zero.
+&gt;&gt; And so this could go like to zero. &gt;&gt; And so this could
+go like to zero. And if that goes to zero and the And if that goes to
+zero and the And if that goes to zero and the advantage of is positive,
+then that's advantage of is positive, then that's advantage of is
+positive, then that's kind of like bad, right? You don't want kind of
+like bad, right? You don't want kind of like bad, right? You don't want
+to be reducing the you don't want to be to be reducing the you don't
+want to be to be reducing the you don't want to be reducing the
+probability to zero when reducing the probability to zero when reducing
+the probability to zero when this is actually a good output, right? this
+is actually a good output, right? this is actually a good output, right?
+&gt;&gt; And so because of that, your gradient &gt;&gt; And so because
+of that, your gradient &gt;&gt; And so because of that, your gradient
+will never be clipped if you're like will never be clipped if you're
+like will never be clipped if you're like reducing too far. Um, on the
+other hand, reducing too far. Um, on the other hand, reducing too far.
+Um, on the other hand, if this is a good output, you don't want if this
+is a good output, you don't want if this is a good output, you don't
+want to increase its probability all the way to increase its probability
+all the way to increase its probability all the way to one because
+that's like too extreme to one because that's like too extreme to one
+because that's like too extreme of a change and that might be like of a
+change and that might be like of a change and that might be like hurting
+the probability of other things hurting the probability of other things
+hurting the probability of other things that you don't have in your um
+like in that you don't have in your um like in that you don't have in
+your um like in your set of things to be considering. your set of things
+to be considering. your set of things to be considering. So, So, So,
+&gt;&gt; question is what if AI is negative? &gt;&gt; question is what
+if AI is negative? &gt;&gt; question is what if AI is negative? What? So
+if AI is negative then you What? So if AI is negative then you What? So
+if AI is negative then you don't want to be don't want to be don't want
+to be like like like you don't want the probability to you don't want
+the probability to you don't want the probability to increase really
+really high and so you increase really really high and so you increase
+really really high and so you don't clip the gradient when the don't
+clip the gradient when the don't clip the gradient when the probability
+it's increasing probability it's increasing probability it's increasing
+&gt;&gt; but like yeah does it cap on how much you can yeah does it cap
+on how much you can yeah does it cap on how much you can function that
+function that function that I'm sorry I'm sorry just I just want to I'm
+sorry I'm sorry just I just want to I'm sorry I'm sorry just I just want
+to see it is that like um Suppose AI is see it is that like um Suppose
+AI is see it is that like um Suppose AI is minus 1,000. minus 1,000.
+minus 1,000. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Pi
+theta by pi theta old is 1x 10. &gt;&gt; Pi theta by pi theta old is 1x
+10. &gt;&gt; Pi theta by pi theta old is 1x 10. &gt;&gt; Mhm. &gt;&gt;
+Mhm. &gt;&gt; Mhm. &gt;&gt; There is nothing stopping that extreme
+&gt;&gt; There is nothing stopping that extreme &gt;&gt; There is
+nothing stopping that extreme decrease from happening decrease from
+happening decrease from happening because minus 100 is smaller than any
+because minus 100 is smaller than any because minus 100 is smaller than
+any clip value. So well this will be clipped well this will be clipped
+well this will be clipped like let's say this was 0.1. like let's say
+this was 0.1. like let's say this was 0.1. So 1 / 10 So 1 / 10 So 1 / 10
+1 / 10 1 / 10 1 / 10 * -100 * -100 * -100 is is is not as small is 1 /
+10 uh 9 / 10 * - not as small is 1 / 10 uh 9 / 10 * - not as small is 1
+/ 10 uh 9 / 10 * - 10,000. So that would be clipped I think 10,000. So
+that would be clipped I think 10,000. So that would be clipped I think
+like like like &gt;&gt; only the stuff inside the clip would be &gt;&gt;
+only the stuff inside the clip would be &gt;&gt; only the stuff inside
+the clip would be clipped right. So like that things clipped right. So
+like that things clipped right. So like that things outside. outside.
+outside. &gt;&gt; Yeah. So so this would be this would be &gt;&gt; Yeah.
+So so this would be this would be &gt;&gt; Yeah. So so this would be
+this would be 1 divided by 10. This would or this 1 divided by 10. This
+would or this 1 divided by 10. This would or this would be 0.1 and this
+would be 0.9 would be 0.1 and this would be 0.9 would be 0.1 and this
+would be 0.9 because this would be clipped be like because this would be
+clipped be like because this would be clipped be like let's say epsilon
+was 0.1 this would be let's say epsilon was 0.1 this would be let's say
+epsilon was 0.1 this would be clipped between 0.9 and 1.1. clipped
+between 0.9 and 1.1. clipped between 0.9 and 1.1. &gt;&gt; So that would
+be clipped to 0.9 this one &gt;&gt; So that would be clipped to 0.9 this
+one &gt;&gt; So that would be clipped to 0.9 this one would go all the
+way towards minus 100. would go all the way towards minus 100. would go
+all the way towards minus 100. So this this would go to minus 100 and So
+this this would go to minus 100 and So this this would go to minus 100
+and this would go to - 900. this would go to - 900. this would go to -
+900. &gt;&gt; The pepper is 0.9. Does the clip &gt;&gt; The pepper is
+0.9. Does the clip &gt;&gt; The pepper is 0.9. Does the clip function
+ensure function ensure function ensure &gt;&gt; this is multiplied by
+the advantage too? &gt;&gt; this is multiplied by the advantage too?
+&gt;&gt; this is multiplied by the advantage too? &gt;&gt; Ah. &gt;&gt;
+Ah. &gt;&gt; Ah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt;
+But all the same um doesn't it sort of &gt;&gt; But all the same um
+doesn't it sort of &gt;&gt; But all the same um doesn't it sort of like
+like like allow the allow the allow the probability to go down like like
+the probability to go down like like the probability to go down like
+like the grad is huge, right? grad is huge, right? grad is huge, right?
+the gra the gradients can get big but the gra the gradients can get big
+but the gra the gradients can get big but like you're normalizing by the
+standard like you're normalizing by the standard like you're normalizing
+by the standard deviation you're dividing by g and stuff deviation
+you're dividing by g and stuff deviation you're dividing by g and stuff
+like that so they don't get really huge like that so they don't get
+really huge like that so they don't get really huge they are normalized
+to be in a they are normalized to be in a they are normalized to be in a
+reasonable range yeah &gt;&gt; this this loss function is exactly
+&gt;&gt; this this loss function is exactly &gt;&gt; this this loss
+function is exactly equivalent to what a so policy what is equivalent to
+what a so policy what is equivalent to what a so policy what is the
+innovation what is the change from the innovation what is the change
+from the innovation what is the change from that makes that makes that
+makes &gt;&gt; so So this clipping is very similar to &gt;&gt; so So
+this clipping is very similar to &gt;&gt; so So this clipping is very
+similar to PO. Um the normalization with the PO. Um the normalization
+with the PO. Um the normalization with the advantage function is the
+main thing advantage function is the main thing advantage function is
+the main thing that JRPO is here. &gt;&gt; Yeah. It's it's basically
+inspired by PO &gt;&gt; Yeah. It's it's basically inspired by PO
+&gt;&gt; Yeah. It's it's basically inspired by PO but taking normalizing
+the advantage by but taking normalizing the advantage by but taking
+normalizing the advantage by the group. Yeah. the group. Yeah. the
+group. Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; What
+like theta and &gt;&gt; What like theta and &gt;&gt; What like theta and
+&gt;&gt; so theta theta old is the theta of uh an &gt;&gt; so theta
+theta old is the theta of uh an &gt;&gt; so theta theta old is the theta
+of uh an old policy. The old policy can be either old policy. The old
+policy can be either old policy. The old policy can be either the
+parameters before the update, which the parameters before the update,
+which the parameters before the update, which I believe is what they do
+in this par in I believe is what they do in this par in I believe is
+what they do in this par in this paper, or it can be um an even this
+paper, or it can be um an even this paper, or it can be um an even older
+policy depending on like how uh older policy depending on like how uh
+older policy depending on like how uh like off policy your generations
+are. So like off policy your generations are. So like off policy your
+generations are. So if like for example you generated over if like for
+example you generated over if like for example you generated over your
+whole corpus um and then you your whole corpus um and then you your
+whole corpus um and then you gradually did updates and were doing
+gradually did updates and were doing gradually did updates and were
+doing like off policy uh reinforcement like off policy uh reinforcement
+like off policy uh reinforcement learning then this would be the policy
+learning then this would be the policy learning then this would be the
+policy that used to generate the outputs. that used to generate the
+outputs. that used to generate the outputs. &gt;&gt; Yeah. &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; So like what temperature settings do we
+&gt;&gt; So like what temperature settings do we &gt;&gt; So like what
+temperature settings do we generate all these outputs from the same
+generate all these outputs from the same generate all these outputs from
+the same temperature? temperature? temperature? &gt;&gt; Yeah. And
+typically when you're training &gt;&gt; Yeah. And typically when you're
+training &gt;&gt; Yeah. And typically when you're training reasoning
+models you use a temperature reasoning models you use a temperature
+reasoning models you use a temperature of one, of one, of one, &gt;&gt;
+right? And like my follow question is &gt;&gt; right? And like my follow
+question is &gt;&gt; right? And like my follow question is like why Do
+we do that? Because if like why Do we do that? Because if like why Do we
+do that? Because if people are able to sample from multiple people are
+able to sample from multiple people are able to sample from multiple
+temperature settings, aren't we like temperature settings, aren't we
+like temperature settings, aren't we like sampling through a whole
+family of sampling through a whole family of sampling through a whole
+family of probability distributions? probability distributions?
+probability distributions? &gt;&gt; You collectively optimizing over a
+&gt;&gt; You collectively optimizing over a &gt;&gt; You collectively
+optimizing over a family of property solutions might be family of
+property solutions might be family of property solutions might be
+interesting. interesting. interesting. &gt;&gt; You could do that, but
+then you'd be off &gt;&gt; You could do that, but then you'd be off
+&gt;&gt; You could do that, but then you'd be off policy because you
+wouldn't be sampling policy because you wouldn't be sampling policy
+because you wouldn't be sampling from the policy that you're optimizing.
+from the policy that you're optimizing. from the policy that you're
+optimizing. So typically you want to sample from the So typically you
+want to sample from the So typically you want to sample from the policy
+that you're optimizing. And if policy that you're optimizing. And if
+policy that you're optimizing. And if you remember to like the very
+first you remember to like the very first you remember to like the very
+first class, the only thing that gives you class, the only thing that
+gives you class, the only thing that gives you samples directly from the
+policy that is samples directly from the policy that is samples directly
+from the policy that is temperature one. Yeah, temperature one. Yeah,
+temperature one. Yeah, &gt;&gt; thanks. &gt;&gt; thanks. &gt;&gt;
+thanks. &gt;&gt; Yeah, sure. Great questions. Sorry, I &gt;&gt; Yeah,
+sure. Great questions. Sorry, I &gt;&gt; Yeah, sure. Great questions.
+Sorry, I should have been more prepared to should have been more
+prepared to should have been more prepared to explain the complicated
+gpo ex uh thing explain the complicated gpo ex uh thing explain the
+complicated gpo ex uh thing with a a figure. Um, so the next thing with
+a a figure. Um, so the next thing with a a figure. Um, so the next thing
+about DeepCar 1 is uh the prompt about DeepCar 1 is uh the prompt about
+DeepCar 1 is uh the prompt template. And so uh as I mentioned, they
+template. And so uh as I mentioned, they template. And so uh as I
+mentioned, they started with no fine-tuning whatsoever. started with no
+fine-tuning whatsoever. started with no fine-tuning whatsoever. And the
+prompt template looks a little And the prompt template looks a little
+And the prompt template looks a little bit like this. Um, it's a
+conversation bit like this. Um, it's a conversation bit like this. Um,
+it's a conversation between a user and assistant. The user between a
+user and assistant. The user between a user and assistant. The user asks
+a question and the assistant solves asks a question and the assistant
+solves asks a question and the assistant solves it. The assistants f the
+assistant first it. The assistants f the assistant first it. The
+assistants f the assistant first thinks about the reasoning process in
+thinks about the reasoning process in thinks about the reasoning process
+in the mind and then provides the user with the mind and then provides
+the user with the mind and then provides the user with the answer. The
+reasoning process and the answer. The reasoning process and the answer.
+The reasoning process and answer are enclosed within think and answer
+are enclosed within think and answer are enclosed within think and
+answer uh tags uh respectively. User answer uh tags uh respectively.
+User answer uh tags uh respectively. User prompt assistant. And so this
+is the prompt assistant. And so this is the prompt assistant. And so
+this is the only priming that they use to make the only priming that
+they use to make the only priming that they use to make the model uh do
+you know do this task. Um model uh do you know do this task. Um model uh
+do you know do this task. Um and one of the very interesting things and
+one of the very interesting things and one of the very interesting
+things about R1 that was very surprising when about R1 that was very
+surprising when about R1 that was very surprising when they did this was
+that this actually was they did this was that this actually was they did
+this was that this actually was sufficient to get the model to do a good
+sufficient to get the model to do a good sufficient to get the model to
+do a good enough job at this. Um so why why do you enough job at this.
+Um so why why do you enough job at this. Um so why why do you think this
+is sufficient? Going back to one of the things we Going back to one of
+the things we Going back to one of the things we talked about in the
+previous class, any ideas? any ideas? any ideas? &gt;&gt; Was this
+sufficient for what? &gt;&gt; Was this sufficient for what? &gt;&gt; Was
+this sufficient for what? &gt;&gt; It's sufficient to get the model to
+&gt;&gt; It's sufficient to get the model to &gt;&gt; It's sufficient to
+get the model to answer the questions well some of the answer the
+questions well some of the answer the questions well some of the time
+without any training. time without any training. time without any
+training. &gt;&gt; Yeah, exactly. It's seen some stuff in &gt;&gt; Yeah,
+exactly. It's seen some stuff in &gt;&gt; Yeah, exactly. It's seen some
+stuff in the training data and we're going to the training data and
+we're going to the training data and we're going to talk a bit more
+about that and so this talk a bit more about that and so this talk a bit
+more about that and so this is enough. Um so that a strong model is
+enough. Um so that a strong model is enough. Um so that a strong model
+trained on the entire internet with uh trained on the entire internet
+with uh trained on the entire internet with uh how many parameters was
+it 470 billion how many parameters was it 470 billion how many
+parameters was it 470 billion parameters um is able to pick up the
+parameters um is able to pick up the parameters um is able to pick up
+the fact that it should be following this fact that it should be
+following this fact that it should be following this template some of
+the time not all of the template some of the time not all of the
+template some of the time not all of the time but enough that it's able
+to learn time but enough that it's able to learn time but enough that
+it's able to learn from the results from the results from the results
+and so basically and so basically and so basically these are the
+training results so even these are the training results so even these
+are the training results so even the very beginning has a little bit of
+the very beginning has a little bit of the very beginning has a little
+bit of training I don't think they have the training I don't think they
+have the training I don't think they have the untrained uh model Um but
+basically this untrained uh model Um but basically this untrained uh
+model Um but basically this is um the R10 pass at one accuracy and is um
+the R10 pass at one accuracy and is um the R10 pass at one accuracy and
+this is um the R1 uh zero consistency at this is um the R1 uh zero
+consistency at this is um the R1 uh zero consistency at 16 accuracy. So
+this is with self 16 accuracy. So this is with self 16 accuracy. So this
+is with self consistency and you can see it starts consistency and you
+can see it starts consistency and you can see it starts out um very uh
+very low you know like out um very uh very low you know like out um very
+uh very low you know like 15% top one accuracy but after training 15%
+top one accuracy but after training 15% top one accuracy but after
+training it for uh a large number of steps with a it for uh a large
+number of steps with a it for uh a large number of steps with a very
+large batch size they're able to very large batch size they're able to
+very large batch size they're able to get up to over 70% accuracy on a
+IME uh get up to over 70% accuracy on a IME uh get up to over 70%
+accuracy on a IME uh problems which are like very hard math problems
+which are like very hard math problems which are like very hard math
+problems. Um, another really interesting result Um, another really
+interesting result Um, another really interesting result from this paper
+is that the thinking from this paper is that the thinking from this
+paper is that the thinking time uh allocated to the reasoning model time
+uh allocated to the reasoning model time uh allocated to the reasoning
+model in uh naturally increases from hundreds in uh naturally increases
+from hundreds in uh naturally increases from hundreds to thousands of
+tokens. And so um if we to thousands of tokens. And so um if we to
+thousands of tokens. And so um if we see hundreds of tokens here, maybe
+800 see hundreds of tokens here, maybe 800 see hundreds of tokens here,
+maybe 800 tokens or something at the very tokens or something at the
+very tokens or something at the very beginning, uh you know, as they
+trained beginning, uh you know, as they trained beginning, uh you know,
+as they trained it and trained it and trained it, it it and trained it
+and trained it, it it and trained it and trained it, it starts using
+more and more and more starts using more and more and more starts using
+more and more and more tokens tokens tokens uh to to solve the problems.
+And another uh another very famous uh And another uh another very famous
+uh And another uh another very famous uh thing from this paper is they
+showed thing from this paper is they showed thing from this paper is
+they showed this example uh with R10. this example uh with R10. this
+example uh with R10. Uh so again this is not you know Uh so again this
+is not you know Uh so again this is not you know specifically trained to
+uh like solve specifically trained to uh like solve specifically trained
+to uh like solve math problems or do uh selfcorrection math problems or
+do uh selfcorrection math problems or do uh selfcorrection but basically
+it there's a place where but basically it there's a place where but
+basically it there's a place where it says wait that's an aha moment I
+can it says wait that's an aha moment I can it says wait that's an aha
+moment I can flag here. And so the like language flag here. And so the
+like language flag here. And so the like language model uh you know
+spontaneously model uh you know spontaneously model uh you know
+spontaneously kind of identified that there was a kind of identified
+that there was a kind of identified that there was a problem in its
+derivation and went back problem in its derivation and went back problem
+in its derivation and went back and fixed it. Um and they also have a
+and fixed it. Um and they also have a and fixed it. Um and they also
+have a very cute thing in the paper where they very cute thing in the
+paper where they very cute thing in the paper where they said this was
+also an aha moment for us said this was also an aha moment for us said
+this was also an aha moment for us as researchers where we realized the
+as researchers where we realized the as researchers where we realized
+the power of reinforcement learning or power of reinforcement learning
+or power of reinforcement learning or something which you know I I
+thought something which you know I I thought something which you know I
+I thought that was uh kind kind of true. I mean, that was uh kind kind
+of true. I mean, that was uh kind kind of true. I mean, you know, uh if
+if you're uh if you see you know, uh if if you're uh if you see you
+know, uh if if you're uh if you see something like this just happen out
+of something like this just happen out of something like this just
+happen out of thin air. thin air. thin air. Um another thing that they
+did in this Um another thing that they did in this Um another thing that
+they did in this paper was they demonstrated that you can paper was they
+demonstrated that you can paper was they demonstrated that you can
+distill the reasoning traces from these distill the reasoning traces
+from these distill the reasoning traces from these very large 470
+billion parameter models very large 470 billion parameter models very
+large 470 billion parameter models down to models of more manageable
+sizes. down to models of more manageable sizes. down to models of more
+manageable sizes. And um they have uh DeepSseek R132B And um they have
+uh DeepSseek R132B And um they have uh DeepSseek R132B which is a
+distilled version of the Quen which is a distilled version of the Quen
+which is a distilled version of the Quen model uh with only 32B
+parameters. And model uh with only 32B parameters. And model uh with
+only 32B parameters. And you can see that it has quite uh you can see
+that it has quite uh you can see that it has quite uh competitive
+results with other models. competitive results with other models.
+competitive results with other models. And basically all they did was
+generate And basically all they did was generate And basically all they
+did was generate lots of reasoning traces with R1 uh lots of reasoning
+traces with R1 uh lots of reasoning traces with R1 uh filter the ones
+that were correct and filter the ones that were correct and filter the
+ones that were correct and then train um uh train this DeepCar 132B then
+train um uh train this DeepCar 132B then train um uh train this DeepCar
+132B model. They have a whole bunch of model. They have a whole bunch of
+model. They have a whole bunch of different sizes and they also have
+different sizes and they also have different sizes and they also have
+experiments where they tried to do R1 experiments where they tried to do
+R1 experiments where they tried to do R1 from scratch with this smaller
+model and from scratch with this smaller model and from scratch with
+this smaller model and they demonstrated that distilling from they
+demonstrated that distilling from they demonstrated that distilling from
+the bigger model is much more effective the bigger model is much more
+effective the bigger model is much more effective and I think the reason
+why is basically and I think the reason why is basically and I think the
+reason why is basically just the larger model is more able to just the
+larger model is more able to just the larger model is more able to get
+like a decent non-zero accuracy when get like a decent non-zero accuracy
+when get like a decent non-zero accuracy when you train uh when you
+started off from you train uh when you started off from you train uh
+when you started off from uh training from scratch. Cool. Um, any any
+questions about this? Cool. Um, any any questions about this? Cool. Um,
+any any questions about this? Yeah. Yeah. Yeah. &gt;&gt; What the length
+of the reasoning chains &gt;&gt; What the length of the reasoning chains
+&gt;&gt; What the length of the reasoning chains are? are? are? &gt;&gt;
+Certainly. &gt;&gt; Certainly. &gt;&gt; Certainly. &gt;&gt; So, I'm
+curious if there's legal any &gt;&gt; So, I'm curious if there's legal
+any &gt;&gt; So, I'm curious if there's legal any followup study showing
+if this has a followup study showing if this has a followup study
+showing if this has a platform because it looks to me just platform
+because it looks to me just platform because it looks to me just
+monotonically increasing without any monotonically increasing without
+any monotonically increasing without any insight. insight. insight.
+&gt;&gt; Yep. I I will talk about that. Yeah. And &gt;&gt; Yep. I I will
+talk about that. Yeah. And &gt;&gt; Yep. I I will talk about that. Yeah.
+And any other questions? Cool. Cool. Cool. Um, so what are the This is
+an inference Um, so what are the This is an inference Um, so what are
+the This is an inference class. This is not a training class, class.
+This is not a training class, class. This is not a training class, which
+is also why I'm not, you know, which is also why I'm not, you know,
+which is also why I'm not, you know, going super deep into how these
+models going super deep into how these models going super deep into how
+these models are trained. Um, but like what are the are trained. Um, but
+like what are the are trained. Um, but like what are the implications
+for inference uh of this implications for inference uh of this
+implications for inference uh of this work? Any any ideas? Any anyone
+want me to ask you to uh run Any anyone want me to ask you to uh run Any
+anyone want me to ask you to uh run a 470 billion parameter model for
+10,000 a 470 billion parameter model for 10,000 a 470 billion parameter
+model for 10,000 tokens and assignment two? &gt;&gt; Yeah, maybe maybe
+not. Um so uh be &gt;&gt; Yeah, maybe maybe not. Um so uh be &gt;&gt;
+Yeah, maybe maybe not. Um so uh be because of this and you know like the
+01 because of this and you know like the 01 because of this and you know
+like the 01 um OpenAI's 01 03 04 GPT5 models um you um OpenAI's 01 03 04
+GPT5 models um you um OpenAI's 01 03 04 GPT5 models um you know they're
+all using more tokens to know they're all using more tokens to know
+they're all using more tokens to think which means inference is becoming
+think which means inference is becoming think which means inference is
+becoming more expensive um they're all getting more expensive um they're
+all getting more expensive um they're all getting larger uh but it also
+can mean that a larger uh but it also can mean that a larger uh but it
+also can mean that a smaller model can beat uh a much larger smaller
+model can beat uh a much larger smaller model can beat uh a much larger
+model uh with more inference tokens. So model uh with more inference
+tokens. So model uh with more inference tokens. So if you look at this
+uh DeepSseek R1 32B if you look at this uh DeepSseek R1 32B if you look
+at this uh DeepSseek R1 32B and compare it to Deepseek V3, Deepseek and
+compare it to Deepseek V3, Deepseek and compare it to Deepseek V3,
+Deepseek V3 is the base model that was used to V3 is the base model that
+was used to V3 is the base model that was used to train um that was used
+to train train um that was used to train train um that was used to train
+Deepsecar 1 and you can see this 32B Deepsecar 1 and you can see this
+32B Deepsecar 1 and you can see this 32B model is beating this 470B
+model. Uh so model is beating this 470B model. Uh so model is beating
+this 470B model. Uh so you can spend like more tokens at you can spend
+like more tokens at you can spend like more tokens at inference with a
+smaller model and get inference with a smaller model and get inference
+with a smaller model and get uh better results. So this you know uh
+better results. So this you know uh better results. So this you know
+paradigm is really the one that made paradigm is really the one that
+made paradigm is really the one that made inference really really
+popular at the inference really really popular at the inference really
+really popular at the beginning of uh this year essentially. Cool. Um so
+now I would like to go into Cool. Um so now I would like to go into
+Cool. Um so now I would like to go into a new uh a new paper. So this is
+a paper a new uh a new paper. So this is a paper a new uh a new paper.
+So this is a paper called cognitive behaviors for called cognitive
+behaviors for called cognitive behaviors for self-improvement. self-
+improvement. self-improvement. And the basic idea behind the paper is
+And the basic idea behind the paper is And the basic idea behind the
+paper is as follows. Um so the first one is um as follows. Um so the
+first one is um as follows. Um so the first one is um th this is uh RL
+style training with th this is uh RL style training with th this is uh
+RL style training with essentially star. Uh this was also by essentially
+star. Uh this was also by essentially star. Uh this was also by the same
+group that did the star the same group that did the star the same group
+that did the star algorithm. And we can see that there's algorithm. And
+we can see that there's algorithm. And we can see that there's two
+models. Uh there's the Quen model two models. Uh there's the Quen model
+two models. Uh there's the Quen model and then there's the llama model.
+And and then there's the llama model. And and then there's the llama
+model. And when you train the Quen model uh the when you train the Quen
+model uh the when you train the Quen model uh the accuracy goes up uh
+quite quickly and accuracy goes up uh quite quickly and accuracy goes up
+uh quite quickly and gets uh gets good results. It does gets uh gets
+good results. It does gets uh gets good results. It does plateau but it
+plateaus a bit higher uh plateau but it plateaus a bit higher uh plateau
+but it plateaus a bit higher uh than the place where the the llama model
+than the place where the the llama model than the place where the the
+llama model plateaus and separately if we look at plateaus and
+separately if we look at plateaus and separately if we look at the
+response length the response length the response length the response
+length the response length the response length for the quen model goes
+up whereas for for the quen model goes up whereas for for the quen model
+goes up whereas for the llama model it basically goes down the llama
+model it basically goes down the llama model it basically goes down like
+this. like this. like this. So what is the difference between these So
+what is the difference between these So what is the difference between
+these two models? Um this paper basically uh two models? Um this paper
+basically uh two models? Um this paper basically uh analyzed four
+different behaviors that analyzed four different behaviors that analyzed
+four different behaviors that they thought were important for ensuring
+they thought were important for ensuring they thought were important for
+ensuring that this like zeroot uh like that this like zeroot uh like
+that this like zeroot uh like reinforcement learning would work. And
+reinforcement learning would work. And reinforcement learning would
+work. And so the first one was verification. So so the first one was
+verification. So so the first one was verification. So this is things
+like let me check my this is things like let me check my this is things
+like let me check my answer. Um a second one is sub goal answer. Um a
+second one is sub goal answer. Um a second one is sub goal setting. Uh
+let's try to get to a setting. Uh let's try to get to a setting. Uh
+let's try to get to a multiple of 10. Uh backtracking. Let's multiple of
+10. Uh backtracking. Let's multiple of 10. Uh backtracking. Let's try a
+different approach. What if we did try a different approach. What if we
+did try a different approach. What if we did whatever? and backward
+chaining which is whatever? and backward chaining which is whatever? and
+backward chaining which is working backwards 24 is 8 time 3 uh etc
+working backwards 24 is 8 time 3 uh etc working backwards 24 is 8 time 3
+uh etc etc etc etc and uh we can look at the average count and uh we can
+look at the average count and uh we can look at the average count of
+these uh behaviors and essentially uh of these uh behaviors and
+essentially uh of these uh behaviors and essentially uh we can see that
+like verification and we can see that like verification and we can see
+that like verification and backtracking and other stuff like that
+backtracking and other stuff like that backtracking and other stuff like
+that um were much higher for the Quen model um were much higher for the
+Quen model um were much higher for the Quen model than they were for the
+llama model. than they were for the llama model. than they were for the
+llama model. And so um so yeah, I already talked about these um so yeah,
+I already talked about these um so yeah, I already talked about these uh
+behaviors um and they compared a bud uh behaviors um and they compared a
+bud uh behaviors um and they compared a bud among a bunch of uh
+different models and among a bunch of uh different models and among a
+bunch of uh different models and basically they saw the quenbase model
+uh basically they saw the quenbase model uh basically they saw the
+quenbase model uh displayed more of all of these behaviors displayed
+more of all of these behaviors displayed more of all of these behaviors
+than the llama 3b model and the llama than the llama 3b model and the
+llama than the llama 3b model and the llama 70b model. I believe the
+coinbased model 70b model. I believe the coinbased model 70b model. I
+believe the coinbased model was 7B. I would Oh, no, sorry. Uh, Quinn was
+7B. I would Oh, no, sorry. Uh, Quinn was 7B. I would Oh, no, sorry. Uh,
+Quinn was also 3B. So, was also 3B. So, was also 3B. So, it's not just
+it's not just it's not just it's not just um, you know, size, it's it's
+not just um, you know, size, it's it's not just um, you know, size, it's
+also just kind of the underlying also just kind of the underlying also
+just kind of the underlying propensity of the model. These are all
+propensity of the model. These are all propensity of the model. These
+are all base models. Um, so like at least base models. Um, so like at
+least base models. Um, so like at least theoretically they're not uh not
+theoretically they're not uh not theoretically they're not uh not
+instruction tuned models. Does anyone instruction tuned models. Does
+anyone instruction tuned models. Does anyone have an idea why we might
+be seeing such have an idea why we might be seeing such have an idea why
+we might be seeing such a big difference? a big difference? a big
+difference? &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Mid
+training. &gt;&gt; Mid training. &gt;&gt; Mid training. &gt;&gt; Mid-
+training. Yeah. Um, so mid-training &gt;&gt; Mid-training. Yeah. Um, so
+mid-training &gt;&gt; Mid-training. Yeah. Um, so mid-training is
+basically uh I I would say there's is basically uh I I would say there's
+is basically uh I I would say there's two possibilities here. Um, mid-
+training two possibilities here. Um, mid-training two possibilities
+here. Um, mid-training is basically where you pre-train on lots is
+basically where you pre-train on lots is basically where you pre-train
+on lots of noisy internet text and then um kind of noisy internet text
+and then um kind of noisy internet text and then um kind of in the
+middle of training, right of in the middle of training, right of in the
+middle of training, right before you finish training, you train on
+before you finish training, you train on before you finish training, you
+train on quote unquote higher quality text. Um, quote unquote higher
+quality text. Um, quote unquote higher quality text. Um, and this higher
+quality text could and this higher quality text could and this higher
+quality text could either be text that was like mined from either be
+text that was like mined from either be text that was like mined from
+the internet uh in a specific way, so the internet uh in a specific way,
+so the internet uh in a specific way, so mining only, you know, math
+textbooks or mining only, you know, math textbooks or mining only, you
+know, math textbooks or like highly uh quote unquote highly like highly
+uh quote unquote highly like highly uh quote unquote highly educational
+content. Um, educational content. Um, educational content. Um, the the
+the even the more open language model even the more open language model
+even the more open language model providers like Quen, you know, they
+providers like Quen, you know, they providers like Quen, you know, they
+release many of their models open release many of their models open
+release many of their models open source. They usually don't talk very
+source. They usually don't talk very source. They usually don't talk
+very much about their data, but there are much about their data, but
+there are much about their data, but there are examples of this from
+like mo and examples of this from like mo and examples of this from like
+mo and hugging face. And um Hugging Face hugging face. And um Hugging
+Face hugging face. And um Hugging Face has a project. has a project. has
+a project. Oops. um called Fine Web. And basically uh um called Fine
+Web. And basically uh um called Fine Web. And basically uh what Fine Web
+did is they like filtered what Fine Web did is they like filtered what
+Fine Web did is they like filtered down a whole bunch of stuff on the uh
+a down a whole bunch of stuff on the uh a down a whole bunch of stuff on
+the uh a whole bunch of data from the internet. whole bunch of data from
+the internet. whole bunch of data from the internet. And they
+demonstrated that if you And they demonstrated that if you And they
+demonstrated that if you trained on this like filtered down trained on
+this like filtered down trained on this like filtered down version of
+the internet, you could get version of the internet, you could get
+version of the internet, you could get much better results, you know, um
+much much better results, you know, um much much better results, you
+know, um much faster. Um I I would argue that this faster. Um I I would
+argue that this faster. Um I I would argue that this will probably
+plateau earlier than will probably plateau earlier than will probably
+plateau earlier than training on the whole internet. So training on the
+whole internet. So training on the whole internet. So actually like
+training on the whole actually like training on the whole actually like
+training on the whole internet is still a good idea. Um but internet is
+still a good idea. Um but internet is still a good idea. Um but you know
+what's typical now is you train you know what's typical now is you train
+you know what's typical now is you train on the whole internet and then
+you add a on the whole internet and then you add a on the whole internet
+and then you add a little bit of this like very high little bit of this
+like very high little bit of this like very high quality data right at
+the very end of quality data right at the very end of quality data right
+at the very end of training as you kind of anneal down to training as
+you kind of anneal down to training as you kind of anneal down to build
+your final base model and and this build your final base model and and
+this build your final base model and and this is called mid training. Um
+another uh is called mid training. Um another uh is called mid training.
+Um another uh possible reason is that this is uh using possible reason
+is that this is uh using possible reason is that this is uh using
+synthetic data of some variety. So synthetic data of some variety. So
+synthetic data of some variety. So regardless, um, despite the fact that
+regardless, um, despite the fact that regardless, um, despite the fact
+that they're all called a quote unquote base they're all called a quote
+unquote base they're all called a quote unquote base model, uh, these
+base models can be model, uh, these base models can be model, uh, these
+base models can be trained in very different ways. And so trained in
+very different ways. And so trained in very different ways. And so
+that's the reason why these like that's the reason why these like that's
+the reason why these like cognitive behaviors might emerge for one
+cognitive behaviors might emerge for one cognitive behaviors might
+emerge for one of the models but not the others. of the models but not
+the others. of the models but not the others. Cool. Um, any any
+questions? Okay, nice. Okay, nice. Okay, nice. Um so they also
+demonstrated in this paper so they also demonstrated in this paper so
+they also demonstrated in this paper that you can uh kind of like prime
+the that you can uh kind of like prime the that you can uh kind of like
+prime the model uh by giving it a prompt that model uh by giving it a
+prompt that model uh by giving it a prompt that encourages it to uh take
+these behaviors encourages it to uh take these behaviors encourages it
+to uh take these behaviors and you give them a few examples of and you
+give them a few examples of and you give them a few examples of this.
+Notably this is not what was done this. Notably this is not what was
+done this. Notably this is not what was done in the deepcar 1 model. Uh
+so deepcar 1 in the deepcar 1 model. Uh so deepcar 1 in the deepcar 1
+model. Uh so deepcar 1 did intentionally did not do this but if did
+intentionally did not do this but if did intentionally did not do this
+but if you do do this this can you know improve you do do this this can
+you know improve you do do this this can you know improve uh the ability
+of the models to uh take uh the ability of the models to uh take uh the
+ability of the models to uh take these behaviors. &gt;&gt; Cool.
+&gt;&gt; Cool. &gt;&gt; Cool. &gt;&gt; One sense graph. &gt;&gt; One
+sense graph. &gt;&gt; One sense graph. &gt;&gt; Yeah sure. &gt;&gt; All
+of them seem to like converge &gt;&gt; All of them seem to like converge
+&gt;&gt; All of them seem to like converge roughly the same number of
+the same roughly the same number of the same roughly the same number of
+the same amount of responses. amount of responses. amount of responses.
+Why? Why? Why? So for this So for this So for this I I think this is
+when they primed based I I think this is when they primed based I I
+think this is when they primed based on a particular strategy. So when
+they on a particular strategy. So when they on a particular strategy. So
+when they said use this particular strategy um said use this particular
+strategy um said use this particular strategy um like use this
+particular strategy, it like use this particular strategy, it like use
+this particular strategy, it converged to a a similar but not exactly
+converged to a a similar but not exactly converged to a a similar but
+not exactly the same length. I think like they the same length. I think
+like they the same length. I think like they encourage particular
+strategies but also encourage particular strategies but also encourage
+particular strategies but also on a higher level that just encourages on
+a higher level that just encourages on a higher level that just
+encourages like reasoning in general. And so like I like reasoning in
+general. And so like I like reasoning in general. And so like I I think
+by encouraging structured I think by encouraging structured I think by
+encouraging structured reasoning you can kind of get it to have
+reasoning you can kind of get it to have reasoning you can kind of get
+it to have a similar response like a similar response like a similar
+response like &gt;&gt; that's like you have only backtracking &gt;&gt;
+that's like you have only backtracking &gt;&gt; that's like you have
+only backtracking approaching the same length as approaching the same
+length as approaching the same length as backtracking plus something
+else backtracking plus something else backtracking plus something else
+backtracking and backtracking and backtracking and &gt;&gt; backtracking
+support. So I was like &gt;&gt; backtracking support. So I was like
+&gt;&gt; backtracking support. So I was like wondering why. wondering
+why. wondering why. &gt;&gt; Yeah, I I think the models um I think
+&gt;&gt; Yeah, I I think the models um I think &gt;&gt; Yeah, I I think
+the models um I think the models will the models will the models will uh
+uh uh you know tend to finish when they like you know tend to finish
+when they like you know tend to finish when they like quote unquote
+think that they have uh quote unquote think that they have uh quote
+unquote think that they have uh like solved the problem. One other thing
+like solved the problem. One other thing like solved the problem. One
+other thing that I'd really I'd like to point out is that I'd really I'd
+like to point out is that I'd really I'd like to point out is um I
+totally missed this when I first um I totally missed this when I first
+um I totally missed this when I first looked at this graph from Deepseek
+R1, looked at this graph from Deepseek R1, looked at this graph from
+Deepseek R1, but look look carefully at this graph. but look look
+carefully at this graph. but look look carefully at this graph. And here
+we have steps, right? This is And here we have steps, right? This is And
+here we have steps, right? This is 8,000 steps. I don't remember exactly
+8,000 steps. I don't remember exactly 8,000 steps. I don't remember
+exactly what the batch size is, but the batch what the batch size is,
+but the batch what the batch size is, but the batch size is very large
+for this. They have size is very large for this. They have size is very
+large for this. They have lots of GPUs for running these lots of GPUs
+for running these lots of GPUs for running these experiments. And so
+they're using a experiments. And so they're using a experiments. And so
+they're using a large batch size. the first 200 steps, large batch size.
+the first 200 steps, large batch size. the first 200 steps, the length
+doesn't increase at all. Um, the length doesn't increase at all. Um, the
+length doesn't increase at all. Um, now go back here. Go back here. Look
+at where this stops. Go back here. Look at where this stops. Go back
+here. Look at where this stops. This stops at 250. And so you can see
+This stops at 250. And so you can see This stops at 250. And so you can
+see that this is stopping at 250. And I that this is stopping at 250.
+And I that this is stopping at 250. And I think the batch size for this
+is smaller think the batch size for this is smaller think the batch size
+for this is smaller than the batch size used for Decar 1. So than the
+batch size used for Decar 1. So than the batch size used for Decar 1. So
+this is trained even less than the this is trained even less than the
+this is trained even less than the DeepCar 1 that was plateauing. So I
+I've DeepCar 1 that was plateauing. So I I've DeepCar 1 that was
+plateauing. So I I've also observed that when training also observed
+that when training also observed that when training reasoning models,
+the response length reasoning models, the response length reasoning
+models, the response length will stagnate for a while and then after
+will stagnate for a while and then after will stagnate for a while and
+then after it's stagnated for a while, it will it's stagnated for a
+while, it will it's stagnated for a while, it will increase um when the
+model has learned increase um when the model has learned increase um
+when the model has learned to like use more extensive uh back like to
+like use more extensive uh back like to like use more extensive uh back
+like backtracking strategies. So um or more backtracking strategies. So
+um or more backtracking strategies. So um or more extensive uh reasoning
+strategies, not extensive uh reasoning strategies, not extensive uh
+reasoning strategies, not necessarily just backtracking. So um I I
+necessarily just backtracking. So um I I necessarily just backtracking.
+So um I I think this is uh also an important thing think this is uh also
+an important thing think this is uh also an important thing to note. to
+note. to note. It could be like completely misleading It could be like
+completely misleading It could be like completely misleading this this
+this &gt;&gt; this graph um if you think that the &gt;&gt; this graph um
+if you think that the &gt;&gt; this graph um if you think that the model
+has converged to a particular model has converged to a particular model
+has converged to a particular length and won't increase later uh this
+length and won't increase later uh this length and won't increase later
+uh this could be misleadingness. I agree. could be misleadingness. I
+agree. could be misleadingness. I agree. &gt;&gt; Thanks. &gt;&gt;
+Thanks. &gt;&gt; Thanks. &gt;&gt; Um cool. So next I'd like to talk
+about &gt;&gt; Um cool. So next I'd like to talk about &gt;&gt; Um cool.
+So next I'd like to talk about a paper that we did called demystifying a
+paper that we did called demystifying a paper that we did called
+demystifying long chain of thought. And um our our long chain of
+thought. And um our our long chain of thought. And um our our question
+was to better understand uh question was to better understand uh
+question was to better understand uh when long chains of thought emerge
+um in when long chains of thought emerge um in when long chains of
+thought emerge um in what conditions enable reasoning um how what
+conditions enable reasoning um how what conditions enable reasoning um
+how does training affect chain of thought does training affect chain of
+thought does training affect chain of thought length. And so our
+experimental setting length. And so our experimental setting length. And
+so our experimental setting was that we wanted to do supervised was that
+we wanted to do supervised was that we wanted to do supervised fine-
+tuning and compare it with fine-tuning and compare it with fine-tuning
+and compare it with reinforcement learning with various reinforcement
+learning with various reinforcement learning with various reward
+functions and training setups. reward functions and training setups.
+reward functions and training setups. Also, how many student
+presentations do Also, how many student presentations do Also, how many
+student presentations do we have today? Just one. we have today? Just
+one. we have today? Just one. Okay, good. I I just want to make sure I
+Okay, good. I I just want to make sure I Okay, good. I I just want to
+make sure I don't run out of time. Um so we have don't run out of time.
+Um so we have don't run out of time. Um so we have various reward
+functions and training various reward functions and training various
+reward functions and training setups. Um and we did length analysis
+setups. Um and we did length analysis setups. Um and we did length
+analysis across iterations and we tried multiple across iterations and
+we tried multiple across iterations and we tried multiple model sizes
+and data sets. model sizes and data sets. model sizes and data sets. So
+the first thing that we did was we So the first thing that we did was we
+So the first thing that we did was we compared um the chain of thought
+type compared um the chain of thought type compared um the chain of
+thought type and essentially what we did was we did and essentially what
+we did was we did and essentially what we did was we did supervised
+fine-tuning um or or we took supervised fine-tuning um or or we took
+supervised fine-tuning um or or we took models that had been supervised
+models that had been supervised models that had been supervised fine-
+tuned to either perform short chain fine-tuned to either perform short
+chain fine-tuned to either perform short chain of thought reasoning. So
+basically um of thought reasoning. So basically um of thought reasoning.
+So basically um perform reasoning with you know only the perform
+reasoning with you know only the perform reasoning with you know only
+the traditional chain of thought versus ones traditional chain of
+thought versus ones traditional chain of thought versus ones that had
+been trained uh kind of like that had been trained uh kind of like that
+had been trained uh kind of like distilled to do long chain of thought.
+distilled to do long chain of thought. distilled to do long chain of
+thought. And we did um supervised fine-tuning on And we did um
+supervised fine-tuning on And we did um supervised fine-tuning on the
+kind of uh the kind of uh the kind of uh on shorter and longer chain of
+thought on shorter and longer chain of thought on shorter and longer
+chain of thought data. And that's the dash line here. And data. And
+that's the dash line here. And data. And that's the dash line here. And
+then we did uh reinforcement learning. then we did uh reinforcement
+learning. then we did uh reinforcement learning. And the thing that you
+can notice is the And the thing that you can notice is the And the thing
+that you can notice is the models that were originally like primed
+models that were originally like primed models that were originally like
+primed to do um to do um to do um well on uh short chains of thought did
+well on uh short chains of thought did well on uh short chains of
+thought did not benefit very much from RL where the not benefit very
+much from RL where the not benefit very much from RL where the ones that
+were primed to do long chains ones that were primed to do long chains
+ones that were primed to do long chains of thought really uh increased a
+lot by of thought really uh increased a lot by of thought really uh
+increased a lot by doing RL. And so this demonstrates that doing RL. And
+so this demonstrates that doing RL. And so this demonstrates that
+there's some you know major advantage in there's some you know major
+advantage in there's some you know major advantage in having like really
+long chains of having like really long chains of having like really long
+chains of thought uh trained by reinforcement thought uh trained by
+reinforcement thought uh trained by reinforcement learning. Another
+thing that we looked at in this Another thing that we looked at in this
+Another thing that we looked at in this paper was uh we were training
+reasoning paper was uh we were training reasoning paper was uh we were
+training reasoning models and we saw essentially that the models and we
+saw essentially that the models and we saw essentially that the models
+would um go up. Uh they they models would um go up. Uh they they models
+would um go up. Uh they they would improve for a while and then they
+would improve for a while and then they would improve for a while and
+then they would suddenly crash. And we we were would suddenly crash. And
+we we were would suddenly crash. And we we were confused by this for a
+bit. But confused by this for a bit. But confused by this for a bit. But
+essentially what we found was that uh essentially what we found was that
+uh essentially what we found was that uh they were exceeding the maximum
+output they were exceeding the maximum output they were exceeding the
+maximum output length and some of these models had you length and some
+of these models had you length and some of these models had you know a
+fixed maximum output length and know a fixed maximum output length and
+know a fixed maximum output length and that that's what we measured by
+the that that's what we measured by the that that's what we measured by
+the exceed rate and once they started exceed rate and once they started
+exceed rate and once they started exceeding the maximum output length
+they exceeding the maximum output length they exceeding the maximum
+output length they would be getting all of the the problems would be
+getting all of the the problems would be getting all of the the problems
+wrong basically because the final answer wrong basically because the
+final answer wrong basically because the final answer was getting
+clipped and so uh that was a was getting clipped and so uh that was a
+was getting clipped and so uh that was a major you know major problem
+because you major you know major problem because you major you know
+major problem because you can't really extend the or well in this can't
+really extend the or well in this can't really extend the or well in
+this paper we didn't make an attempt to paper we didn't make an attempt
+to paper we didn't make an attempt to extend the output length and so
+extend the output length and so extend the output length and so
+basically just our our training uh died basically just our our training
+uh died basically just our our training uh died and so um the way we
+fixed this was and so um the way we fixed this was and so um the way we
+fixed this was or or we tried to fix this and the way or or we tried to
+fix this and the way or or we tried to fix this and the way we did so
+was we proposed a new variety we did so was we proposed a new variety we
+did so was we proposed a new variety of reward where we considered both
+the of reward where we considered both the of reward where we considered
+both the um correctness and the length. And so um correctness and the
+length. And so um correctness and the length. And so the classic reward
+gives you a you know the classic reward gives you a you know the classic
+reward gives you a you know reward of one when you get it correct reward
+of one when you get it correct reward of one when you get it correct and
+a reward of zero when you get it and a reward of zero when you get it
+and a reward of zero when you get it wrong. But in this paper we have
+this uh wrong. But in this paper we have this uh wrong. But in this
+paper we have this uh reward where we multiply it by the reward where we
+multiply it by the reward where we multiply it by the cosine and cosine
+and cosine and uh where the cosine will converge to uh where the cosine
+will converge to uh where the cosine will converge to zero at the
+maximum output length. And zero at the maximum output length. And zero
+at the maximum output length. And so if the answer is wrong we basically
+so if the answer is wrong we basically so if the answer is wrong we
+basically give a larger negative reward when the give a larger negative
+reward when the give a larger negative reward when the answer is short.
+And so what that's answer is short. And so what that's answer is short.
+And so what that's saying is um if you're getting it wrong, saying is um
+if you're getting it wrong, saying is um if you're getting it wrong,
+make it longer until we like approach make it longer until we like
+approach make it longer until we like approach the uh the output length.
+And then if the uh the output length. And then if the uh the output
+length. And then if you're getting it right, make it shorter you're
+getting it right, make it shorter you're getting it right, make it
+shorter until we uh until you like no longer get until we uh until you
+like no longer get until we uh until you like no longer get it right.
+And so this is a way to kind it right. And so this is a way to kind it
+right. And so this is a way to kind of balance uh the output. And this
+of balance uh the output. And this of balance uh the output. And this
+allowed us to stably train uh models allowed us to stably train uh
+models allowed us to stably train uh models without exceeding the
+response length. We also examined a little bit about the We also
+examined a little bit about the We also examined a little bit about the
+um conditions for emergence and we found um conditions for emergence and
+we found um conditions for emergence and we found that 7B models really
+struggled to that 7B models really struggled to that 7B models really
+struggled to develop complex abilities. Um and we develop complex
+abilities. Um and we develop complex abilities. Um and we came up with
+you know the cosign reward. came up with you know the cosign reward.
+came up with you know the cosign reward. Um also uh for the base model
+quality uh Um also uh for the base model quality uh Um also uh for the
+base model quality uh we found that the overexposure to short we found
+that the overexposure to short we found that the overexposure to short
+data hindered the long coot development data hindered the long coot
+development data hindered the long coot development and uh RL from the
+long coott improved. and uh RL from the long coott improved. and uh RL
+from the long coott improved. Um Um Um so another thing that we looked
+into was so another thing that we looked into was so another thing that
+we looked into was uh the quality of the verifier and we uh the quality
+of the verifier and we uh the quality of the verifier and we found that
+rule rule-based verifiers found that rule rule-based verifiers found
+that rule rule-based verifiers basically work better than modelbased
+basically work better than modelbased basically work better than
+modelbased verifiers. verifiers. verifiers. Um and so there's a lot of
+things that Um and so there's a lot of things that Um and so there's a
+lot of things that need to go right for these abilities to need to go
+right for these abilities to need to go right for these abilities to
+emerge and we just tried to like catalog emerge and we just tried to
+like catalog emerge and we just tried to like catalog a lot of them in
+this paper basically. Cool. Um any any questions about this? Okay. Um in
+particular, if you want a Okay. Um in particular, if you want a Okay. Um
+in particular, if you want a shortcut to making things work, I shortcut
+to making things work, I shortcut to making things work, I recommend
+this. We've tried it several recommend this. We've tried it several
+recommend this. We've tried it several times since we did this paper and
+it times since we did this paper and it times since we did this paper
+and it works quite well. So um you know, if works quite well. So um you
+know, if works quite well. So um you know, if you're doing that sort of
+training, I'd you're doing that sort of training, I'd you're doing that
+sort of training, I'd suggest trying it out. suggest trying it out.
+suggest trying it out. Cool. Another one um is as I mentioned Cool.
+Another one um is as I mentioned Cool. Another one um is as I mentioned
+in the cognitive behavior behaviors in the cognitive behavior behaviors
+in the cognitive behavior behaviors paper um a lot of people have done
+uh or paper um a lot of people have done uh or paper um a lot of people
+have done uh or like basically you need very particular like basically
+you need very particular like basically you need very particular types
+of reasoning models to get uh types of reasoning models to get uh types
+of reasoning models to get uh emergent abilities to emerge. And so
+emergent abilities to emerge. And so emergent abilities to emerge. And
+so basically this paper has the simple idea basically this paper has the
+simple idea basically this paper has the simple idea of uh trying to do
+RL for reasoning on a of uh trying to do RL for reasoning on a of uh
+trying to do RL for reasoning on a very large number of models of
+different very large number of models of different very large number of
+models of different sizes. And they did a direct RL from sizes. And they
+did a direct RL from sizes. And they did a direct RL from base models
+and uh no SFT and tried to base models and uh no SFT and tried to base
+models and uh no SFT and tried to find whether smaller diverse models
+find whether smaller diverse models find whether smaller diverse models
+could exhibit emergent reasoning. And could exhibit emergent reasoning.
+And could exhibit emergent reasoning. And they found that it is true for
+some they found that it is true for some they found that it is true for
+some extent um to some extent the um extent um to some extent the um
+extent um to some extent the um they definitely saw the greatest they
+definitely saw the greatest they definitely saw the greatest
+improvements on Quen, but um if you improvements on Quen, but um if you
+improvements on Quen, but um if you train for long enough and have a
+number train for long enough and have a number train for long enough and
+have a number of settings kind of like fine-tuned in a of settings kind
+of like fine-tuned in a of settings kind of like fine-tuned in a way
+that can get the model to generate way that can get the model to
+generate way that can get the model to generate uh positive rewards in
+some cases. uh a uh positive rewards in some cases. uh a uh positive
+rewards in some cases. uh a lot of models are are nonetheless able lot
+of models are are nonetheless able lot of models are are nonetheless
+able to uh see improvements and um they also did uh kind of and um they
+also did uh kind of and um they also did uh kind of evaluations on um
+whether they exhibited evaluations on um whether they exhibited
+evaluations on um whether they exhibited different behaviors. So we uh
+were a different behaviors. So we uh were a different behaviors. So we
+uh were a they were able to see that uh you know they were able to see
+that uh you know they were able to see that uh you know Quen did thing
+lots of stuff like sub Quen did thing lots of stuff like sub Quen did
+thing lots of stuff like sub goal setting um enumeration verification
+goal setting um enumeration verification goal setting um enumeration
+verification maybe less backtracking maybe less backtracking maybe less
+backtracking um and then Mistl uh you know had more um and then Mistl uh
+you know had more um and then Mistl uh you know had more enumeration and
+other stuff like this. enumeration and other stuff like this.
+enumeration and other stuff like this. So overall this is mostly an
+empirical So overall this is mostly an empirical So overall this is
+mostly an empirical paper but it's also a good code base if paper but
+it's also a good code base if paper but it's also a good code base if
+you want to do any sorts of these you want to do any sorts of these you
+want to do any sorts of these experiments. So uh you can definitely
+experiments. So uh you can definitely experiments. So uh you can
+definitely try that out. Cool. Cool. Cool. So, another thing that I'd
+like to talk So, another thing that I'd like to talk So, another thing
+that I'd like to talk about is um uh a paper we recently did about is um
+uh a paper we recently did about is um uh a paper we recently did on
+reasoning transfer. And a lot of on reasoning transfer. And a lot of on
+reasoning transfer. And a lot of papers papers papers examine the
+ability of mathematical examine the ability of mathematical examine the
+ability of mathematical reasoning data to improve reasoning data to
+improve reasoning data to improve the the the scores or mathematical and
+codebased scores or mathematical and codebased scores or mathematical
+and codebased reasoning data to improve the scores of reasoning data to
+improve the scores of reasoning data to improve the scores of models on
+reasoning based tasks uh sorry models on reasoning based tasks uh sorry
+models on reasoning based tasks uh sorry of math or codebased tasks. So
+it's of math or codebased tasks. So it's of math or codebased tasks. So
+it's essentially like in-domain training. essentially like in-domain
+training. essentially like in-domain training. It's not exactly the same
+data set, but It's not exactly the same data set, but It's not exactly
+the same data set, but it's like math for math, code for code, it's like
+math for math, code for code, it's like math for math, code for code,
+um, and and things like that. And so our um, and and things like that.
+And so our um, and and things like that. And so our key question in this
+paper was, do gains key question in this paper was, do gains key
+question in this paper was, do gains in solving math problems transfer
+to, in solving math problems transfer to, in solving math problems
+transfer to, um, other reasoning domains, uh, like um, other reasoning
+domains, uh, like um, other reasoning domains, uh, like scientific QA,
+uh, coding and agent scientific QA, uh, coding and agent scientific QA,
+uh, coding and agent planning planning planning and also uh other non-
+reing tasks like and also uh other non-reing tasks like and also uh
+other non-reing tasks like conversation and its direction conversation
+and its direction conversation and its direction following. So the
+experimental setup was we did So the experimental setup was we did So
+the experimental setup was we did some controlled experiments on quen um
+some controlled experiments on quen um some controlled experiments on
+quen um quen 314b uh where we did training data quen 314b uh where we
+did training data quen 314b uh where we did training data with math only
+um and we compared uh with math only um and we compared uh with math
+only um and we compared uh supervised fine-tuning with uh supervised
+fine-tuning with uh supervised fine-tuning with uh reinforcement
+learning is the two reinforcement learning is the two reinforcement
+learning is the two paradigms uh and the SFT setup was paradigms uh and
+the SFT setup was paradigms uh and the SFT setup was basically rejection
+sampling with a quen basically rejection sampling with a quen basically
+rejection sampling with a quen 332B teacher and so 332B teacher and so
+332B teacher and so um for SFT and RL which one do you think um for SFT
+and RL which one do you think um for SFT and RL which one do you think
+would generalize better to other would generalize better to other would
+generalize better to other domains? Any ideas? domains? Any ideas?
+domains? Any ideas? RL RL RL &gt;&gt; RL. Okay. Any ideas why that might
+be &gt;&gt; RL. Okay. Any ideas why that might be &gt;&gt; RL. Okay. Any
+ideas why that might be the case? the case? the case? &gt;&gt; Vibes.
+&gt;&gt; Vibes. &gt;&gt; Vibes. &gt;&gt; Vibes. &gt;&gt; Vibes. &gt;&gt;
+Vibes. &gt;&gt; I mean, I have to agree that I I had &gt;&gt; I mean, I
+have to agree that I I had &gt;&gt; I mean, I have to agree that I I had
+vibes that RL would work better, too, vibes that RL would work better,
+too, vibes that RL would work better, too, but I actually have an
+explanation for but I actually have an explanation for but I actually
+have an explanation for it after this paper. it after this paper. it
+after this paper. &gt;&gt; Okay. Um, and so for the RL setup, we
+&gt;&gt; Okay. Um, and so for the RL setup, we &gt;&gt; Okay. Um, and so
+for the RL setup, we had answer correctness is the reward. Um had answer
+correctness is the reward. Um had answer correctness is the reward. Um
+and so and so and so this is the an example of this is the an example of
+this is the an example of transferability transferability
+transferability um across different tasks with different um across
+different tasks with different um across different tasks with different
+reasoning models. Uh so this is this is reasoning models. Uh so this is
+this is reasoning models. Uh so this is this is our non-controlled
+experiment where we our non-controlled experiment where we our non-
+controlled experiment where we basically took reasoning models and the
+basically took reasoning models and the basically took reasoning models
+and the base models that corresponded to those base models that
+corresponded to those base models that corresponded to those reasoning
+models. And we uh defined reasoning models. And we uh defined reasoning
+models. And we uh defined something as the transferability index.
+something as the transferability index. something as the transferability
+index. And um the transferability index is And um the transferability
+index is And um the transferability index is essentially like if we look
+at the gains essentially like if we look at the gains essentially like
+if we look at the gains that we get on the task that the model that we
+get on the task that the model that we get on the task that the model
+was trained on and we compare them to was trained on and we compare them
+to was trained on and we compare them to the gains that we get on the
+tasks that the gains that we get on the tasks that the gains that we get
+on the tasks that the model was not trained on or the test the model was
+not trained on or the test the model was not trained on or the test
+categories that the model was not categories that the model was not
+categories that the model was not trained on. What's the difference
+trained on. What's the difference trained on. What's the difference
+between the two? Um and so between the two? Um and so between the two?
+Um and so uh what we Oh no, sorry I I misspoke uh what we Oh no, sorry I
+I misspoke uh what we Oh no, sorry I I misspoke there. So if we look at
+the um at the there. So if we look at the um at the there. So if we look
+at the um at the tasks that the model was not trained on tasks that the
+model was not trained on tasks that the model was not trained on uh does
+it improve or not improve there? uh does it improve or not improve
+there? uh does it improve or not improve there? And so for other
+reasoning tasks, what And so for other reasoning tasks, what And so for
+other reasoning tasks, what we found was that the models generally we
+found was that the models generally we found was that the models
+generally improved on other reasoning tasks, but improved on other
+reasoning tasks, but improved on other reasoning tasks, but they
+improved more when they were they improved more when they were they
+improved more when they were trained using RL. trained using RL. trained
+using RL. On the other hand, if we looked at On the other hand, if we
+looked at On the other hand, if we looked at non-reasoning tasks, um we
+found that non-reasoning tasks, um we found that non-reasoning tasks, um
+we found that actually the models trained with RL actually the models
+trained with RL actually the models trained with RL tended to still
+improve somewhat, but tended to still improve somewhat, but tended to
+still improve somewhat, but the models trained uh with SFT actually the
+models trained uh with SFT actually the models trained uh with SFT
+actually decreased decreased decreased um to some extent on the non-
+reent um to some extent on the non-reent um to some extent on the non-
+reent tasks. tasks. tasks. And the reasoning or the reason why we And
+the reasoning or the reason why we And the reasoning or the reason why
+we think this is the case is actually maybe think this is the case is
+actually maybe think this is the case is actually maybe a little bit a
+little bit a little bit obvious in hindsight but that we didn't obvious
+in hindsight but that we didn't obvious in hindsight but that we didn't
+uh we didn't know it before we started uh we didn't know it before we
+started uh we didn't know it before we started this experiment. But
+basically uh one of this experiment. But basically uh one of this
+experiment. But basically uh one of the things that we looked at was the
+the things that we looked at was the the things that we looked at was
+the change in the probability of various change in the probability of
+various change in the probability of various tokens uh that um uh after
+the tokens uh that um uh after the tokens uh that um uh after the fine-
+tuning process. And here are some fine-tuning process. And here are some
+fine-tuning process. And here are some examples of tokens that changed
+greatly examples of tokens that changed greatly examples of tokens that
+changed greatly um in the positive direction or the um in the positive
+direction or the um in the positive direction or the negative direction
+for RL and SFT. And negative direction for RL and SFT. And negative
+direction for RL and SFT. And basically what you can see is that the
+basically what you can see is that the basically what you can see is
+that the SFT model uh leads to lots of change in SFT model uh leads to
+lots of change in SFT model uh leads to lots of change in the model
+where whereas the RLbased the model where whereas the RLbased the model
+where whereas the RLbased model it leads to relatively little model it
+leads to relatively little model it leads to relatively little change
+and it leads particularly to change and it leads particularly to change
+and it leads particularly to changes in um words that seem related to
+changes in um words that seem related to changes in um words that seem
+related to reasoning. reasoning. reasoning. So any idea why this is the
+case? So any idea why this is the case? So any idea why this is the
+case? &gt;&gt; Could it appear that like RL encodes &gt;&gt; Could it
+appear that like RL encodes &gt;&gt; Could it appear that like RL
+encodes heristics and SF encodes biases? heristics and SF encodes
+biases? heristics and SF encodes biases? &gt;&gt; Arl encodes heristics
+and SFT encodes &gt;&gt; Arl encodes heristics and SFT encodes &gt;&gt;
+Arl encodes heristics and SFT encodes biases. Let let me also uh
+specifically biases. Let let me also uh specifically biases. Let let me
+also uh specifically say that this is gpo. say that this is gpo. say
+that this is gpo. Um and if we remember what gpo does, it Um and if we
+remember what gpo does, it Um and if we remember what gpo does, it
+generates a bunch of hypotheses. It generates a bunch of hypotheses. It
+generates a bunch of hypotheses. It compares them. It upweights the good
+compares them. It upweights the good compares them. It upweights the
+good ones and downweights bad ones. And also maybe it might be worth And
+also maybe it might be worth And also maybe it might be worth thinking
+when you're doing SFT, what thinking when you're doing SFT, what
+thinking when you're doing SFT, what hypothesis are you downweing?
+You're upweing the correct one, but what You're upweing the correct one,
+but what You're upweing the correct one, but what are you downweing? If
+you if you do a parameter update on a If you if you do a parameter
+update on a If you if you do a parameter update on a particular sequence
+with SFT, which particular sequence with SFT, which particular sequence
+with SFT, which sequence's probability will increase and sequence's
+probability will increase and sequence's probability will increase and
+maybe in general which sequences maybe in general which sequences maybe
+in general which sequences probability will decrease? probability will
+decrease? probability will decrease? &gt;&gt; Yeah. Um, &gt;&gt; Yeah.
+Um, &gt;&gt; Yeah. Um, &gt;&gt; yeah, exactly. Basically everything
+&gt;&gt; yeah, exactly. Basically everything &gt;&gt; yeah, exactly.
+Basically everything else. So the difference between gRPO and else. So
+the difference between gRPO and else. So the difference between gRPO and
+SFT is that in GRPO you're downweing the SFT is that in GRPO you're
+downweing the SFT is that in GRPO you're downweing the negative
+sequences that were sampled negative sequences that were sampled
+negative sequences that were sampled that got a bad reward. And in SFT,
+that got a bad reward. And in SFT, that got a bad reward. And in SFT,
+you're upweing the one sequence that you you're upweing the one sequence
+that you you're upweing the one sequence that you sampled that got a
+good reward and sampled that got a good reward and sampled that got a
+good reward and downweing everything else. So basically, downweing
+everything else. So basically, downweing everything else. So basically,
+you're modifying every sequence in SFT, you're modifying every sequence
+in SFT, you're modifying every sequence in SFT, whereas in RL you're
+only upweing and whereas in RL you're only upweing and whereas in RL
+you're only upweing and downweing like particular sequences. And
+downweing like particular sequences. And downweing like particular
+sequences. And so that um we're not the first people to so that um we're
+not the first people to so that um we're not the first people to notice
+this. Other people have noticed notice this. Other people have noticed
+notice this. Other people have noticed this as well. But particularly
+from the this as well. But particularly from the this as well. But
+particularly from the point of view of reasoning, this means point of
+view of reasoning, this means point of view of reasoning, this means
+that you get minimal changes. And we that you get minimal changes. And
+we that you get minimal changes. And we also have some um examination in
+the also have some um examination in the also have some um examination
+in the paper that the difference in the um like paper that the
+difference in the um like paper that the difference in the um like model
+parameters also is much lesser model parameters also is much lesser
+model parameters also is much lesser when you're training using RL than
+SFT. when you're training using RL than SFT. when you're training using
+RL than SFT. And so that kind of makes sense that it And so that kind of
+makes sense that it And so that kind of makes sense that it would
+generalize better, right? You're would generalize better, right? You're
+would generalize better, right? You're not like deleting a lot of the or
+like not like deleting a lot of the or like not like deleting a lot of
+the or like damaging a lot of the knowledge from the damaging a lot of
+the knowledge from the damaging a lot of the knowledge from the other
+domains. and it's still able to do other domains. and it's still able to
+do other domains. and it's still able to do relatively well. relatively
+well. relatively well. &gt;&gt; In general down, &gt;&gt; yeah, I can I
+can also go back to the &gt;&gt; yeah, I can I can also go back to the
+&gt;&gt; yeah, I can I can also go back to the GRPO equation, GRPO
+equation, GRPO equation, but basically um but basically um but basically
+um we're Oops. So the the negative examples in GRPO are So the the
+negative examples in GRPO are So the the negative examples in GRPO are
+the ones where the advantage is like the ones where the advantage is
+like the ones where the advantage is like less than zero, right? less
+than zero, right? less than zero, right? &gt;&gt; I see. &gt;&gt; I see.
+&gt;&gt; I see. &gt;&gt; And so you're you're mostly downing &gt;&gt;
+And so you're you're mostly downing &gt;&gt; And so you're you're mostly
+downing you're mostly trying to reduce the you're mostly trying to
+reduce the you're mostly trying to reduce the probability of the
+examples where the probability of the examples where the probability of
+the examples where the advantage is less than zero compared to advantage
+is less than zero compared to advantage is less than zero compared to
+the old probability there as opposed to the old probability there as
+opposed to the old probability there as opposed to um comparing it to
+everything else. um comparing it to everything else. um comparing it to
+everything else. this. this. this. &gt;&gt; Yeah. &gt;&gt; Yeah.
+&gt;&gt; Yeah. &gt;&gt; Is this the reason why? &gt;&gt; Um &gt;&gt; Um
+&gt;&gt; Um I don't think they explicitly wrote that I don't think they
+explicitly wrote that I don't think they explicitly wrote that in their
+paper, but I I think the idea in their paper, but I I think the idea in
+their paper, but I I think the idea behind trying to train with RL from
+behind trying to train with RL from behind trying to train with RL from
+scratch is that like this goes all the scratch is that like this goes
+all the scratch is that like this goes all the way back to AlphaGo. I
+guess like if you way back to AlphaGo. I guess like if you way back to
+AlphaGo. I guess like if you like AlphaGo had a lot of influence on like
+AlphaGo had a lot of influence on like AlphaGo had a lot of influence on
+um like the the people doing RL because um like the the people doing RL
+because um like the the people doing RL because Alph Go was trained
+completely from Alph Go was trained completely from Alph Go was trained
+completely from scratch but it was able to discover scratch but it was
+able to discover scratch but it was able to discover strategies that
+like you know most strategies that like you know most strategies that
+like you know most humans would not have thought of and um humans would
+not have thought of and um humans would not have thought of and um so
+the idea here is we'll just let the so the idea here is we'll just let
+the so the idea here is we'll just let the model do whatever whatever it
+wants and model do whatever whatever it wants and model do whatever
+whatever it wants and if we let the model do whatever it wants if we let
+the model do whatever it wants if we let the model do whatever it wants
+and like it's getting at least some and like it's getting at least some
+and like it's getting at least some reward then eventually it will you
+know reward then eventually it will you know reward then eventually it
+will you know uh it will converge onto something good. uh it will
+converge onto something good. uh it will converge onto something good.
+Uh that being said, we are using a large Uh that being said, we are
+using a large Uh that being said, we are using a large language model.
+Um and the large language model. Um and the large language model. Um and
+the large language model has a lot of you know language model has a lot
+of you know language model has a lot of you know prior knowledge in it.
+So we're not prior knowledge in it. So we're not prior knowledge in it.
+So we're not starting completely from scratch. But starting completely
+from scratch. But starting completely from scratch. But that's the basic
+idea I think. Yeah. some performance. some performance. some
+performance. &gt;&gt; I I think you can &gt;&gt; I I think you can
+&gt;&gt; I I think you can um I think on mathematical reasoning um I
+think on mathematical reasoning um I think on mathematical reasoning
+actually they did do SFT and RL and that actually they did do SFT and RL
+and that actually they did do SFT and RL and that gave better results on
+mathematical gave better results on mathematical gave better results on
+mathematical reasoning but I think that might give reasoning but I think
+that might give reasoning but I think that might give worse results on
+other you know on other worse results on other you know on other worse
+results on other you know on other tasks. That's what our paper shows
+tasks. That's what our paper shows tasks. That's what our paper shows
+anyway. anyway. anyway. Cool. Um I'm going to sorry kind of Cool. Um I'm
+going to sorry kind of Cool. Um I'm going to sorry kind of power through
+the final ones to make power through the final ones to make power
+through the final ones to make sure we have time for the the student
+sure we have time for the the student sure we have time for the the
+student presentation. But um the these are a few presentation. But um
+the these are a few presentation. But um the these are a few kind of
+like interesting but maybe less kind of like interesting but maybe less
+kind of like interesting but maybe less uh central findings I think in
+the um uh uh central findings I think in the um uh uh central findings I
+think in the um uh like in in the like in in the like in in the okay
+they're they're still good. I I okay they're they're still good. I I
+okay they're they're still good. I I don't want to downplay them but
+I'll go don't want to downplay them but I'll go don't want to downplay
+them but I'll go through them quickly. So um the first through them
+quickly. So um the first through them quickly. So um the first one is
+simple test time scaling. Um, one is simple test time scaling. Um, one
+is simple test time scaling. Um, basically what they demonstrated is
+that basically what they demonstrated is that basically what they
+demonstrated is that you could use a minimal data with like a you could
+use a minimal data with like a you could use a minimal data with like a
+thousand carefully curated reasoning thousand carefully curated
+reasoning thousand carefully curated reasoning examples and a very
+simple trick called examples and a very simple trick called examples and
+a very simple trick called budget forcing which allows you to budget
+forcing which allows you to budget forcing which allows you to control
+thinking duration at test time control thinking duration at test time
+control thinking duration at test time to very efficiently train
+reasoning to very efficiently train reasoning to very efficiently train
+reasoning models. Um and the way they did this um models. Um and the way
+they did this um models. Um and the way they did this um and this
+allowed them to just do uh and this allowed them to just do uh and this
+allowed them to just do uh supervised fine-tuning um uh with Quen
+supervised fine-tuning um uh with Quen supervised fine-tuning um uh with
+Quen 2.532B and get good results and uh in a 2.532B and get good results
+and uh in a 2.532B and get good results and uh in a very sample
+efficient manner. Um very sample efficient manner. Um very sample
+efficient manner. Um and uh the the basic idea here is uh and uh the the
+basic idea here is uh and uh the the basic idea here is uh like they did
+two things. The first like they did two things. The first like they did
+two things. The first thing they did is they had a short chain thing
+they did is they had a short chain thing they did is they had a short
+chain of thought model generate the chain of of thought model generate
+the chain of of thought model generate the chain of thought and then
+they just put the word thought and then they just put the word thought
+and then they just put the word weight after it and then they made it
+weight after it and then they made it weight after it and then they made
+it generate again. generate again. generate again. So it's really like
+it's essentially So it's really like it's essentially So it's really
+like it's essentially forcing it to do you know re-examination forcing
+it to do you know re-examination forcing it to do you know re-
+examination of its previous hypothesis and this of its previous
+hypothesis and this of its previous hypothesis and this actually worked.
+Um so uh the second actually worked. Um so uh the second actually
+worked. Um so uh the second thing that they did was when it started
+thing that they did was when it started thing that they did was when it
+started uh reaching the end of its token limit uh reaching the end of
+its token limit uh reaching the end of its token limit they cut it off
+and they said times out they cut it off and they said times out they cut
+it off and they said times out now answer and it answered. So now answer
+and it answered. So now answer and it answered. So completely heristic
+but um despite the completely heristic but um despite the completely
+heristic but um despite the fact that it's completely heristic it fact
+that it's completely heristic it fact that it's completely heristic it
+got like actually quite uh quite good got like actually quite uh quite
+good got like actually quite uh quite good examples with a very quite
+good results examples with a very quite good results examples with a
+very quite good results with a very small number of examples. Um,
+another thing related to length and Um, another thing related to length
+and Um, another thing related to length and this is uh actually um
+another paper by this is uh actually um another paper by this is uh
+actually um another paper by Prangel here at LTI um is uh length Prangel
+here at LTI um is uh length Prangel here at LTI um is uh length
+controlled policy optimization and controlled policy optimization and
+controlled policy optimization and basically they wanted to come up with
+a basically they wanted to come up with a basically they wanted to come
+up with a way to control the reasoning length. Um, way to control the
+reasoning length. Um, way to control the reasoning length. Um, and they
+gave it a prompt like think for and they gave it a prompt like think for
+and they gave it a prompt like think for n tokens to try to get the
+model to like n tokens to try to get the model to like n tokens to try
+to get the model to like think for a varying amount of time uh think for
+a varying amount of time uh think for a varying amount of time uh that
+you can control. that you can control. that you can control. And uh
+based on this, their results And uh based on this, their results And uh
+based on this, their results basically showed that they were able to
+basically showed that they were able to basically showed that they were
+able to get better uh token uh like token get better uh token uh like
+token get better uh token uh like token accuracy trade-offs than other
+um other accuracy trade-offs than other um other accuracy trade-offs
+than other um other models including S1, the one I just uh models
+including S1, the one I just uh models including S1, the one I just uh
+introduced. And the way they did this uh introduced. And the way they
+did this uh introduced. And the way they did this uh was by adding a new
+reward. Um they was by adding a new reward. Um they was by adding a new
+reward. Um they called it L LCPO but basically it's called it L LCPO but
+basically it's called it L LCPO but basically it's adding another term
+to uh to the reward adding another term to uh to the reward adding
+another term to uh to the reward uh where you try to find the gold
+length uh where you try to find the gold length uh where you try to find
+the gold length and compare with the gold length. and compare with the
+gold length. and compare with the gold length. And uh they got good
+results on all the And uh they got good results on all the And uh they
+got good results on all the data sets they evaluated on. data sets they
+evaluated on. data sets they evaluated on. Another really interesting
+paper which Another really interesting paper which Another really
+interesting paper which um this came out before R1. Um and um this came
+out before R1. Um and um this came out before R1. Um and actually until
+R1 came out a lot of actually until R1 came out a lot of actually until
+R1 came out a lot of people thought that uh the open AI people thought
+that uh the open AI people thought that uh the open AI models were
+actually maybe doing models were actually maybe doing models were
+actually maybe doing something like this. Uh after R1 came something
+like this. Uh after R1 came something like this. Uh after R1 came out I
+think most people switched to out I think most people switched to out I
+think most people switched to thinking that the open AI models did
+thinking that the open AI models did thinking that the open AI models
+did something more similar to R1. Um but something more similar to R1.
+Um but something more similar to R1. Um but basically the idea is you
+take a search basically the idea is you take a search basically the idea
+is you take a search algorithm. So you take like best first algorithm.
+So you take like best first algorithm. So you take like best first
+search or something like this. um you search or something like this. um
+you search or something like this. um you run that search algorithm, you
+get a run that search algorithm, you get a run that search algorithm,
+you get a solution and then you turn it into a solution and then you
+turn it into a solution and then you turn it into a chain of thought. So
+you like chain of thought. So you like chain of thought. So you like
+heristically turn the thing into a chain heristically turn the thing
+into a chain heristically turn the thing into a chain of thought just
+like we did for the of thought just like we did for the of thought just
+like we did for the scratch pad in star. So like star was a scratch pad
+in star. So like star was a scratch pad in star. So like star was a way
+of solving mathematical equations. way of solving mathematical
+equations. way of solving mathematical equations. Now this is a way of
+like taking a Now this is a way of like taking a Now this is a way of
+like taking a search algorithm and turning it into a search algorithm
+and turning it into a search algorithm and turning it into a chain of
+thought. Um so they tried a bunch of different uh Um so they tried a
+bunch of different uh Um so they tried a bunch of different uh search
+strategies like breath first search strategies like breath first search
+strategies like breath first search and depth first search variants.
+search and depth first search variants. search and depth first search
+variants. Um, you know, all of these are things Um, you know, all of
+these are things Um, you know, all of these are things you've already
+learned, basically. Um, you've already learned, basically. Um, you've
+already learned, basically. Um, and then, uh, they took 500k search, uh,
+and then, uh, they took 500k search, uh, and then, uh, they took 500k
+search, uh, trajectories on a game called Countdown, trajectories on a
+game called Countdown, trajectories on a game called Countdown, where
+you need to countdown, uh, to, uh, where you need to countdown, uh, to,
+uh, where you need to countdown, uh, to, uh, I forget the exact details,
+but it's a, I forget the exact details, but it's a, I forget the exact
+details, but it's a, a simple game that nonetheless requires a simple
+game that nonetheless requires a simple game that nonetheless requires
+reasoning. And, um, then they uh, they reasoning. And, um, then they uh,
+they reasoning. And, um, then they uh, they compared this and were able
+to get uh, compared this and were able to get uh, compared this and were
+able to get uh, good results with this stream of search good results
+with this stream of search good results with this stream of search
+strategy. And then finally uh an interesting one And then finally uh an
+interesting one And then finally uh an interesting one that kind of
+mixes reasoning with tool that kind of mixes reasoning with tool that
+kind of mixes reasoning with tool use a little bit. Sorry this figure is
+a use a little bit. Sorry this figure is a use a little bit. Sorry this
+figure is a little bit small is uh adaptive parallel little bit small is
+uh adaptive parallel little bit small is uh adaptive parallel search.
+And basically the idea is they search. And basically the idea is they
+search. And basically the idea is they use something similar to stream
+of use something similar to stream of use something similar to stream of
+search but they give the model the search but they give the model the
+search but they give the model the ability to spawn parallel search
+ability to spawn parallel search ability to spawn parallel search
+threads. So it's like a tool that allows threads. So it's like a tool
+that allows threads. So it's like a tool that allows you to like split
+off different threads you to like split off different threads you to
+like split off different threads in in inference and join uh to return
+in in inference and join uh to return in in inference and join uh to
+return the results to a parent thread. So it's the results to a parent
+thread. So it's the results to a parent thread. So it's like you know
+multi-thread programming like you know multi-thread programming like you
+know multi-thread programming basically basically basically um and they
+do end toend RL optimization um and they do end toend RL optimization um
+and they do end toend RL optimization of this sort of like parent child
+of this sort of like parent child of this sort of like parent child
+coordination. And one interesting thing coordination. And one
+interesting thing coordination. And one interesting thing that they are
+able to show is that that they are able to show is that that they are
+able to show is that compared to stream of search where compared to
+stream of search where compared to stream of search where stream of
+search essentially had a limit stream of search essentially had a limit
+stream of search essentially had a limit on what you could do uh due to
+the on what you could do uh due to the on what you could do uh due to
+the overall token length. So like you know overall token length. So like
+you know overall token length. So like you know everybody talks about
+inference time everybody talks about inference time everybody talks
+about inference time scaling by like generating lots of scaling by like
+generating lots of scaling by like generating lots of tokens. Um but if
+you run out of tokens tokens. Um but if you run out of tokens tokens. Um
+but if you run out of tokens you can't generate anymore, right? So um
+you can't generate anymore, right? So um you can't generate anymore,
+right? So um what this does is this allows you to what this does is this
+allows you to what this does is this allows you to split off and do
+parallel search threads split off and do parallel search threads split
+off and do parallel search threads and merge them back together um while
+and merge them back together um while and merge them back together um
+while limiting the number of sequential tokens limiting the number of
+sequential tokens limiting the number of sequential tokens and greatly
+increasing the accuracy on and greatly increasing the accuracy on and
+greatly increasing the accuracy on the um things they were working on.
+Um the um things they were working on. Um the um things they were
+working on. Um the overall latency gets slower because the overall
+latency gets slower because the overall latency gets slower because you
+need to generate more um more tokens you need to generate more um more
+tokens you need to generate more um more tokens overall but uh
+nonetheless you can see overall but uh nonetheless you can see overall
+but uh nonetheless you can see it's reasonably beneficial. it's
+reasonably beneficial. it's reasonably beneficial. Cool. Um so this is
+kind of a high level Cool. Um so this is kind of a high level Cool. Um
+so this is kind of a high level overview. This is a very popular topic
+overview. This is a very popular topic overview. This is a very popular
+topic nowadays. So there's like tons and tons nowadays. So there's like
+tons and tons nowadays. So there's like tons and tons of stuff that I
+didn't cover, but um of stuff that I didn't cover, but um of stuff that
+I didn't cover, but um hopefully these give you uh some ideas hopefully
+these give you uh some ideas hopefully these give you uh some ideas of
+general uh general things in that of general uh general things in that
+of general uh general things in that direction. Um cool. And then uh I
+guess direction. Um cool. And then uh I guess direction. Um cool. And
+then uh I guess we can switch over to the student we can switch over to
+the student we can switch over to the student presentation uh while we
+have uh the presentation uh while we have uh the presentation uh while
+we have uh the presenter come

@@ -1,0 +1,1389 @@
+# cmu-llm-inference-8-self-refine-and-self-correction
+# video: https://www.youtube.com/watch?v=uaxf9yssDy4
+# captions: manual
+
+I think I saw that we have three student I think I saw that we have
+three student I think I saw that we have three student presentations
+today. Are is everyone presentations today. Are is everyone
+presentations today. Are is everyone here for that? here for that? here
+for that? One, two. One, two. One, two. Okay, maybe the other person
+isn't yet. Okay. Um but uh that that's a lot of Okay. Um but uh that
+that's a lot of Okay. Um but uh that that's a lot of presentations and I
+actually have a fair presentations and I actually have a fair
+presentations and I actually have a fair number of slides. So uh maybe I
+will get number of slides. So uh maybe I will get number of slides. So
+uh maybe I will get started. Um and I I think more people started. Um
+and I I think more people started. Um and I I think more people will
+come in as they walk over. Um, will come in as they walk over. Um, will
+come in as they walk over. Um, so this time I want to talk about so this
+time I want to talk about so this time I want to talk about self-
+refinement and self-correction self-refinement and self-correction self-
+refinement and self-correction methods. And these are kind of like the
+methods. And these are kind of like the methods. And these are kind of
+like the more explicit self-refinement and more explicit self-refinement
+and more explicit self-refinement and self-correction methods. Um, and
+uh, self-correction methods. Um, and uh, self-correction methods. Um,
+and uh, last time we talked about chain of last time we talked about
+chain of last time we talked about chain of thought. Next time we're
+going to talk thought. Next time we're going to talk thought. Next time
+we're going to talk about reasoning models. And I kind of about
+reasoning models. And I kind of about reasoning models. And I kind of
+view reasoning models as like sticking view reasoning models as like
+sticking view reasoning models as like sticking self-refinement and
+self-correction and self-refinement and self-correction and self-
+refinement and self-correction and chain of thought like together. chain
+of thought like together. chain of thought like together. uh but these
+are more explicit ways of uh but these are more explicit ways of uh but
+these are more explicit ways of doing things and they still can be very
+doing things and they still can be very doing things and they still can
+be very useful uh in a number of scenarios. useful uh in a number of
+scenarios. useful uh in a number of scenarios. So LM generation is
+typically done in a So LM generation is typically done in a So LM
+generation is typically done in a single pass from left to right and
+it's single pass from left to right and it's single pass from left to
+right and it's susceptible to errors in long or complex susceptible to
+errors in long or complex susceptible to errors in long or complex
+outputs. Um and then if we contrast this outputs. Um and then if we
+contrast this outputs. Um and then if we contrast this to human
+iterative writing uh you know to human iterative writing uh you know to
+human iterative writing uh you know very often you will write your essay
+or very often you will write your essay or very often you will write
+your essay or your code or whatever uh like that and your code or
+whatever uh like that and your code or whatever uh like that and then go
+in and you know refine and and then go in and you know refine and and
+then go in and you know refine and and fix the details and so the these
+methods fix the details and so the these methods fix the details and so
+the these methods are methods to help you do that. Um and are methods to
+help you do that. Um and are methods to help you do that. Um and in
+general uh with some nuances the in general uh with some nuances the in
+general uh with some nuances the selfcorrection process looks a little
+selfcorrection process looks a little selfcorrection process looks a
+little bit like this. So it's basically um you bit like this. So it's
+basically um you bit like this. So it's basically um you you have a
+self-correction loop uh and you have a self-correction loop uh and you
+have a self-correction loop uh and you have a certain number of maximum
+you have a certain number of maximum you have a certain number of
+maximum iterations and you have a stopping iterations and you have a
+stopping iterations and you have a stopping criterion and you generate
+your initial criterion and you generate your initial criterion and you
+generate your initial generation. Um you step over the maximum
+generation. Um you step over the maximum generation. Um you step over
+the maximum number of iterations and you'll usually number of iterations
+and you'll usually number of iterations and you'll usually have a hard
+stop here so that you don't have a hard stop here so that you don't have
+a hard stop here so that you don't you know do this forever. um you have
+you know do this forever. um you have you know do this forever. um you
+have some evaluation of uh the input with you some evaluation of uh the
+input with you some evaluation of uh the input with you know some
+nuances about exactly how you know some nuances about exactly how you
+know some nuances about exactly how you do this or sorry of the output
+and you do this or sorry of the output and you do this or sorry of the
+output and you have some nuances with exactly how you have some nuances
+with exactly how you have some nuances with exactly how you do this.
+Then you have your stopping do this. Then you have your stopping do
+this. Then you have your stopping criterion where you basically judge
+criterion where you basically judge criterion where you basically judge
+whether your critique said the output whether your critique said the
+output whether your critique said the output was satisfactory or not and
+uh then if was satisfactory or not and uh then if was satisfactory or
+not and uh then if you didn't say it was satisfactory you you didn't say
+it was satisfactory you you didn't say it was satisfactory you refine
+the output like this. So refine the output like this. So refine the
+output like this. So nothing nothing you know that complex nothing
+nothing you know that complex nothing nothing you know that complex but
+uh of course the details matter here but uh of course the details matter
+here but uh of course the details matter here and most of the methods
+I'm going to and most of the methods I'm going to and most of the
+methods I'm going to introduce in this class are details of introduce in
+this class are details of introduce in this class are details of how you
+can get this to work. how you can get this to work. how you can get this
+to work. So in particular what I want to talk So in particular what I
+want to talk So in particular what I want to talk about is several
+design decisions. Um about is several design decisions. Um about is
+several design decisions. Um the first is uh for your critique the first
+is uh for your critique the first is uh for your critique whether it's
+an explicit critique or an whether it's an explicit critique or an
+whether it's an explicit critique or an implicit critique. And by
+explicit implicit critique. And by explicit implicit critique. And by
+explicit critique I mean you explicitly prompt critique I mean you
+explicitly prompt critique I mean you explicitly prompt the model or
+explicitly train the model the model or explicitly train the model the
+model or explicitly train the model to decide whether the output is good
+or to decide whether the output is good or to decide whether the output
+is good or not. Um implicit means that this isn't not. Um implicit means
+that this isn't not. Um implicit means that this isn't done explicitly.
+It's only done by uh done explicitly. It's only done by uh done
+explicitly. It's only done by uh having the language model itself you
+having the language model itself you having the language model itself
+you know maybe not generate any changes. Um know maybe not generate any
+changes. Um know maybe not generate any changes. Um and when the
+language model doesn't and when the language model doesn't and when the
+language model doesn't generate any changes then we judge that generate
+any changes then we judge that generate any changes then we judge that
+the output is already good enough and we the output is already good
+enough and we the output is already good enough and we don't need to to
+make any more changes. don't need to to make any more changes. don't
+need to to make any more changes. uh in the refinement set. uh in the
+refinement set. uh in the refinement set. Um another thing is training.
+So uh Um another thing is training. So uh Um another thing is training.
+So uh whether we explicitly train the model to whether we explicitly
+train the model to whether we explicitly train the model to be good at
+self-refinement or uh we be good at self-refinement or uh we be good at
+self-refinement or uh we don't uh don't do this. don't uh don't do this.
+don't uh don't do this. Um another thing is what we condition Um another
+thing is what we condition Um another thing is what we condition the
+refinement step on. So we can get the refinement step on. So we can get
+the refinement step on. So we can get condition this on the input, we
+can condition this on the input, we can condition this on the input, we
+can condition this on the output and we can condition this on the output
+and we can condition this on the output and we can condition this on the
+critique uh condition this on the critique uh condition this on the
+critique uh itself. And different methods use uh itself. And different
+methods use uh itself. And different methods use uh different uh
+varieties of this. different uh varieties of this. different uh
+varieties of this. And finally um you can use external And finally um
+you can use external And finally um you can use external tools. And so
+some of the critique tools. And so some of the critique tools. And so
+some of the critique methods just rely on the language model. methods
+just rely on the language model. methods just rely on the language
+model. Some of the critique methods uh rely on Some of the critique
+methods uh rely on Some of the critique methods uh rely on external
+tools to judge whether the external tools to judge whether the external
+tools to judge whether the output is good or not. output is good or not.
+output is good or not. And I'm going to be introducing seven uh And I'm
+going to be introducing seven uh And I'm going to be introducing seven
+uh different papers today. Um six of them different papers today. Um six
+of them different papers today. Um six of them are are kind of self-
+refinement methods. are are kind of self-refinement methods. are are
+kind of self-refinement methods. Another one is maybe related but not
+Another one is maybe related but not Another one is maybe related but
+not exactly the same. Um and they are uh exactly the same. Um and they
+are uh exactly the same. Um and they are uh they are these papers. Um
+the for and we they are these papers. Um the for and we they are these
+papers. Um the for and we have this table here. I might come back have
+this table here. I might come back have this table here. I might come
+back to this table at the end but basically to this table at the end but
+basically to this table at the end but basically you can see that some
+of them don't you can see that some of them don't you can see that some
+of them don't explicitly critique some of them do uh explicitly critique
+some of them do uh explicitly critique some of them do uh some of them
+train the models some of some of them train the models some of some of
+them train the models some of them don't. Uh they condition on various
+them don't. Uh they condition on various them don't. Uh they condition
+on various different things they either use tools different things they
+either use tools different things they either use tools or do not uh etc
+etc. So the first one I want to talk about um So the first one I want to
+talk about um So the first one I want to talk about um is uh very
+simple. Uh this is a paper is uh very simple. Uh this is a paper is uh
+very simple. Uh this is a paper that was done in 2017. So this was you
+that was done in 2017. So this was you that was done in 2017. So this
+was you know back when uh like neural neural know back when uh like
+neural neural know back when uh like neural neural models for language
+generation were very models for language generation were very models for
+language generation were very uh fresh and new basically. But the uh
+fresh and new basically. But the uh fresh and new basically. But the
+basic idea here is that you don't want basic idea here is that you don't
+want basic idea here is that you don't want to uh generate a single uh
+output but to uh generate a single uh output but to uh generate a single
+uh output but you want to generate an output and then you want to
+generate an output and then you want to generate an output and then you
+want to go in and refine it. And you want to go in and refine it. And
+you want to go in and refine it. And what they did here is they did two
+pass what they did here is they did two pass what they did here is they
+did two pass decoding um with uh quote unquote decoding um with uh quote
+unquote decoding um with uh quote unquote deliberation and refinement.
+deliberation and refinement. deliberation and refinement. And so the
+first pass uh output uh first And so the first pass uh output uh first
+And so the first pass uh output uh first pass generation generates an
+initial pass generation generates an initial pass generation generates
+an initial draft sequence and then the second pass draft sequence and
+then the second pass draft sequence and then the second pass refineses
+uh with global context of what refineses uh with global context of what
+refineses uh with global context of what the output may look like. And
+so the the output may look like. And so the the output may look like.
+And so the algorithm is uh as simple as this. It's algorithm is uh as
+simple as this. It's algorithm is uh as simple as this. It's not not
+very interesting. there's not not not very interesting. there's not not
+not very interesting. there's not even a for loop in it. But um the even
+a for loop in it. But um the even a for loop in it. But um the important
+thing is uh they demonstrated important thing is uh they demonstrated
+important thing is uh they demonstrated that you can actually train
+models to be that you can actually train models to be that you can
+actually train models to be good at self-refinement. good at self-
+refinement. good at self-refinement. And uh the way they did this is
+they had And uh the way they did this is they had And uh the way they
+did this is they had a training objective where uh basically a training
+objective where uh basically a training objective where uh basically
+they expressed their objective as being they expressed their objective
+as being they expressed their objective as being the log probability of
+the final output the log probability of the final output the log
+probability of the final output conditioned on the intermediate output.
+conditioned on the intermediate output. conditioned on the intermediate
+output. So y prime is the uh is the intermediate So y prime is the uh is
+the intermediate So y prime is the uh is the intermediate output and y
+is the final output output and y is the final output output and y is the
+final output and um they sorry they have theta e and um they sorry they
+have theta e and um they sorry they have theta e here. This is the theta
+for the like here. This is the theta for the like here. This is the
+theta for the like encoder model because they were using encoder model
+because they were using encoder model because they were using encoder
+decoder models back then. You encoder decoder models back then. You
+encoder decoder models back then. You can kind of just ignore this for
+now. Um can kind of just ignore this for now. Um can kind of just ignore
+this for now. Um uh but uh so then you have uh parameters uh but uh so
+then you have uh parameters uh but uh so then you have uh parameters for
+the first model and parameters for for the first model and parameters
+for for the first model and parameters for the second model. Um, you
+could also the second model. Um, you could also the second model. Um,
+you could also like nowadays I think you wouldn't like nowadays I think
+you wouldn't like nowadays I think you wouldn't actually train two
+different models. I actually train two different models. I actually
+train two different models. I think you train a single model to be think
+you train a single model to be think you train a single model to be good
+at both of these tasks. But um that good at both of these tasks. But um
+that good at both of these tasks. But um that that's what they did in
+2017. that's what they did in 2017. that's what they did in 2017. So uh
+anybody have an idea what's wrong So uh anybody have an idea what's
+wrong So uh anybody have an idea what's wrong with this training
+objective here? Why why would this not be feasible? Why why would this
+not be feasible? Why why would this not be feasible? Yeah, it conditions
+on the intermediate input. it conditions on the intermediate input. it
+conditions on the intermediate input. Well, this is actually
+conditioning on Well, this is actually conditioning on Well, this is
+actually conditioning on the initial input and the intermediate the
+initial input and the intermediate the initial input and the
+intermediate input when it's calculating this here. Any any other ideas?
+&gt;&gt; Uh good good point. Can you compute the &gt;&gt; Uh good good
+point. Can you compute the &gt;&gt; Uh good good point. Can you compute
+the gradient is a good question to be gradient is a good question to be
+gradient is a good question to be asking. Can you compute this function?
+What what is the space of y prime? It it is discreet. Um this is uh oh
+yeah It it is discreet. Um this is uh oh yeah It it is discreet. Um this
+is uh oh yeah actually here maybe I should say x is actually here maybe
+I should say x is actually here maybe I should say x is your input
+sequence and y is your output your input sequence and y is your output
+your input sequence and y is your output sequence. So how how big would
+be the space of y So how how big would be the space of y So how how big
+would be the space of y prime? large large large &gt;&gt; infinitely
+large. Yeah. So you don't &gt;&gt; infinitely large. Yeah. So you don't
+&gt;&gt; infinitely large. Yeah. So you don't want to be solving this
+sum, right? So want to be solving this sum, right? So want to be solving
+this sum, right? So uh that that is a big problem and so we uh that that
+is a big problem and so we uh that that is a big problem and so we need
+to find an alternative way of doing need to find an alternative way of
+doing need to find an alternative way of doing this. The reason why it's
+infinitely this. The reason why it's infinitely this. The reason why
+it's infinitely large is it's the space of all large is it's the space
+of all large is it's the space of all sequences. Yeah. sequences. Yeah.
+sequences. Yeah. &gt;&gt; Oh yeah, sure. So um this is a model &gt;&gt;
+Oh yeah, sure. So um this is a model &gt;&gt; Oh yeah, sure. So um this
+is a model that takes in an input sequence and that takes in an input
+sequence and that takes in an input sequence and generates an output
+sequence and you generates an output sequence and you generates an
+output sequence and you could have an infinite number of could have an
+infinite number of could have an infinite number of possible output
+sequences right possible output sequences right possible output
+sequences right um and so uh or at least like let's say um and so uh or
+at least like let's say um and so uh or at least like let's say your
+sequences could be of length up to your sequences could be of length up
+to your sequences could be of length up to 100 it would be v to 100 v to
+the 100 so 100 it would be v to 100 v to the 100 so 100 it would be v to
+100 v to the 100 so you could can't enumerate over that you could can't
+enumerate over that you could can't enumerate over that &gt;&gt; so what
+what's our uh standard way of &gt;&gt; so what what's our uh standard
+way of &gt;&gt; so what what's our uh standard way of solving this
+problem solving this problem solving this problem &gt;&gt; yeah &gt;&gt;
+yeah &gt;&gt; yeah Yeah, exactly. Sampling. So you sample a Yeah,
+exactly. Sampling. So you sample a Yeah, exactly. Sampling. So you
+sample a smaller model, a smaller number of smaller model, a smaller
+number of smaller model, a smaller number of outputs and um basically
+the way they outputs and um basically the way they outputs and um
+basically the way they did this is they um they reformulated did this is
+they um they reformulated did this is they um they reformulated this.
+They sampled over the um over the this. They sampled over the um over
+the this. They sampled over the um over the inputs here and then they
+generated the inputs here and then they generated the inputs here and
+then they generated the outputs. And if you sample a number outputs. And
+if you sample a number outputs. And if you sample a number greater than
+one here, you can actually greater than one here, you can actually
+greater than one here, you can actually see which intermediate state
+results in see which intermediate state results in see which
+intermediate state results in a higher probability here or a lower a
+higher probability here or a lower a higher probability here or a lower
+probability here. and you can bias the probability here. and you can
+bias the probability here. and you can bias the the states. Um to to do
+this in uh 2025 the states. Um to to do this in uh 2025 the states. Um
+to to do this in uh 2025 terms, this is basically gpo. Um if terms, this
+is basically gpo. Um if terms, this is basically gpo. Um if people have
+heard of gpo, it's a you people have heard of gpo, it's a you people
+have heard of gpo, it's a you know uh way it's not exactly the same as
+know uh way it's not exactly the same as know uh way it's not exactly
+the same as gpo, but it's uh it's an idea where you gpo, but it's uh
+it's an idea where you gpo, but it's uh it's an idea where you sample
+multiple outputs and you upweight sample multiple outputs and you
+upweight sample multiple outputs and you upweight the ones that give you
+a better reward the ones that give you a better reward the ones that
+give you a better reward or a worse reward where your reward is or a
+worse reward where your reward is or a worse reward where your reward is
+essentially this um uh this log essentially this um uh this log
+essentially this um uh this log probability here. Yeah. What did you
+probability here. Yeah. What did you probability here. Yeah. What did
+you say? Sample over the inputs. say? Sample over the inputs. say?
+Sample over the inputs. &gt;&gt; So you sample you sample several
+&gt;&gt; So you sample you sample several &gt;&gt; So you sample you
+sample several intermediate states and then uh several intermediate
+states and then uh several intermediate states and then uh several
+intermediate sequences and then after intermediate sequences and then
+after intermediate sequences and then after you've sampled several
+intermediate you've sampled several intermediate you've sampled several
+intermediate sequences, you calculate the log sequences, you calculate
+the log sequences, you calculate the log probability of the output given
+these probability of the output given these probability of the output
+given these several intermediate sequences. several intermediate
+sequences. several intermediate sequences. &gt;&gt; Also be like
+&gt;&gt; Also be like &gt;&gt; Also be like intermediate sequence.
+intermediate sequence. intermediate sequence. &gt;&gt; The output
+sequence is always the same. &gt;&gt; The output sequence is always the
+same. &gt;&gt; The output sequence is always the same. So you're you
+have a supervised output So you're you have a supervised output So
+you're you have a supervised output sequence and so this this you know
+that sequence and so this this you know that sequence and so this this
+you know that could be whatever your uh target answer could be whatever
+your uh target answer could be whatever your uh target answer is. Yeah.
+is. Yeah. is. Yeah. &gt;&gt; So we just like aperture something and
+&gt;&gt; So we just like aperture something and &gt;&gt; So we just like
+aperture something and then we just s then we just s then we just s
+&gt;&gt; Yeah. And and specifically they did this &gt;&gt; Yeah. And and
+specifically they did this &gt;&gt; Yeah. And and specifically they did
+this for machine translation. So their input for machine translation. So
+their input for machine translation. So their input was a German
+sentence, their output was was a German sentence, their output was was a
+German sentence, their output was an English sentence. But if you wanted
+an English sentence. But if you wanted an English sentence. But if you
+wanted this to be uh sampling, you know, an this to be uh sampling, you
+know, an this to be uh sampling, you know, an output uh to that was an
+answer to a output uh to that was an answer to a output uh to that was
+an answer to a question, it could be the answer to the question, it
+could be the answer to the question, it could be the answer to the
+question also. question also. question also. &gt;&gt; Yeah. &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Thanks. &gt;&gt; Thanks. &gt;&gt; Thanks.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Cool. &gt;&gt;
+Cool. &gt;&gt; Cool. Um so yeah they they use sampling to Um so yeah
+they they use sampling to Um so yeah they they use sampling to
+approximate gradients and um both were approximate gradients and um both
+were approximate gradients and um both were trained with a shared
+decoder and so trained with a shared decoder and so trained with a
+shared decoder and so they got they got good results with this they got
+they got good results with this they got they got good results with this
+uh demonstrated a pretty large uh demonstrated a pretty large uh
+demonstrated a pretty large improvement over a very strong baseline
+improvement over a very strong baseline improvement over a very strong
+baseline model back in 2017 which we don't care model back in 2017 which
+we don't care model back in 2017 which we don't care about anymore
+because it's not strong about anymore because it's not strong about
+anymore because it's not strong anymore. Um uh but yeah so so that's a
+anymore. Um uh but yeah so so that's a anymore. Um uh but yeah so so
+that's a demonstration for how we can train demonstration for how we can
+train demonstration for how we can train these. Um of course we can also
+train these. Um of course we can also train these. Um of course we can
+also train with multiple steps. So we could do this with multiple steps.
+So we could do this with multiple steps. So we could do this you know
+multiple um multiple steps at you know multiple um multiple steps at you
+know multiple um multiple steps at once. Uh you could do that in a
+heristic once. Uh you could do that in a heristic once. Uh you could do
+that in a heristic way and we're also going to talk about way and we're
+also going to talk about way and we're also going to talk about
+diffusion models which do something like diffusion models which do
+something like diffusion models which do something like this over and
+over again in an efficient this over and over again in an efficient this
+over and over again in an efficient way but not in this class. way but
+not in this class. way but not in this class. Um the second thing I'd
+like to talk Um the second thing I'd like to talk Um the second thing
+I'd like to talk about is uh learning to model editing about is uh
+learning to model editing about is uh learning to model editing
+processes. And this is a um a paper that processes. And this is a um a
+paper that processes. And this is a um a paper that I did uh and the
+basic idea is that we I did uh and the basic idea is that we I did uh
+and the basic idea is that we have a multi-step editing processes and
+have a multi-step editing processes and have a multi-step editing
+processes and I think there's two interesting things I think there's two
+interesting things I think there's two interesting things in this paper.
+Um the first interesting in this paper. Um the first interesting in this
+paper. Um the first interesting thing in this paper is uh that we were
+thing in this paper is uh that we were thing in this paper is uh that we
+were able to get data for editing processes able to get data for editing
+processes able to get data for editing processes uh that naturally
+occurs online and use uh that naturally occurs online and use uh that
+naturally occurs online and use that to train models. So the first that
+to train models. So the first that to train models. So the first
+interesting thing is the data. Um the interesting thing is the data. Um
+the interesting thing is the data. Um the second interesting thing is
+the way we second interesting thing is the way we second interesting
+thing is the way we um the way we expressed editing um the way we
+expressed editing um the way we expressed editing processes. And uh the
+way we did this processes. And uh the way we did this processes. And uh
+the way we did this was not by just uh not by just training was not by
+just uh not by just training was not by just uh not by just training a
+model to edit output text but to train a model to edit output text but
+to train a model to edit output text but to train a model that actually
+identified like a model that actually identified like a model that
+actually identified like where should be edited and then uh based where
+should be edited and then uh based where should be edited and then uh
+based on identifying where should be edited on identifying where should
+be edited on identifying where should be edited and how um like actually
+going in and and how um like actually going in and and how um like
+actually going in and doing the editing. So uh the way the algorithm
+works is a So uh the way the algorithm works is a So uh the way the
+algorithm works is a bit like this. Um it's closer to the bit like this.
+Um it's closer to the bit like this. Um it's closer to the self-
+refinement uh self-refinement uh self-refinement uh algorithm that we
+had before uh with two algorithm that we had before uh with two
+algorithm that we had before uh with two major differences. So the first
+thing is major differences. So the first thing is major differences. So
+the first thing is we have our input um we have our editing we have our
+input um we have our editing we have our input um we have our editing
+history uh we can we can start from a history uh we can we can start
+from a history uh we can we can start from a blank state or we can start
+from a null blank state or we can start from a null blank state or we
+can start from a null state where we have like something that state
+where we have like something that state where we have like something
+that we want to go in and edit. Um but while we want to go in and edit.
+Um but while we want to go in and edit. Um but while we have not
+finished um which could be we have not finished um which could be we
+have not finished um which could be you know uh predicting a null edit
+or you know uh predicting a null edit or you know uh predicting a null
+edit or running out of um running out of running out of um running out
+of running out of um running out of iterations or something like this.
+The iterations or something like this. The iterations or something like
+this. The first thing we did was we predict edit first thing we did was
+we predict edit first thing we did was we predict edit operations uh
+where these edit operations uh where these edit operations uh where
+these edit operations are insert, delete, keep or operations are insert,
+delete, keep or operations are insert, delete, keep or replace. Um, and
+then we generate replace. Um, and then we generate replace. Um, and then
+we generate content based on the edit operations and content based on
+the edit operations and content based on the edit operations and the
+history of the edits we've made so the history of the edits we've made
+so the history of the edits we've made so far. And um then we have uh we
+apply the far. And um then we have uh we apply the far. And um then we
+have uh we apply the edits uh based on the generated content. edits uh
+based on the generated content. edits uh based on the generated content.
+This is a deterministic operation. And This is a deterministic
+operation. And This is a deterministic operation. And then we uh add the
+edit history uh add then we uh add the edit history uh add then we uh
+add the edit history uh add to the edit history so it can be to the edit
+history so it can be to the edit history so it can be referenced before
+Yeah question. So does content uh only Yeah question. So does content uh
+only Yeah question. So does content uh only give out editive changes or
+does it give give out editive changes or does it give give out editive
+changes or does it give out like final state? So I mean I don't out like
+final state? So I mean I don't out like final state? So I mean I don't
+understand the reason for applying the understand the reason for
+applying the understand the reason for applying the new content. new
+content. new content. &gt;&gt; Yep. I'll I'll have a a diagram in the
+&gt;&gt; Yep. I'll I'll have a a diagram in the &gt;&gt; Yep. I'll I'll
+have a a diagram in the next slide. Yeah. next slide. Yeah. next slide.
+Yeah. So um So um So um this is the core uh the core way we this is the
+core uh the core way we this is the core uh the core way we decompose.
+So we have um a prediction uh decompose. So we have um a prediction uh
+decompose. So we have um a prediction uh from from from uh the the
+previous states and the edit uh the the previous states and the edit uh
+the the previous states and the edit sequences corresponding to the
+previous sequences corresponding to the previous sequences corresponding
+to the previous states and we predict the edits and then states and we
+predict the edits and then states and we predict the edits and then
+given the edits we predict the uh the given the edits we predict the uh
+the given the edits we predict the uh the output content and um output
+content and um output content and um this is uh so so the first thing we
+do is uh we so so the first thing we do is uh we so so the first thing
+we do is uh we have a predictor where the predictor have a predictor
+where the predictor have a predictor where the predictor basically for
+each of the tokens uh basically for each of the tokens uh basically for
+each of the tokens uh predicts whether we want to insert predicts
+whether we want to insert predicts whether we want to insert something
+there. So uh here uh it would something there. So uh here uh it would
+something there. So uh here uh it would be like uh after the we want to
+insert a be like uh after the we want to insert a be like uh after the
+we want to insert a word. The other thing would be replace. word. The
+other thing would be replace. word. The other thing would be replace. So
+we want to replace this token So we want to replace this token So we
+want to replace this token sequence. We want to delete words or we
+sequence. We want to delete words or we sequence. We want to delete
+words or we want to replace. And so these are um want to replace. And so
+these are um want to replace. And so these are um these are just it's
+like a tokening uh these are just it's like a tokening uh these are just
+it's like a tokening uh sorry tagging task that we apply to each sorry
+tagging task that we apply to each sorry tagging task that we apply to
+each uh token in the input sequence. And then uh token in the input
+sequence. And then uh token in the input sequence. And then for delete
+uh delete is just for delete uh delete is just for delete uh delete is
+just deterministic right we just remove the deterministic right we just
+remove the deterministic right we just remove the content there for
+insert or replace we content there for insert or replace we content
+there for insert or replace we need to generate new content. And so we
+need to generate new content. And so we need to generate new content.
+And so we were able to generate uh this content were able to generate uh
+this content were able to generate uh this content and we actually did
+it in a parallel and we actually did it in a parallel and we actually
+did it in a parallel manner. So um for every insert sequence manner. So
+um for every insert sequence manner. So um for every insert sequence or
+replace sequence we then uh you know or replace sequence we then uh you
+know or replace sequence we then uh you know conditioned on the
+representation here conditioned on the representation here conditioned
+on the representation here and generated like domestic or uh or and
+generated like domestic or uh or and generated like domestic or uh or
+domesticated descendant of. And so once domesticated descendant of. And
+so once domesticated descendant of. And so once we have the insert uh
+replace and delete we have the insert uh replace and delete we have the
+insert uh replace and delete sequences um and the outputs from the
+sequences um and the outputs from the sequences um and the outputs from
+the decoder for each of the inserts or decoder for each of the inserts
+or decoder for each of the inserts or replace sequences, we can replace
+sequences, we can replace sequences, we can deterministically generate
+the domestic deterministically generate the domestic deterministically
+generate the domestic dog is a dog is a dog is a domesticated descendant
+of the wolf like domesticated descendant of the wolf like domesticated
+descendant of the wolf like that, right? that, right? that, right? And
+so this is also really um really And so this is also really um really
+And so this is also really um really nice if you want to edit a really
+long nice if you want to edit a really long nice if you want to edit a
+really long document over and over again because you document over and
+over again because you document over and over again because you don't
+need to actually generate each uh don't need to actually generate each
+uh don't need to actually generate each uh token here. You can just do a
+single token here. You can just do a single token here. You can just do
+a single pass uh to predict all of these tokens pass uh to predict all
+of these tokens pass uh to predict all of these tokens using a tagging
+model which is a lot using a tagging model which is a lot using a
+tagging model which is a lot faster because you're just doing faster
+because you're just doing faster because you're just doing encoding and
+then you can generate encoding and then you can generate encoding and
+then you can generate shorter shorter sequences. shorter shorter
+sequences. shorter shorter sequences. &gt;&gt; Yeah. E1 are the actions
+edit actions. &gt;&gt; Yeah. E1 are the actions edit actions. &gt;&gt;
+Yeah. E1 are the actions edit actions. &gt;&gt; Uh the E are the edit
+actions. Yeah. &gt;&gt; Uh the E are the edit actions. Yeah. &gt;&gt; Uh
+the E are the edit actions. Yeah. &gt;&gt; If E also contains for
+inserted replace &gt;&gt; If E also contains for inserted replace
+&gt;&gt; If E also contains for inserted replace the token that you're
+supposed to the token that you're supposed to the token that you're
+supposed to replace it with. replace it with. replace it with. Do we
+need the extra condition of X I Do we need the extra condition of X I Do
+we need the extra condition of X I given EI? Like if edits are defined
+then given EI? Like if edits are defined then given EI? Like if edits
+are defined then we know what the XI would be given X and we know what
+the XI would be given X and we know what the XI would be given X and E.
+So, oh, so the edits are just these E. So, oh, so the edits are just
+these E. So, oh, so the edits are just these tags. So, you don't yet
+know um you tags. So, you don't yet know um you tags. So, you don't yet
+know um you don't yet know the these words up here don't yet know the
+these words up here don't yet know the these words up here when you
+predict E. Yeah, cool. when you predict E. Yeah, cool. when you predict
+E. Yeah, cool. &gt;&gt; Um yeah, &gt;&gt; Um yeah, &gt;&gt; Um yeah,
+&gt;&gt; when generating or &gt;&gt; uh just end of sequence token,
+&gt;&gt; uh just end of sequence token, &gt;&gt; uh just end of sequence
+token, &gt;&gt; so we we generate like domestic and then &gt;&gt; so we
+we generate like domestic and then &gt;&gt; so we we generate like
+domestic and then end of sequence. So, it can uh generate end of
+sequence. So, it can uh generate end of sequence. So, it can uh generate
+as many tokens as it wants. Yeah. as many tokens as it wants. Yeah. as
+many tokens as it wants. Yeah. Um so Um so Um so we um the other thing I
+mentioned about we um the other thing I mentioned about we um the other
+thing I mentioned about this is we created two data sets. Uh the this is
+we created two data sets. Uh the this is we created two data sets. Uh
+the first is wiki revisions and code first is wiki revisions and code
+first is wiki revisions and code revisions. So wiki revisions was a data
+revisions. So wiki revisions was a data revisions. So wiki revisions was
+a data set um from Wikipedia data and set um from Wikipedia data and set
+um from Wikipedia data and interestingly Wikipedia has all of the
+interestingly Wikipedia has all of the interestingly Wikipedia has all
+of the revision history right so you can go and revision history right
+so you can go and revision history right so you can go and actually see
+how Wikipedia was edited um actually see how Wikipedia was edited um
+actually see how Wikipedia was edited um for code revisions uh this was
+from for code revisions uh this was from for code revisions uh this was
+from GitHub and similarly you can see how the GitHub and similarly you
+can see how the GitHub and similarly you can see how the code was edited
+on GitHub. So uh we we code was edited on GitHub. So uh we we code was
+edited on GitHub. So uh we we got this and we also um did experiments
+got this and we also um did experiments got this and we also um did
+experiments where basically we just tried to predict where basically we
+just tried to predict where basically we just tried to predict the edits
+given the current um given the the edits given the current um given the
+the edits given the current um given the current current current state
+of the text or code and an editing state of the text or code and an
+editing state of the text or code and an editing in intent. So the
+editing intent comes in intent. So the editing intent comes in intent.
+So the editing intent comes from the um the commit uh like the text from
+the um the commit uh like the text from the um the commit uh like the
+text that was along with the commit or the that was along with the
+commit or the that was along with the commit or the description of the
+change on Wikipedia. description of the change on Wikipedia. description
+of the change on Wikipedia. And so that's the single order thing and And
+so that's the single order thing and And so that's the single order
+thing and this was our overall perplexity for this was our overall
+perplexity for this was our overall perplexity for making the edit. Um
+the we also tried a making the edit. Um the we also tried a making the
+edit. Um the we also tried a thing where you looked at past edits and
+thing where you looked at past edits and thing where you looked at past
+edits and you tried to um you tried to predict you tried to um you tried
+to predict you tried to um you tried to predict based on past edits. And
+interestingly based on past edits. And interestingly based on past
+edits. And interestingly this demonstrated that if you reference this
+demonstrated that if you reference this demonstrated that if you
+reference past edits you can also um you know past edits you can also um
+you know past edits you can also um you know predict future edits. So
+you can see predict future edits. So you can see predict future edits.
+So you can see that if this part was edited before now that if this part
+was edited before now that if this part was edited before now this part
+will be likely edited again. this part will be likely edited again. this
+part will be likely edited again. And you know, it kind of makes sense
+And you know, it kind of makes sense And you know, it kind of makes
+sense because um on Wikipedia, one one thing because um on Wikipedia,
+one one thing because um on Wikipedia, one one thing we found a lot was
+um like basically uh we found a lot was um like basically uh we found a
+lot was um like basically uh it edit wars like spam spam wars where it
+edit wars like spam spam wars where it edit wars like spam spam wars
+where people like added spam and then the spam people like added spam
+and then the spam people like added spam and then the spam got deleted.
+So you could actually got deleted. So you could actually got deleted. So
+you could actually predict that that spam was going to be predict that
+that spam was going to be predict that that spam was going to be deleted
+uh afterwards. So um it allows deleted uh afterwards. So um it allows
+deleted uh afterwards. So um it allows you to predict future edits more
+uh more you to predict future edits more uh more you to predict future
+edits more uh more easily. Cool. Um so this just demonstrates that Cool.
+Um so this just demonstrates that Cool. Um so this just demonstrates
+that there's you know like alternative ways there's you know like
+alternative ways there's you know like alternative ways to do uh
+modeling of editing processes to do uh modeling of editing processes to
+do uh modeling of editing processes and I also wanted to uh introduce
+that and I also wanted to uh introduce that and I also wanted to uh
+introduce that like data create creation methodology in like data create
+creation methodology in like data create creation methodology in case
+it's like interesting or insightful case it's like interesting or
+insightful case it's like interesting or insightful for uh for any of
+your work. for uh for any of your work. for uh for any of your work. Um
+another uh thing that I'd like to Um another uh thing that I'd like to
+Um another uh thing that I'd like to talk about is uh learning to
+represent talk about is uh learning to represent talk about is uh
+learning to represent edits. And this is another uh paper that edits.
+And this is another uh paper that edits. And this is another uh paper
+that I I did uh together with uh a student I I did uh together with uh a
+student I I did uh together with uh a student here at CMU. And the basic
+idea is that here at CMU. And the basic idea is that here at CMU. And
+the basic idea is that you can learn to represent the types of you can
+learn to represent the types of you can learn to represent the types of
+changes that are made uh when changing changes that are made uh when
+changing changes that are made uh when changing between uh different
+sequences. between uh different sequences. between uh different
+sequences. And And And uh that's a little small. Let me make uh that's a
+little small. Let me make uh that's a little small. Let me make that
+bigger. But the basic idea is that that bigger. But the basic idea is
+that that bigger. But the basic idea is that we have a um we have two we
+have a um we have two we have a um we have two uh like an input and an
+output and based uh like an input and an output and based uh like an
+input and an output and based on the input and output we get a single on
+the input and output we get a single on the input and output we get a
+single like vector representation of what type like vector
+representation of what type like vector representation of what type of
+edit it is. And then we have another of edit it is. And then we have
+another of edit it is. And then we have another similar input and output
+and we feed in similar input and output and we feed in similar input and
+output and we feed in the input and that edit representation the input
+and that edit representation the input and that edit representation uh
+to try to generate uh the output. And uh to try to generate uh the
+output. And uh to try to generate uh the output. And so this can be
+trained. so this can be trained. so this can be trained. Um so this is
+essentially what it looks Um so this is essentially what it looks Um so
+this is essentially what it looks like. You know we have a source and a
+like. You know we have a source and a like. You know we have a source
+and a target. We have an uh target. We have an uh target. We have an uh
+we have an edit vector uh edit encoder. we have an edit vector uh edit
+encoder. we have an edit vector uh edit encoder. And then um if you have
+a new source, And then um if you have a new source, And then um if you
+have a new source, you can then apply uh apply this edit to you can then
+apply uh apply this edit to you can then apply uh apply this edit to a
+new a new source if you want to. a new a new source if you want to. a
+new a new source if you want to. Um but the details are pretty simple.
+Um but the details are pretty simple. Um but the details are pretty
+simple. You can ignore the you know particular You can ignore the you
+know particular You can ignore the you know particular type of uh edit
+encoder we used. It type of uh edit encoder we used. It type of uh edit
+encoder we used. It could be um you know any uh any variety could be um
+you know any uh any variety could be um you know any uh any variety of
+edit encoder. But um I now I'd of edit encoder. But um I now I'd of edit
+encoder. But um I now I'd probably just use a a large language probably
+just use a a large language probably just use a a large language model
+uh with the two things fed in and model uh with the two things fed in
+and model uh with the two things fed in and fine-tune it. Um but uh the
+important fine-tune it. Um but uh the important fine-tune it. Um but uh
+the important thing is the edit representation is thing is the edit
+representation is thing is the edit representation is limited to 512
+dimensions and the reason limited to 512 dimensions and the reason
+limited to 512 dimensions and the reason why is we actually want to
+learn a good why is we actually want to learn a good why is we actually
+want to learn a good representation of what type of edit this
+representation of what type of edit this representation of what type of
+edit this is as opposed to like memorizing is as opposed to like
+memorizing is as opposed to like memorizing everything that was done. So
+we everything that was done. So we everything that was done. So we
+basically like limited the size of the basically like limited the size
+of the basically like limited the size of the dimensions here so that we
+would dimensions here so that we would dimensions here so that we would
+actually be able to learn um you know a actually be able to learn um you
+know a actually be able to learn um you know a representation of the
+edit as opposed to representation of the edit as opposed to
+representation of the edit as opposed to um as opposed to just like
+memorizing um as opposed to just like memorizing um as opposed to just
+like memorizing everything. everything. everything. And the training
+objective is pretty And the training objective is pretty And the
+training objective is pretty simple. um what it's a kind of like simple.
+um what it's a kind of like simple. um what it's a kind of like
+autoenccoder style objective where we autoenccoder style objective where
+we autoenccoder style objective where we learn the um edit
+representation from learn the um edit representation from learn the um
+edit representation from before and after and then conditioned on before
+and after and then conditioned on before and after and then conditioned
+on this edit representation we calculate this edit representation we
+calculate this edit representation we calculate the probability uh the
+log probability the probability uh the log probability the probability
+uh the log probability of the after token here. of the after token here.
+of the after token here. Does that make sense? Does that make sense?
+Does that make sense? &gt;&gt; Yeah, sure. Um so we have a encoder that
+&gt;&gt; Yeah, sure. Um so we have a encoder that &gt;&gt; Yeah, sure.
+Um so we have a encoder that encodes before and after into an edit
+encodes before and after into an edit encodes before and after into an
+edit representation and that edit representation and that edit
+representation and that edit representation is basically a
+representation is basically a representation is basically a
+512dimensional vector and then based on 512dimensional vector and then
+based on 512dimensional vector and then based on that 512dimensional
+vector we feed in that 512dimensional vector we feed in that
+512dimensional vector we feed in the before token and that 512th the
+before token and that 512th the before token and that 512th dimensional
+vector and we calculate the dimensional vector and we calculate the
+dimensional vector and we calculate the log probability of after. And so
+what log probability of after. And so what log probability of after. And
+so what that means is we need to like smoosh as that means is we need to
+like smoosh as that means is we need to like smoosh as much information
+as possible into that much information as possible into that much
+information as possible into that 512 dimensional vector to tell uh like
+512 dimensional vector to tell uh like 512 dimensional vector to tell uh
+like the model what sorts of edits it should the model what sorts of
+edits it should the model what sorts of edits it should be doing. be
+doing. be doing. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. Yeah.
+Yeah. Yeah. &gt;&gt; Is the encoder and diameter trained &gt;&gt; Is the
+encoder and diameter trained &gt;&gt; Is the encoder and diameter
+trained jointly or jointly or jointly or &gt;&gt; uh they are trained
+jointly because you &gt;&gt; uh they are trained jointly because you
+&gt;&gt; uh they are trained jointly because you can see that um both of
+them will affect can see that um both of them will affect can see that
+um both of them will affect affect the likelihood. um this will affect
+the likelihood. um this will affect the likelihood. um this will affect
+the likelihood uh because it's uh affect the likelihood uh because it's
+uh affect the likelihood uh because it's uh this the output of this is
+conditioned this the output of this is conditioned this the output of
+this is conditioned on this and it's all different. Yeah. &gt;&gt; Cool.
+Um and so the way we &gt;&gt; Cool. Um and so the way we &gt;&gt; Cool.
+Um and so the way we primarily evaluated this was not based primarily
+evaluated this was not based primarily evaluated this was not based on
+um was not based on whether it was a on um was not based on whether it
+was a on um was not based on whether it was a good editor or not, but
+rather based on good editor or not, but rather based on good editor or
+not, but rather based on whether it was good at picking up whether it
+was good at picking up whether it was good at picking up similar edits
+that were made. Um and we similar edits that were made. Um and we
+similar edits that were made. Um and we uh we compared this with a bag
+of words uh we compared this with a bag of words uh we compared this
+with a bag of words model and we got much higher accuracy on model and
+we got much higher accuracy on model and we got much higher accuracy on
+like a data set of similar edits and we like a data set of similar edits
+and we like a data set of similar edits and we had some you know tricky
+stuff in the had some you know tricky stuff in the had some you know
+tricky stuff in the paper. Um for some context, this was paper. Um for
+some context, this was paper. Um for some context, this was done by the
+Microsoft like code analysis done by the Microsoft like code analysis
+done by the Microsoft like code analysis uh is an internship with the
+Microsoft uh is an internship with the Microsoft uh is an internship
+with the Microsoft code analysis team and they wanted to code analysis
+team and they wanted to code analysis team and they wanted to pick up
+like similar kinds of edits that pick up like similar kinds of edits
+that pick up like similar kinds of edits that people were doing on
+GitHub so that they people were doing on GitHub so that they people were
+doing on GitHub so that they could say oh like these are all the like
+could say oh like these are all the like could say oh like these are all
+the like fixes of a security a particular fixes of a security a
+particular fixes of a security a particular security vulnerability or
+something like security vulnerability or something like security
+vulnerability or something like that. So we um we came up with a pseudo
+that. So we um we came up with a pseudo that. So we um we came up with a
+pseudo data set where we applied different um data set where we applied
+different um data set where we applied different um kind of like code
+transformation tools kind of like code transformation tools kind of like
+code transformation tools and then tried to see whether it did a and
+then tried to see whether it did a and then tried to see whether it did
+a good job of identifying similar code good job of identifying similar
+code good job of identifying similar code transformations that were
+created by transformations that were created by transformations that
+were created by these tools. But yeah, it's not limited to that But
+yeah, it's not limited to that But yeah, it's not limited to that
+application, of course. Cool. Um any any questions about that? Okay. So,
+sounds good. Um, in Okay. So, sounds good. Um, in Okay. So, sounds good.
+Um, in particular, I would, um, if you're particular, I would, um, if
+you're particular, I would, um, if you're interested in, interested in,
+interested in, uh, for instance, reasoning, reasoning uh, for instance,
+reasoning, reasoning uh, for instance, reasoning, reasoning strategies
+or something like this, like strategies or something like this, like
+strategies or something like this, like the the stuff that's, you know,
+very the the stuff that's, you know, very the the stuff that's, you
+know, very popular nowadays. I could definitely popular nowadays. I
+could definitely popular nowadays. I could definitely view this as being
+a a tool to analyze view this as being a a tool to analyze view this as
+being a a tool to analyze the types of reasoning strategies that the
+types of reasoning strategies that the types of reasoning strategies
+that are are performed for instance by are are performed for instance by
+are are performed for instance by encoding uh encoding each step and
+then encoding uh encoding each step and then encoding uh encoding each
+step and then predicting the next step for instance. predicting the next
+step for instance. predicting the next step for instance. Cool. Um okay
+so next I'd like to talk Cool. Um okay so next I'd like to talk Cool. Um
+okay so next I'd like to talk about self-refin. So this was one of the
+about self-refin. So this was one of the about self-refin. So this was
+one of the first papers uh first papers uh first papers uh on kind of
+self-refinement with large on kind of self-refinement with large on kind
+of self-refinement with large language models in uh in a training free
+language models in uh in a training free language models in uh in a
+training free context. And basically what it context. And basically what
+it context. And basically what it demonstrated was um that you can use
+demonstrated was um that you can use demonstrated was um that you can
+use large language models to essentially large language models to
+essentially large language models to essentially critique their own
+inputs and um critique their own inputs and um critique their own inputs
+and um critique their own inputs and generate critique their own inputs
+and generate critique their own inputs and generate better outputs as a
+result. better outputs as a result. better outputs as a result. And the
+idea is very simple. You know, And the idea is very simple. You know,
+And the idea is very simple. You know, you generate an output uh refine
+it and you generate an output uh refine it and you generate an output uh
+refine it and get feedback. So the algorithm is is get feedback. So the
+algorithm is is get feedback. So the algorithm is is essentially exactly
+the self-correction essentially exactly the self-correction essentially
+exactly the self-correction algorithm that I showed you before. Uh
+algorithm that I showed you before. Uh algorithm that I showed you
+before. Uh nothing uh nothing particularly uh like nothing uh nothing
+particularly uh like nothing uh nothing particularly uh like fancy here.
+Um but uh they they did this fancy here. Um but uh they they did this
+fancy here. Um but uh they they did this all in a prompting fashion. So
+they uh all in a prompting fashion. So they uh all in a prompting
+fashion. So they uh generated uh the output uh standard generated uh the
+output uh standard generated uh the output uh standard fshot prompting
+uh with a few task fshot prompting uh with a few task fshot prompting uh
+with a few task specific examples. Um they generated specific examples.
+Um they generated specific examples. Um they generated feedback. So um
+their prompt template feedback. So um their prompt template feedback. So
+um their prompt template for this was why is this uh out why is for this
+was why is this uh out why is for this was why is this uh out why is
+this output not you know correct or not this output not you know correct
+or not this output not you know correct or not fluent or whatever
+quality you wanted. fluent or whatever quality you wanted. fluent or
+whatever quality you wanted. Um and that would identify like specific Um
+and that would identify like specific Um and that would identify like
+specific areas of improvement areas of improvement areas of improvement
+and uh then they had the refine step uh and uh then they had the refine
+step uh and uh then they had the refine step uh where they essentially
+uh combined the where they essentially uh combined the where they
+essentially uh combined the original input, the current output and
+original input, the current output and original input, the current
+output and the feedback and um said you know the feedback and um said
+you know the feedback and um said you know improve this output based on
+the improve this output based on the improve this output based on the
+feedback and then it would generate the feedback and then it would
+generate the feedback and then it would generate the output. And the
+stopping criterion was output. And the stopping criterion was output.
+And the stopping criterion was uh they had a simple heristic checking uh
+they had a simple heristic checking uh they had a simple heristic
+checking for uh for positive feedback or a fixed for uh for positive
+feedback or a fixed for uh for positive feedback or a fixed number of
+iterations. And uh this this was all done through a And uh this this was
+all done through a And uh this this was all done through a single L1. So
+the results um were interesting I So the results um were interesting I
+So the results um were interesting I would say. Uh the there's a few
+good would say. Uh the there's a few good would say. Uh the there's a
+few good results. Um the first result is that it results. Um the first
+result is that it results. Um the first result is that it helps uh a lot
+in some particular uh helps uh a lot in some particular uh helps uh a
+lot in some particular uh cases. So it it helped in like for cases. So
+it it helped in like for cases. So it it helped in like for instance
+improving the readability of instance improving the readability of
+instance improving the readability of code uh improving the um you know
+I I code uh improving the um you know I I code uh improving the um you
+know I I forget dialogue response was like forget dialogue response was
+like forget dialogue response was like friendliness friendliness or
+sentiment friendliness friendliness or sentiment friendliness
+friendliness or sentiment of the dialogue response um changing of the
+dialogue response um changing of the dialogue response um changing
+changing the sentiment of outputs and changing the sentiment of outputs
+and changing the sentiment of outputs and other uh other things like
+this. Um it other uh other things like this. Um it other uh other things
+like this. Um it notably did not help uh as much on notably did not help
+uh as much on notably did not help uh as much on mathematical reasoning
+which is mathematical reasoning which is mathematical reasoning which is
+something that people are very something that people are very something
+that people are very interested in uh nowadays. Um so I I interested in
+uh nowadays. Um so I I interested in uh nowadays. Um so I I would say
+that uh one one thing to note would say that uh one one thing to note
+would say that uh one one thing to note a little bit here is that all of
+these a little bit here is that all of these a little bit here is that
+all of these tasks are not super major tasks uh that tasks are not super
+major tasks uh that tasks are not super major tasks uh that were really
+hard for language models. were really hard for language models. were
+really hard for language models. They're kind of like tricky uh tricky
+They're kind of like tricky uh tricky They're kind of like tricky uh
+tricky tasks. And I I think the reason why is tasks. And I I think the
+reason why is tasks. And I I think the reason why is because um there's
+certain varieties of because um there's certain varieties of because um
+there's certain varieties of tasks which we'll talk about like in a
+tasks which we'll talk about like in a tasks which we'll talk about like
+in a little bit. Um where models uh they're little bit. Um where models
+uh they're little bit. Um where models uh they're not like numeric tasks
+but they're not like numeric tasks but they're not like numeric tasks
+but they're models where they're tasks where the models where they're
+tasks where the models where they're tasks where the model has not been
+like trained to be model has not been like trained to be model has not
+been like trained to be really good at them. And those are really good
+at them. And those are really good at them. And those are places where
+self-improvement without places where self-improvement without places
+where self-improvement without any external tools tends to be uh the any
+external tools tends to be uh the any external tools tends to be uh the
+most helpful. Um Um Um so this this is very very so this this is very
+very so this this is very very straightforward. Um oh another thing is
+straightforward. Um oh another thing is straightforward. Um oh another
+thing is uh they demonstrated that there were uh they demonstrated that
+there were uh they demonstrated that there were greater improvements for
+stronger greater improvements for stronger greater improvements for
+stronger models. So like GPD4 got better results models. So like GPD4
+got better results models. So like GPD4 got better results from self-
+refinement. Um so this was from self-refinement. Um so this was from
+self-refinement. Um so this was interesting. Uh in the paper they said
+interesting. Uh in the paper they said interesting. Uh in the paper they
+said uh bigger models do better. I think in uh bigger models do better.
+I think in uh bigger models do better. I think in reality it's just like
+stronger models reality it's just like stronger models reality it's just
+like stronger models do better at this. But um yeah that's do better at
+this. But um yeah that's do better at this. But um yeah that's another
+uh interesting finding. Cool. So, another one that I would like Cool.
+So, another one that I would like Cool. So, another one that I would
+like to show is uh self-debugging. And again, to show is uh self-
+debugging. And again, to show is uh self-debugging. And again, this uh
+fits the general pattern uh this this uh fits the general pattern uh
+this this uh fits the general pattern uh this is teaching large language
+models to is teaching large language models to is teaching large
+language models to self-debug. self-debug. self-debug. And the basic
+idea is that unlike self And the basic idea is that unlike self And the
+basic idea is that unlike self refine where they and like actually all
+refine where they and like actually all refine where they and like
+actually all of the others that I talked about before of the others that
+I talked about before of the others that I talked about before where
+they solely relied on the language where they solely relied on the
+language where they solely relied on the language model to improve the
+outputs. Here they model to improve the outputs. Here they model to
+improve the outputs. Here they started introducing uh external tools
+started introducing uh external tools started introducing uh external
+tools and specifically they uh introduced code and specifically they uh
+introduced code and specifically they uh introduced code execution where
+you can do code execution where you can do code execution where you can
+do code generation. You actually execute the generation. You actually
+execute the generation. You actually execute the code to see if it
+passes unit tests or code to see if it passes unit tests or code to see
+if it passes unit tests or or something like that. You get an or
+something like that. You get an or something like that. You get an
+explanation and feedback. You get an explanation and feedback. You get
+an explanation and feedback. You get an explanation from the unit tests.
+You get explanation from the unit tests. You get explanation from the
+unit tests. You get uh create feedback and then based on uh create
+feedback and then based on uh create feedback and then based on that you
+feed that back to the model to that you feed that back to the model to
+that you feed that back to the model to improve the outputs. improve the
+outputs. improve the outputs. Um and so it looks a little bit like Um
+and so it looks a little bit like Um and so it looks a little bit like
+this. You get um you actually add a code this. You get um you actually
+add a code this. You get um you actually add a code execution loop in
+here. Um if all the execution loop in here. Um if all the execution loop
+in here. Um if all the unit tests you have pass, then you unit tests you
+have pass, then you unit tests you have pass, then you you're done and
+uh you're happy. If not, you're done and uh you're happy. If not, you're
+done and uh you're happy. If not, you ask the language model to explain
+you ask the language model to explain you ask the language model to
+explain the error and then based on that you the error and then based on
+that you the error and then based on that you refine the critique. So
+this is in refine the critique. So this is in refine the critique. So
+this is in introducing an external signal. So um So um So um yeah. yeah.
+yeah. For For For example, passing the stack trace to the example,
+passing the stack trace to the example, passing the stack trace to the
+model. model. model. Why not just pass the stack? Why not just pass the
+stack? Why not just pass the stack? &gt;&gt; Why not just pass the stack
+trace back &gt;&gt; Why not just pass the stack trace back &gt;&gt; Why
+not just pass the stack trace back to the model? Um, that's a good to
+the model? Um, that's a good to the model? Um, that's a good question. I
+I think maybe they wanted to question. I I think maybe they wanted to
+question. I I think maybe they wanted to condense it down to be smaller.
+Um, condense it down to be smaller. Um, condense it down to be smaller.
+Um, again, this this was uh like a paper in again, this this was uh like
+a paper in again, this this was uh like a paper in 2023, and it might be
+the case that 2023, and it might be the case that 2023, and it might be
+the case that models now have seen enough stack traces models now have
+seen enough stack traces models now have seen enough stack traces in
+their training data that you wouldn't in their training data that you
+wouldn't in their training data that you wouldn't need to do this
+anymore. But that's what need to do this anymore. But that's what need
+to do this anymore. But that's what they decided to do here. &gt;&gt; Uh
+yeah, I think so. &gt;&gt; Uh yeah, I think so. &gt;&gt; Uh yeah, I
+think so. &gt;&gt; Cool. &gt;&gt; Cool. &gt;&gt; Cool. Um so if we look
+at the results, um Um so if we look at the results, um Um so if we look
+at the results, um basically this was able to improve over basically
+this was able to improve over basically this was able to improve over
+the baseline the baseline the baseline um by anywhere from a little bit
+to a um by anywhere from a little bit to a um by anywhere from a little
+bit to a lot. And um this may not be you know lot. And um this may not
+be you know lot. And um this may not be you know super surprising now if
+you've used like super surprising now if you've used like super
+surprising now if you've used like language models to generate code for
+you language models to generate code for you language models to generate
+code for you but uh this this was the first result uh but uh this this
+was the first result uh but uh this this was the first result uh in in
+that sort of uh area. Um and they also found that execution Um and they
+also found that execution Um and they also found that execution feedback
+was really critical here um and feedback was really critical here um and
+feedback was really critical here um and uh gave significant results on
+uh gave significant results on uh gave significant results on especially
+the harder tasks. Another interesting finding um is this Another
+interesting finding um is this Another interesting finding um is this
+was one of the uh one of the first was one of the uh one of the first
+was one of the uh one of the first papers that I know of where they
+papers that I know of where they papers that I know of where they
+compared compared compared um various varieties of inference time um
+various varieties of inference time um various varieties of inference
+time algorithms. And so basically algorithms. And so basically
+algorithms. And so basically um they also compared with um they also
+compared with um they also compared with self-consistency. self-
+consistency. self-consistency. uh and when they compared with uh and
+when they compared with uh and when they compared with self-consistency,
+self-consistency they self-consistency, self-consistency they self-
+consistency, self-consistency they had to sample 16 samples and then uh
+in had to sample 16 samples and then uh in had to sample 16 samples and
+then uh in contrast to that they did self-debugging contrast to that
+they did self-debugging contrast to that they did self-debugging and
+with self-debugging they only need and with self-debugging they only
+need and with self-debugging they only need needed one sample from the
+model and so needed one sample from the model and so needed one sample
+from the model and so this demonstrates that you know if you this
+demonstrates that you know if you this demonstrates that you know if you
+pull in external signals or have other pull in external signals or have
+other pull in external signals or have other uh you know methods of
+spending uh you know methods of spending uh you know methods of spending
+inference time compute that can compete inference time compute that can
+compete inference time compute that can compete with the more brute
+force thing of with the more brute force thing of with the more brute
+force thing of expanding lots of hypothesis which may be a very nice
+comparison for which may be a very nice comparison for which may be a
+very nice comparison for you to do in your homework for instance. Cool.
+Um so the next two papers are kind Cool. Um so the next two papers are
+kind Cool. Um so the next two papers are kind of just generally in the
+in a similar of just generally in the in a similar of just generally in
+the in a similar direction. um reflection direction. um reflection
+direction. um reflection uh I I would almost say this is uh a uh I I
+would almost say this is uh a uh I I would almost say this is uh a
+combination of self-debugging combination of self-debugging combination
+of self-debugging and self refined self-debugging and uh and self
+refined self-debugging and uh and self refined self-debugging and uh
+something similar to what we did in the something similar to what we did
+in the something similar to what we did in the learning to represent or
+um learning to learning to represent or um learning to learning to
+represent or um learning to model editing processes paper but they model
+editing processes paper but they model editing processes paper but they
+basically have um a a basically have um a a basically have um a a
+process where they uh evaluate And then process where they uh evaluate
+And then process where they uh evaluate And then they have they get
+external feedback. they have they get external feedback. they have they
+get external feedback. They have self-reflection and they They have
+self-reflection and they They have self-reflection and they generate
+experience which turns into um generate experience which turns into um
+generate experience which turns into um memory and that that can be used
+to uh memory and that that can be used to uh memory and that that can be
+used to uh further improve uh the LM on f future further improve uh the
+LM on f future further improve uh the LM on f future iterations. And so
+this is an example. iterations. And so this is an example. iterations.
+And so this is an example. Um you can see that like we were doing Um you
+can see that like we were doing Um you can see that like we were doing
+in the learning to model editing in the learning to model editing in the
+learning to model editing processes, we are appending the critique
+processes, we are appending the critique processes, we are appending the
+critique to our memory and then uh you know doing to our memory and then
+uh you know doing to our memory and then uh you know doing loops uh
+where we continue where we loops uh where we continue where we loops uh
+where we continue where we consider all the memory of the past consider
+all the memory of the past consider all the memory of the past critiques
+as opposed to just uh just the critiques as opposed to just uh just the
+critiques as opposed to just uh just the current step. and uh they
+evaluate this on a whole and uh they evaluate this on a whole and uh
+they evaluate this on a whole bunch of different domains and and bunch
+of different domains and and bunch of different domains and and
+demonstrate that it's quite effective. So So So this is another um paper
+where this is another um paper where this is another um paper where
+essentially they essentially they essentially they um um um instead of
+having a fixed instead of having a fixed instead of having a fixed uh
+code execution uh code execution uh code execution pipeline like we had
+in uh the selfdebug pipeline like we had in uh the selfdebug pipeline
+like we had in uh the selfdebug paper. We have a pipeline where the
+paper. We have a pipeline where the paper. We have a pipeline where the
+critic itself is allowed to use tools. critic itself is allowed to use
+tools. critic itself is allowed to use tools. Um, and so I think this is
+kind of Um, and so I think this is kind of Um, and so I think this is
+kind of interesting. Um, the critic when it does interesting. Um, the
+critic when it does interesting. Um, the critic when it does
+verification, it can look up things in a verification, it can look up
+things in a verification, it can look up things in a knowledge base or
+run a code interpreter knowledge base or run a code interpreter
+knowledge base or run a code interpreter or uh use uh the perspective
+API to or uh use uh the perspective API to or uh use uh the perspective
+API to check whether it's positive sentiment or check whether it's
+positive sentiment or check whether it's positive sentiment or use a
+search engine or something like use a search engine or something like
+use a search engine or something like this. So the uh general idea is
+that um this. So the uh general idea is that um this. So the uh general
+idea is that um you add tools at during the critiquing you add tools at
+during the critiquing you add tools at during the critiquing process
+process process and uh and uh and uh they uh added different tools
+depending they uh added different tools depending they uh added
+different tools depending on the uh type of task that they wanted on the
+uh type of task that they wanted on the uh type of task that they wanted
+to be handling. Um and so they got uh quite significant Um and so they
+got uh quite significant Um and so they got uh quite significant
+improvements over uh you know all of the improvements over uh you know
+all of the improvements over uh you know all of the tasks that they
+evaluated on by tasks that they evaluated on by tasks that they
+evaluated on by incorporating tools in this way. So this incorporating
+tools in this way. So this incorporating tools in this way. So this is
+another uh another thing that you can is another uh another thing that
+you can is another uh another thing that you can uh think about as you
+uh build inference uh think about as you uh build inference uh think
+about as you uh build inference time algorithms. Do you want to add time
+algorithms. Do you want to add time algorithms. Do you want to add tools
+during your generation process? Uh tools during your generation process?
+Uh tools during your generation process? Uh would you like to add tools
+during a would you like to add tools during a would you like to add
+tools during a critique process or uh you know some critique process or
+uh you know some critique process or uh you know some other uh some
+other way of incorporating other uh some other way of incorporating
+other uh some other way of incorporating tools uh once we get to the
+tool use tools uh once we get to the tool use tools uh once we get to
+the tool use part. &gt;&gt; Cool. &gt;&gt; Cool. &gt;&gt; Cool. Um any
+any questions? Um any any questions? Um any any questions? &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. These workflows are simple only
+because These workflows are simple only because These workflows are
+simple only because the background model the background model the
+background model if you want to make some smaller models if you want to
+make some smaller models if you want to make some smaller models work
+for this you don't have demon &gt;&gt; yeah it's a great question um
+just to &gt;&gt; yeah it's a great question um just to &gt;&gt; yeah
+it's a great question um just to repeat it it's like all of these repeat
+it it's like all of these repeat it it's like all of these workflows
+work only because of the workflows work only because of the workflows
+work only because of the backbone model is very strong I would backbone
+model is very strong I would backbone model is very strong I would say
+that's not the case for the first say that's not the case for the first
+say that's not the case for the first several that I introduced because
+those several that I introduced because those several that I introduced
+because those are much older papers when the backbone are much older
+papers when the backbone are much older papers when the backbone model
+was a lot weaker um but notably model was a lot weaker um but notably
+model was a lot weaker um but notably all of those methods had training
+all of those methods had training all of those methods had training
+involved in some way. So I think um it's involved in some way. So I
+think um it's involved in some way. So I think um it's definitely not
+the case. I I would say definitely not the case. I I would say
+definitely not the case. I I would say that GPD4 is probably the first
+model that GPD4 is probably the first model that GPD4 is probably the
+first model that kind of like spontaneously had this that kind of like
+spontaneously had this that kind of like spontaneously had this ability
+to self-correct without any ability to self-correct without any ability
+to self-correct without any explicit training. And now uh you know
+explicit training. And now uh you know explicit training. And now uh you
+know as we're going to talk about next class, as we're going to talk
+about next class, as we're going to talk about next class, we're
+training reasoning models so that we're training reasoning models so
+that we're training reasoning models so that they have this ability. Um
+and compared they have this ability. Um and compared they have this
+ability. Um and compared to things like GPT4, they're m much to things
+like GPT4, they're m much to things like GPT4, they're m much better at
+self-correcting. So I I think better at self-correcting. So I I think
+better at self-correcting. So I I think um yeah you you'll need training
+in the um yeah you you'll need training in the um yeah you you'll need
+training in the process somewhere if the models are less process
+somewhere if the models are less process somewhere if the models are
+less uh powerful spontaneously. uh powerful spontaneously. uh powerful
+spontaneously. Cool. Cool. Cool. Okay. Um so just to uh demonstrate that
+Okay. Um so just to uh demonstrate that Okay. Um so just to uh
+demonstrate that uh you know when people write papers uh you know when
+people write papers uh you know when people write papers they tend to
+write papers about positive they tend to write papers about positive
+they tend to write papers about positive results. Um and then every once
+in a results. Um and then every once in a results. Um and then every
+once in a while somebody comes in and writes a while somebody comes in
+and writes a while somebody comes in and writes a paper about negative
+results. And so I I paper about negative results. And so I I paper about
+negative results. And so I I want to present those as well. Um so want
+to present those as well. Um so want to present those as well. Um so
+there there was this paper large there there was this paper large there
+there was this paper large language models cannot self-correct language
+models cannot self-correct language models cannot self-correct reasoning
+yet. And um their key findings reasoning yet. And um their key findings
+reasoning yet. And um their key findings were intrinsic self-correction
+often were intrinsic self-correction often were intrinsic self-
+correction often fails without external feedback. And um fails without
+external feedback. And um fails without external feedback. And um
+performance can even degrade uh quite performance can even degrade uh
+quite performance can even degrade uh quite frequently if you're just
+asking it to frequently if you're just asking it to frequently if you're
+just asking it to self-correct itself. Um and self-correct itself. Um
+and self-correct itself. Um and uh you know many models struggle to uh
+you know many models struggle to uh you know many models struggle to
+identify their own errors. So things identify their own errors. So
+things identify their own errors. So things that are difficult for the
+model to that are difficult for the model to that are difficult for the
+model to check are also difficult things for it check are also difficult
+things for it check are also difficult things for it to uh sorry things
+that the models are to uh sorry things that the models are to uh sorry
+things that the models are difficult uh things that are difficult
+difficult uh things that are difficult difficult uh things that are
+difficult for the models to do are things for that for the models to do
+are things for that for the models to do are things for that are also
+difficult for them to check. So are also difficult for them to check. So
+are also difficult for them to check. So um and there's also a
+confirmation bias um and there's also a confirmation bias um and there's
+also a confirmation bias which uh for a tendency to reinforce which uh
+for a tendency to reinforce which uh for a tendency to reinforce initial
+uh reasoning. initial uh reasoning. initial uh reasoning. Um so Um so Um
+so they kind of lay out a number of they kind of lay out a number of
+they kind of lay out a number of successful scenarios where models tend
+successful scenarios where models tend successful scenarios where models
+tend to do well and these are things like to do well and these are
+things like to do well and these are things like grammar, style,
+formatting. Um with grammar, style, formatting. Um with grammar, style,
+formatting. Um with external feedback uh things like code external
+feedback uh things like code external feedback uh things like code
+execution and factchecking you can get execution and factchecking you
+can get execution and factchecking you can get significant improvements
+and it works significant improvements and it works significant
+improvements and it works significantly better with stronger base
+significantly better with stronger base significantly better with
+stronger base models. Um like we just talked about of models. Um like we
+just talked about of models. Um like we just talked about of course um
+and then in challenging course um and then in challenging course um and
+then in challenging scenarios uh there are deep reasoning scenarios uh
+there are deep reasoning scenarios uh there are deep reasoning errors
+like mathematical proofs in errors like mathematical proofs in errors
+like mathematical proofs in logic. So these um experiments were run
+logic. So these um experiments were run logic. So these um experiments
+were run with you know models that were not with you know models that
+were not with you know models that were not specifically trained to be
+good at these specifically trained to be good at these specifically
+trained to be good at these tasks. Um also knowledge gaps. So if the
+tasks. Um also knowledge gaps. So if the tasks. Um also knowledge gaps.
+So if the model doesn't know uh you know a model doesn't know uh you
+know a model doesn't know uh you know a particular fact, you can't
+really have particular fact, you can't really have particular fact, you
+can't really have it self-correct. Um and also complex uh it self-
+correct. Um and also complex uh it self-correct. Um and also complex uh
+multi-step reasoning. Um and here here are a few examples. Um Um and
+here here are a few examples. Um Um and here here are a few examples. Um
+so so so for very simple math problems it's able for very simple math
+problems it's able for very simple math problems it's able to do better
+but on the other hand for to do better but on the other hand for to do
+better but on the other hand for very simple math problems it can go in
+very simple math problems it can go in very simple math problems it can
+go in and break itself. So it's like um it's and break itself. So it's
+like um it's and break itself. So it's like um it's not entirely not
+entirely not entirely like there there's also not particularly like
+there there's also not particularly like there there's also not
+particularly uh a hard and fast rule that you should uh a hard and fast
+rule that you should uh a hard and fast rule that you should use it in
+this case and not use it in use it in this case and not use it in use it
+in this case and not use it in this case. this case. this case. Great.
+So yeah, I I mentioned a few Great. So yeah, I I mentioned a few Great.
+So yeah, I I mentioned a few dimensions. Um hopefully these dimensions.
+Um hopefully these dimensions. Um hopefully these dimensions and these
+examples will be dimensions and these examples will be dimensions and
+these examples will be good for thinking about self-correction good for
+thinking about self-correction good for thinking about self-correction
+methods on a higher level. So if you methods on a higher level. So if
+you methods on a higher level. So if you want to use these in your you
+know class want to use these in your you know class want to use these in
+your you know class projects or your homeworks or something projects or
+your homeworks or something projects or your homeworks or something like
+this, you can think um do I want to like this, you can think um do I
+want to like this, you can think um do I want to be adding explicit
+critiques or implicit be adding explicit critiques or implicit be adding
+explicit critiques or implicit critiques? Um do I want to be training
+critiques? Um do I want to be training critiques? Um do I want to be
+training my model to be good at these things? Um my model to be good at
+these things? Um my model to be good at these things? Um what do I want
+to condition it on? Do I what do I want to condition it on? Do I what do
+I want to condition it on? Do I want to condition it on, you know, um, a
+want to condition it on, you know, um, a want to condition it on, you
+know, um, a chain of thought? Do I want to be doing chain of thought? Do
+I want to be doing chain of thought? Do I want to be doing it on, you
+know, multiple steps? And do it on, you know, multiple steps? And do it
+on, you know, multiple steps? And do I want to be incorporating, uh,
+tools I want to be incorporating, uh, tools I want to be incorporating,
+uh, tools to, you know, clarify the outputs in to, you know, clarify the
+outputs in to, you know, clarify the outputs in some way? some way? some
+way? &gt;&gt; Cool. Um, any any questions before we &gt;&gt; Cool. Um,
+any any questions before we &gt;&gt; Cool. Um, any any questions before
+we move on to the student uh student move on to the student uh student
+move on to the student uh student presentations? Yeah. presentations?
+Yeah. presentations? Yeah. &gt;&gt; Why are the answer to all of these
+&gt;&gt; Why are the answer to all of these &gt;&gt; Why are the answer
+to all of these things just like yes? things just like yes? things just
+like yes? Uh why why don't we pick uh explicit Uh why why don't we pick
+uh explicit Uh why why don't we pick uh explicit with with with &gt;&gt;
+as much as you can &gt;&gt; as much as you can &gt;&gt; as much as you
+can &gt;&gt; as much as you can. &gt;&gt; as much as you can. &gt;&gt;
+as much as you can. &gt;&gt; Um I would say maybe uh computational
+&gt;&gt; Um I would say maybe uh computational &gt;&gt; Um I would say
+maybe uh computational cost. Uh so remember this is an cost. Uh so
+remember this is an cost. Uh so remember this is an inference class and
+we're going to want inference class and we're going to want inference
+class and we're going to want to to to infer on large amounts of data
+and in infer on large amounts of data and in infer on large amounts of
+data and in fact your uh your final score on the fact your uh your final
+score on the fact your uh your final score on the leaderboard will
+depend on it. So uh leaderboard will depend on it. So uh leaderboard
+will depend on it. So uh like you might not want to incorporate like you
+might not want to incorporate like you might not want to incorporate
+tools if they're not necessary for tools if they're not necessary for
+tools if they're not necessary for instance. Um also kind of if you
+think instance. Um also kind of if you think instance. Um also kind of
+if you think more on the industry side operational more on the industry
+side operational more on the industry side operational complexity so
+like spinning up a code uh complexity so like spinning up a code uh
+complexity so like spinning up a code uh sandbox is much much more
+operationally sandbox is much much more operationally sandbox is much
+much more operationally complex than just hitting a language complex
+than just hitting a language complex than just hitting a language model
+API um because it's another moving model API um because it's another
+moving model API um because it's another moving part in your system and
+it might break part in your system and it might break part in your
+system and it might break or something. So I'd say that's maybe or
+something. So I'd say that's maybe or something. So I'd say that's maybe
+another reason. another reason. another reason. &gt;&gt; Thanks.
+&gt;&gt; Thanks. &gt;&gt; Thanks. &gt;&gt; Cool. Great question though.
+These are &gt;&gt; Cool. Great question though. These are &gt;&gt; Cool.
+Great question though. These are like exactly the questions we should be
+like exactly the questions we should be like exactly the questions we
+should be asking for this class. asking for this class. asking for this
+class. Cool. Um, and we I think we have three Cool. Um, and we I think
+we have three Cool. Um, and we I think we have three presentations. Uh,
+is everyone here? presentations. Uh, is everyone here? presentations.
+Uh, is everyone here? Okay, cool. If you could come up.

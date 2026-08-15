@@ -1,0 +1,147 @@
+# claude-code-harness
+# video: https://www.youtube.com/watch?v=jcNZ7fnD-Cg
+
+Let's take apart a paper that reverse
+engineers the coding agent many of us
+now use all day. Dive into Claude code
+from the Villa lab. They read the actual
+shipping source and ask, "What makes a
+coding agent good?" Almost none of it,
+it turns out, is the model.
+Here's the number that started it all.
+Someone measured how much of Claude
+code's real source is the part that
+decides what to do next, the
+intelligence. About 1 and 1/2%. The rest
+is plumbing, permissions, context, tool
+routing, recovery. The model is a guest.
+The house around it is the real product.
+So, this paper ignores benchmarks and
+reads that house as an architecture.
+The authors put an actual number on just
+how thin that reasoning layer really is.
+Strip everything away and the engine is
+almost embarrassingly small, a while
+loop. Gather context, take an action,
+verify the result, repeat. The model
+asks to use a tool. The harness runs it
+and feeds the result back. And every
+hard problem in the paper is just a
+subsystem bolted onto one of three
+moments, what the model sees, what it
+can reach, and whether an action can
+run.
+Now, the deepest choice, where does the
+thinking happen? Claude code splits it
+clean. The model reasons about what to
+do. The harness decides whether it's
+allowed and does it. The model's only
+lever on your machine is a request the
+harness inspects first. And that's
+security, not just tidiness. Reasoning
+and enforcement live on separate code
+paths, so a jailbroken model still can't
+override the rules. It asks, the harness
+holds the keys.
+Every action passes through one gate,
+answered with three words, allow, ask,
+or deny. The ordering is the philosophy,
+deny first. A deny always wins, even
+over a more specific allow. And anything
+unrecognized is escalated to you, never
+silently waved through. And it isn't one
+switch, but a spectrum from plan mode up
+to auto-approving edits. And you walk up
+it as you learn to trust the thing.
+Trust is a trajectory, not a setting.
+Here's that precedence rule, stated
+exactly in the source.
+But here's where it gets human. People
+approve about 93% of those prompts,
+usually without reading them. Say yes
+nine times out of 10, and the prompt
+isn't a safety mechanism anymore. It's a
+button you mash to get unblocked. So,
+the fix isn't more warnings, it's fewer
+decisions. A sandbox the agent roams
+freely inside, with a real human
+decision saved for the unusual case.
+That cut prompts by around 80%.
+If watching a supposedly simple while
+loop sprout layer after layer of safety
+machinery is your idea of fun, do the
+loop Y thing. Like, subscribe, and send
+it to the friend who still insists
+Claude code is just a model. Right, back
+to the plumbing that's actually the
+product.
+The resource that quietly governs
+everything is the context window. It
+always eventually fills up, and quality
+falls off a cliff. So, Claude code
+manages it like a memory manager, not a
+trash bin. Compaction layers fired
+gentlest first. It trims fat tool
+outputs, drops old turns, compresses,
+and only as a last resort summarizes the
+whole conversation. Cheapest move first.
+What about the things you wanted to
+remember every time? Those live in plain
+markdown, the Claude.md files, loaded
+lazily as the agent explores. But
+notice, no embeddings, no vector search.
+To find relevant memory, a model just
+schemes the file headers and picks a
+few. You trade a little finesse for
+something priceless. You can open the
+file and see exactly what the agent was
+told.
+Sometimes the smartest move is to not do
+the work yourself. If fixing one task
+means first understanding a whole messy
+module, the agent spawns a sub-agent
+with its own fresh context. It does the
+noisy exploration and hands back only a
+short summary, leaving the mess in a
+separate transcript. Delegation as
+context hygiene. You get the answer
+without inheriting the clutter.
+So, is this just a nice story or
+actually measurable? It's measurable.
+Hold the model fixed, change only the
+harness, and its score on long horizon
+task swings by up to 18 points. Same
+brain, different body. An Anthropic's
+own survey found 27% of tasks done with
+the tool were work that wouldn't have
+been attempted at all. The harness
+doesn't just squeeze more from the
+model. It changes what people try.
+So, the whole machine in one breath. The
+power isn't the model, it's the harness.
+At its heart, a while loop. Gather, act,
+verify. The model only emits a request,
+and the harness holds the keys. A gate
+answers deny first. Context is the
+scarce resource, managed by compaction
+and plain memory files. Sub-agents
+explore in isolation and return a
+summary. The model reasons, the harness
+decides. That split is the whole design.
+The one-line version. A coding agent's
+intelligence is a commodity, and its
+architecture is an operating system for
+that intelligence. A tiny reasoning core
+wrapped in a thick deterministic shell
+that decides what it sees, what it can
+touch, and what it's allowed to do.
+What sticks with me is the question the
+paper saves for last. We now have
+overwhelming evidence that the harness
+makes the model more capable, and almost
+none that it keeps the human capable.
+Maybe the next great harness isn't the
+one that makes the agent more
+autonomous. Maybe it's the one that
+keeps you in the loop on purpose. That's
+my read. Tell me yours. Until next time.

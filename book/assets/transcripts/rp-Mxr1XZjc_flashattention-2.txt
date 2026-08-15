@@ -1,0 +1,167 @@
+# flashattention-2
+# video: https://www.youtube.com/watch?v=rp-Mxr1XZjc
+
+Let's break down Flash Attention 2,
+faster attention with better parallelism
+and work partitioning from Tri Dao at
+Princeton and Stanford. Same math, seven
+times faster.
+You already know what attention does.
+Here's the part nobody mentions. The
+slow bit isn't the math. This is the
+score matrix. Every token against every
+other token. And standard attention
+builds the whole thing, writes it to
+memory, reads it back, writes it again.
+The arithmetic is trivial. The shuttling
+is everything. Flash Attention 2
+computes the exact same numbers, not an
+approximation, the same numbers, and
+never builds the grid at all. Seven
+times faster than the attention most
+people were running, and the reason long
+context stopped being a luxury.
+A GPU isn't one pool of memory. It's a
+hierarchy, and the gap is brutal. At the
+bottom, HBM, 80 GB on an A100, about 2
+TB a second. Sounds quick. Up top, SRAM,
+on chip, right beside the compute units,
+19 TB a second, but you get roughly 200
+KB of it per multiprocessor. So, the
+only question that matters is what lives
+up there. Standard attention's answer is
+nothing. It parks the N by N grid in HBM
+and drags it across the bus three
+separate times.
+Which makes attention memory bound, and
+that's the whole insight. Operations
+come in two flavors, compute bound, a
+fat matrix multiply, so much arithmetic
+the memory traffic vanishes into the
+noise. Memory bound, barely any math per
+byte, so you sit there waiting on the
+bus. Softmax, masking, dropout, every
+element-wise pass over that grid is
+deeply memory bound. So, cutting flops,
+the optimization everyone reaches for,
+optimizes the thing that wasn't costing
+you anything. Count bytes moved, not
+operations performed.
+So, why not skip the grid and go
+straight to the output? Because SoftMax
+is nosy. To normalize one score, you
+need the maximum over the entire row for
+stability, and the sum of every
+exponential in it. Both are reductions
+across all in columns. You can't finish
+one weight until you've seen all of
+them. Here's the fix. Take the row in
+chunks and carry two running numbers,
+the largest score so far and the running
+sum. When a chunk arrives with a bigger
+maximum, you rescale the old sum by one
+exponential factor, then add. Exact at
+every step. Nothing approximated.
+Now, put it on silicon. Cut the queries
+into row blocks, the keys and values
+into column blocks, and the grid becomes
+a checkerboard of tiles small enough to
+fit in SRAM. Load one tile, compute its
+scores on chip, fold them into that
+query blocks running statistics. And
+here's the move. Keep the running output
+vector, too, and rescale it by the same
+correction factor whenever a bigger
+score turns up. One fused kernel, load,
+compute, write. The N-by-N matrix is
+never allocated. Quadratic memory
+becomes linear, and the answer is
+bit-for-bit identical.
+The whole recipe in one sentence.
+Training needs gradients, and the
+textbook backward pass wants exactly the
+matrices we refuse to store. Awkward.
+The answer is recomputation. The forward
+pass kept the output and one number per
+row, the log sum exp, and that's enough
+to rebuild any tile from scratch in fast
+memory on demand. It looks like
+checkpointing, trade compute for memory.
+But attention is memory-bound, so
+recomputing a tile in SRAM beats
+fetching one from HBM. You save the
+memory, and you get faster.
+If winning by counting bytes instead of
+flops is your idea of a good time, like,
+subscribe, and send this to the friend
+still optimizing the wrong number
+because version two gets properly petty.
+Here's the thing though, flash attention
+was fast and still only hit 25%
+of what the chip can do while a plain
+matrix multiply gets 80 or 90. Version
+two hunts that gap. First target,
+non-matmal flops. An A100 does 312
+teraflops of matmal on its tensor cores,
+but only 19 and a half of ordinary math.
+So, each non-matmal operation costs 16
+times more. So, pull the division out of
+the inner loop, accumulate the output on
+scaled, divide once at the end, and
+store one log sum exp instead of two
+statistics. Identical output, far fewer
+expensive instructions.
+Second target, keeping the GPU busy.
+Version one gave each attention head its
+own thread block. Fine when batch times
+heads clears 108 the 100's
+multiprocessor count. But, long context
+means small batches and half the chip
+goes idle. So, version two parallelizes
+over sequence length two. Flip the loops
+so query sit outside and every block of
+rows becomes an independent worker that
+talks to nobody. Inside a block, version
+one split the keys across warps forcing
+them to swap partials through shared
+memory. Version two splits the queries
+instead. Each warp owns its rows end to
+end.
+Add it up, about two times faster than
+flash attention across the board, 1.7 to
+3 depending on head dimension and
+masking, and up to 10 times a standard
+PyTorch implementation. 230 teraflops on
+an A100, 73% of theoretical peak. That's
+matrix multiply territory for something
+with a softmax in the middle of it. End
+to end, GPT models train at 72% model
+flops utilization. Translated, 16,000
+token context for the price of eight.
+For the record.
+So, the recipe. Attention is memory
+bound. Count bytes, not flops. Never
+materialize the N by N grid. Stream the
+soft max with a running max and a
+running sum, so it stays exact. Tile
+into SRAM and fuse it into one kernel.
+Recompute in the backward pass instead
+of storing. Then version two. Spend your
+cycles on matmuls. Split the work across
+sequence length. Give every warp its own
+rows. Same attention, several times the
+speed.
+One line. Attention was never compute
+bound. Count trips to memory instead of
+flops. Keep the whole computation on
+chip and the exact same math runs
+several times faster, which is what made
+long context affordable.
+Which leaves an uncomfortable question.
+Flash attention two didn't change the
+math by a single symbol. It just moved
+the numbers to a better neighborhood.
+So, how much of what we call a better
+algorithm is really just better memory?
+That's my read. Tell me yours. Until
+next time.

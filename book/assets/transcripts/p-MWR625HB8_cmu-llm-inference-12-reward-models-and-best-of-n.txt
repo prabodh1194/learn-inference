@@ -1,0 +1,2183 @@
+# cmu-llm-inference-12-reward-models-and-best-of-n
+# video: https://www.youtube.com/watch?v=p-MWR625HB8
+# captions: manual
+
+All right, cool. Uh, we can go ahead and All right, cool. Uh, we can go
+ahead and All right, cool. Uh, we can go ahead and get started then. Um,
+before we start, a get started then. Um, before we start, a get started
+then. Um, before we start, a couple of updates. Um, as you've couple of
+updates. Um, as you've couple of updates. Um, as you've probably seen,
+homework 2 is out. Um, we probably seen, homework 2 is out. Um, we
+probably seen, homework 2 is out. Um, we are working on grading homework
+one. are working on grading homework one. are working on grading
+homework one. However, we will probably not release However, we will
+probably not release However, we will probably not release full grades
+for homework one before the full grades for homework one before the full
+grades for homework one before the drop deadline, which I believe is
+next drop deadline, which I believe is next drop deadline, which I
+believe is next week. So, if this is a concern for you, week. So, if
+this is a concern for you, week. So, if this is a concern for you, if
+this is like information you needed if this is like information you
+needed if this is like information you needed to make that decision, if
+you make a to make that decision, if you make a to make that decision,
+if you make a private post on Piaza, we can like private post on Piaza,
+we can like private post on Piaza, we can like prioritize grading for
+anyone that that prioritize grading for anyone that that prioritize
+grading for anyone that that applies to. Um there's also a question
+applies to. Um there's also a question applies to. Um there's also a
+question on Piaza about the AI and um use policy. on Piaza about the AI
+and um use policy. on Piaza about the AI and um use policy. Um and we'll
+make a post on that later Um and we'll make a post on that later Um and
+we'll make a post on that later today. Essentially, our policy is today.
+Essentially, our policy is today. Essentially, our policy is probably as
+you've seen in most other probably as you've seen in most other probably
+as you've seen in most other classes that you can use AI assistance,
+classes that you can use AI assistance, classes that you can use AI
+assistance, but you can't just sort of plug in but you can't just sort
+of plug in but you can't just sort of plug in things directly. Um and
+we'll we'll have things directly. Um and we'll we'll have things
+directly. Um and we'll we'll have more details in that post as well. Um
+more details in that post as well. Um more details in that post as well.
+Um and then last bit of administrative and then last bit of
+administrative and then last bit of administrative stuff, um we have the
+feedback for stuff, um we have the feedback for stuff, um we have the
+feedback for feedback form out for homework one. Um feedback form out
+for homework one. Um feedback form out for homework one. Um the stuff
+we've seen on there so far is the stuff we've seen on there so far is
+the stuff we've seen on there so far is super useful and right around
+half of super useful and right around half of super useful and right
+around half of the class has filled it out. So if you the class has
+filled it out. So if you the class has filled it out. So if you haven't
+filled that out yet um it's haven't filled that out yet um it's haven't
+filled that out yet um it's super super helpful. We're keeping it in
+super super helpful. We're keeping it in super super helpful. We're
+keeping it in mind. It's on Piaza and it'll be open mind. It's on Piaza
+and it'll be open mind. It's on Piaza and it'll be open until I think
+tomorrow at midnight. until I think tomorrow at midnight. until I think
+tomorrow at midnight. Cool. And so from there we'll get Cool. And so
+from there we'll get Cool. And so from there we'll get started. Uh today
+we're going to be started. Uh today we're going to be started. Uh today
+we're going to be talking about reward models and best talking about
+reward models and best talking about reward models and best event and we
+will have three student event and we will have three student event and
+we will have three student presentations. So this will be maybe a
+presentations. So this will be maybe a presentations. So this will be
+maybe a little bit shorter than usual. Um I little bit shorter than
+usual. Um I little bit shorter than usual. Um I think a sort of
+reasonable first think a sort of reasonable first think a sort of
+reasonable first question here is why we're going to be question here is
+why we're going to be question here is why we're going to be spending a
+whole lecture on best of end spending a whole lecture on best of end
+spending a whole lecture on best of end which from the name alone seems
+like an which from the name alone seems like an which from the name
+alone seems like an extremely simple idea. Um and the answer extremely
+simple idea. Um and the answer extremely simple idea. Um and the answer
+here is that we're going to use this as here is that we're going to use
+this as here is that we're going to use this as sort of a framework to
+talk about um a a sort of a framework to talk about um a a sort of a
+framework to talk about um a a tiny bit of uh computational statistics
+tiny bit of uh computational statistics tiny bit of uh computational
+statistics and a little bit more broadly about and a little bit more
+broadly about and a little bit more broadly about reward models which
+are also um though reward models which are also um though reward models
+which are also um though RLHF is not something that we'll cover RLHF is
+not something that we'll cover RLHF is not something that we'll cover as
+much in this class hugely useful for as much in this class hugely useful
+for as much in this class hugely useful for reinforcement learning and
+for a wider reinforcement learning and for a wider reinforcement
+learning and for a wider variety of different post-training variety of
+different post-training variety of different post-training approaches
+that are very popular approaches that are very popular approaches that
+are very popular nowadays. So we'll talk about this nowadays. So we'll
+talk about this nowadays. So we'll talk about this through sort of the
+inference time through sort of the inference time through sort of the
+inference time equivalent which is best using a reward equivalent which
+is best using a reward equivalent which is best using a reward model.
+model. model. Um, but before we talk about reward Um, but before we talk
+about reward Um, but before we talk about reward modeling at all, we're
+going to take a modeling at all, we're going to take a modeling at all,
+we're going to take a little bit of a diversion and talk about little
+bit of a diversion and talk about little bit of a diversion and talk
+about the broader problem of rejection the broader problem of rejection
+the broader problem of rejection sampling. The idea here is that we have
+sampling. The idea here is that we have sampling. The idea here is that
+we have some type of distribution that we're some type of distribution
+that we're some type of distribution that we're interested in generating
+samples from. interested in generating samples from. interested in
+generating samples from. Um, and we know some properties of this Um, and
+we know some properties of this Um, and we know some properties of this
+distribution, but we don't have a distribution, but we don't have a
+distribution, but we don't have a well-formed way of drawing samples
+well-formed way of drawing samples well-formed way of drawing samples
+directly from it. Maybe it's um not directly from it. Maybe it's um not
+directly from it. Maybe it's um not computationally feasible. Maybe we
+don't computationally feasible. Maybe we don't computationally feasible.
+Maybe we don't know um exactly how to write down the know um exactly how
+to write down the know um exactly how to write down the form of this
+distribution. We kind of form of this distribution. We kind of form of
+this distribution. We kind of know how to check the probability for a
+know how to check the probability for a know how to check the
+probability for a given point, but we don't really know um given point,
+but we don't really know um given point, but we don't really know um
+like a good way of sampling from it. like a good way of sampling from
+it. like a good way of sampling from it. Maybe it's just expensive to
+sample from Maybe it's just expensive to sample from Maybe it's just
+expensive to sample from this and so we want some alternative. Um this
+and so we want some alternative. Um this and so we want some
+alternative. Um what if we what do we do if we want to what if we what
+do we do if we want to what if we what do we do if we want to sample
+from D but we don't know how to sample from D but we don't know how to
+sample from D but we don't know how to get it. Um, and the idea of
+rejection get it. Um, and the idea of rejection get it. Um, and the idea
+of rejection sampling is to draw samples from some sampling is to draw
+samples from some sampling is to draw samples from some other
+distribution and then do some kind other distribution and then do some
+kind other distribution and then do some kind of manipulation at the end
+to get a of manipulation at the end to get a of manipulation at the end
+to get a sample that could have plausibly come sample that could have
+plausibly come sample that could have plausibly come from our target
+distribution D. So to from our target distribution D. So to from our
+target distribution D. So to see how that works, um, let's say this see
+how that works, um, let's say this see how that works, um, let's say
+this is our target distribution D. Um, this is our target distribution
+D. Um, this is our target distribution D. Um, this kind of so this is
+probability on the y- kind of so this is probability on the y- kind of
+so this is probability on the y- axis and then this x here is our axis
+and then this x here is our axis and then this x here is our support.
+Um, and this is a kind of nasty support. Um, and this is a kind of nasty
+support. Um, and this is a kind of nasty looking structure. Maybe it's
+hard to looking structure. Maybe it's hard to looking structure. Maybe
+it's hard to write down an equation for that would write down an
+equation for that would write down an equation for that would give you
+exactly this function. give you exactly this function. give you exactly
+this function. Um but we want something that we we want Um but we want
+something that we we want Um but we want something that we we want a
+sample that sort of fits in this a sample that sort of fits in this a
+sample that sort of fits in this probability mass space that defines the
+probability mass space that defines the probability mass space that
+defines the distribution D. Right? So what we'll do distribution D.
+Right? So what we'll do distribution D. Right? So what we'll do instead
+is rather than trying to write instead is rather than trying to write
+instead is rather than trying to write out what D would look like, we
+will take out what D would look like, we will take out what D would look
+like, we will take some other target some other candidate some other
+target some other candidate some other target some other candidate
+distribution or proposal distribution to distribution or proposal
+distribution to distribution or proposal distribution to sample from. So
+here let's say we want sample from. So here let's say we want sample
+from. So here let's say we want to sample from the distribution with to
+sample from the distribution with to sample from the distribution with
+uniform probability over the support of uniform probability over the
+support of uniform probability over the support of D. This is really
+easy. We know how to D. This is really easy. We know how to D. This is
+really easy. We know how to draw a sample from a uniform draw a sample
+from a uniform draw a sample from a uniform distribution, right? You
+just do random distribution, right? You just do random distribution,
+right? You just do random a random number in that range. Um, and a
+random number in that range. Um, and a random number in that range. Um,
+and so it's very easy to from this proposal so it's very easy to from
+this proposal so it's very easy to from this proposal distribution
+sample a number of points. distribution sample a number of points.
+distribution sample a number of points. Once we have points from a
+proposal Once we have points from a proposal Once we have points from a
+proposal distribution, however, we now have a distribution, however, we
+now have a distribution, however, we now have a sample from our
+distribution P, our sample from our distribution P, our sample from our
+distribution P, our proposal, and not from our actual target proposal,
+and not from our actual target proposal, and not from our actual target
+distribution D. How do we get there? Um distribution D. How do we get
+there? Um distribution D. How do we get there? Um what we're going to do
+is we're going to what we're going to do is we're going to what we're
+going to do is we're going to now that we have this sort of sample in
+now that we have this sort of sample in now that we have this sort of
+sample in one direction, the sample along the one direction, the sample
+along the one direction, the sample along the support, we're going to
+try to estimate support, we're going to try to estimate support, we're
+going to try to estimate a probability that each of these things a
+probability that each of these things a probability that each of these
+things is actually um from D. So the intuition is actually um from D. So
+the intuition is actually um from D. So the intuition here is that we
+want to say like um if here is that we want to say like um if here is
+that we want to say like um if we were sampling from Directly, the odds
+we were sampling from Directly, the odds we were sampling from Directly,
+the odds that we would have sampled say um this that we would have
+sampled say um this that we would have sampled say um this point which
+is like quite um a low point which is like quite um a low point which is
+like quite um a low probability region of D are relatively probability
+region of D are relatively probability region of D are relatively small.
+the odds that we would have small. the odds that we would have small.
+the odds that we would have sampled say this point which is from sampled
+say this point which is from sampled say this point which is from quite
+a high probability region of D are quite a high probability region of D
+are quite a high probability region of D are relatively high. Um and so
+by doing this relatively high. Um and so by doing this relatively high.
+Um and so by doing this we're going to eliminate parts of our we're
+going to eliminate parts of our we're going to eliminate parts of our
+sample to try to get something that was sample to try to get something
+that was sample to try to get something that was more characteristic of
+our uh target more characteristic of our uh target more characteristic
+of our uh target distribution. distribution. distribution. And the way
+we do that is we sort of And the way we do that is we sort of And the
+way we do that is we sort of sample a likelihood of acceptance. And
+sample a likelihood of acceptance. And sample a likelihood of
+acceptance. And I'm speaking kind of loosely here I'm speaking kind of
+loosely here I'm speaking kind of loosely here because we'll look at the
+math in just a because we'll look at the math in just a because we'll
+look at the math in just a second. Um, and so we've taken these second.
+Um, and so we've taken these second. Um, and so we've taken these points
+that we drew from this points that we drew from this points that we drew
+from this distribution and we've given them sort distribution and we've
+given them sort distribution and we've given them sort of a probability
+along another of a probability along another of a probability along
+another dimension, which is the likelihood that dimension, which is the
+likelihood that dimension, which is the likelihood that we would accept
+that as part of our we would accept that as part of our we would accept
+that as part of our sample from D. Um, then we now have this sample from
+D. Um, then we now have this sample from D. Um, then we now have this
+sort of distribution here and we can sort of distribution here and we
+can sort of distribution here and we can just score this. Anything that
+was in just score this. Anything that was in just score this. Anything
+that was in like our inner area of D, we're going to like our inner area
+of D, we're going to like our inner area of D, we're going to keep.
+Anything that was outside of that keep. Anything that was outside of
+that keep. Anything that was outside of that region, we're going to
+reject. and our region, we're going to reject. and our region, we're
+going to reject. and our new um sample here which is just these new um
+sample here which is just these new um sample here which is just these
+green points that we sampled will be green points that we sampled will
+be green points that we sampled will be more characteristic of a sample
+from D more characteristic of a sample from D more characteristic of a
+sample from D than our original sample from our than our original sample
+from our than our original sample from our proposal distribution.
+proposal distribution. proposal distribution. So to sort of write this
+out um a little So to sort of write this out um a little So to sort of
+write this out um a little bit more formally we're going to to bit more
+formally we're going to to bit more formally we're going to to sample
+from a distribution that we find sample from a distribution that we find
+sample from a distribution that we find is hard to sample from define a
+proposal is hard to sample from define a proposal is hard to sample from
+define a proposal distribution that has support at least distribution
+that has support at least distribution that has support at least as
+large as D support. So what this as large as D support. So what this as
+large as D support. So what this means is that everywhere that D has
+means is that everywhere that D has means is that everywhere that D has
+nonzero probability, we need to have nonzero probability, we need to
+have nonzero probability, we need to have non-zero probability because
+you can't non-zero probability because you can't non-zero probability
+because you can't get a sample that's characteristic of get a sample
+that's characteristic of get a sample that's characteristic of this
+distribution if you can't sample this distribution if you can't sample
+this distribution if you can't sample everything in that distribution,
+right? everything in that distribution, right? everything in that
+distribution, right? And then we're going to sample from our And then
+we're going to sample from our And then we're going to sample from our
+proposal distribution. And then we'll proposal distribution. And then
+we'll proposal distribution. And then we'll define a probability of
+acceptance for define a probability of acceptance for define a
+probability of acceptance for each individual point in that sample each
+individual point in that sample each individual point in that sample
+which is this probability here. The which is this probability here. The
+which is this probability here. The probability of that point under D
+probability of that point under D probability of that point under D
+divided by C times the probability of divided by C times the probability
+of divided by C times the probability of that point under our proposal
+that point under our proposal that point under our proposal
+distribution. And C here um is a distribution. And C here um is a
+distribution. And C here um is a constant. There's a in rejection
+constant. There's a in rejection constant. There's a in rejection
+sampling you would define this as sort sampling you would define this as
+sort sampling you would define this as sort of the tightest upper
+ground. Um if of the tightest upper ground. Um if of the tightest upper
+ground. Um if you're doing this uh sort of iteratively you're doing this
+uh sort of iteratively you're doing this uh sort of iteratively you can
+also approximate this but the you can also approximate this but the you
+can also approximate this but the idea is that you need to pick a value
+of idea is that you need to pick a value of idea is that you need to
+pick a value of C that is big enough such that the C that is big enough
+such that the C that is big enough such that the probability under your
+uh true your probability under your uh true your probability under your
+uh true your target distribution is smaller than or target distribution
+is smaller than or target distribution is smaller than or equal to C
+times the probability under equal to C times the probability under equal
+to C times the probability under your proposal distribution. And the
+your proposal distribution. And the your proposal distribution. And the
+reason you do this is you want this to reason you do this is you want
+this to reason you do this is you want this to be a well- definfined
+probability be a well- definfined probability be a well- definfined
+probability distribution here. So, you know, for any distribution here.
+So, you know, for any distribution here. So, you know, for any sample,
+you're going to have support at sample, you're going to have support at
+sample, you're going to have support at least as large as D's. So, D of
+X could least as large as D's. So, D of X could least as large as D's.
+So, D of X could be zero. Um, but P of X obviously never be zero. Um,
+but P of X obviously never be zero. Um, but P of X obviously never will
+be because you sampled that from P. will be because you sampled that
+from P. will be because you sampled that from P. And you're going to
+make sure that your And you're going to make sure that your And you're
+going to make sure that your denominator is always at least as big as
+denominator is always at least as big as denominator is always at least
+as big as your numerator. So, at most this will go your numerator. So,
+at most this will go your numerator. So, at most this will go from 0 to
+one. And because this is a from 0 to one. And because this is a from 0
+to one. And because this is a probability distribution, you need it to
+probability distribution, you need it to probability distribution, you
+need it to go no more than zero to one. Right? go no more than zero to
+one. Right? go no more than zero to one. Right? So this is um a sort of
+a something in So this is um a sort of a something in So this is um a
+sort of a something in the broad class of Monte Carlo the broad class of
+Monte Carlo the broad class of Monte Carlo techniques or ways of doing
+some kind of techniques or ways of doing some kind of techniques or ways
+of doing some kind of probabilistic manipulation to get at probabilistic
+manipulation to get at probabilistic manipulation to get at something
+that is actually hard to something that is actually hard to something
+that is actually hard to calculate directly. Um and this is our
+calculate directly. Um and this is our calculate directly. Um and this
+is our uh rejection sampling in particular is uh rejection sampling in
+particular is uh rejection sampling in particular is our way of getting
+samples from a our way of getting samples from a our way of getting
+samples from a distribution that we don't know how to distribution that
+we don't know how to distribution that we don't know how to sample from
+directly. sample from directly. sample from directly. Why are we talking
+about this if we're Why are we talking about this if we're Why are we
+talking about this if we're in a class on language models? Um, but in a
+class on language models? Um, but in a class on language models? Um, but
+we're going to tie this into the idea of we're going to tie this into
+the idea of we're going to tie this into the idea of sampling from the
+distribution of human sampling from the distribution of human sampling
+from the distribution of human preference or the distribution of uh
+preference or the distribution of uh preference or the distribution of
+uh some particular subset of people's some particular subset of people's
+some particular subset of people's preference, which is a distribution
+that preference, which is a distribution that preference, which is a
+distribution that is kind of hard in practice to write is kind of hard
+in practice to write is kind of hard in practice to write down and hard
+to directly draw samples down and hard to directly draw samples down and
+hard to directly draw samples from. But before we do that, if we look
+from. But before we do that, if we look from. But before we do that, if
+we look at this um graph here, so this blue at this um graph here, so
+this blue at this um graph here, so this blue target distribution and
+this black target distribution and this black target distribution and
+this black proposal distribution, proposal distribution, proposal
+distribution, um you notice that we we rejected maybe um you notice that
+we we rejected maybe um you notice that we we rejected maybe half of the
+points that we sampled. If half of the points that we sampled. If half
+of the points that we sampled. If we wanted a really good uh sample from
+we wanted a really good uh sample from we wanted a really good uh sample
+from our target distribution, we could be our target distribution, we
+could be our target distribution, we could be here a really long time,
+right? So the here a really long time, right? So the here a really long
+time, right? So the idea here is that the closer our target idea here is
+that the closer our target idea here is that the closer our target
+distribution is to our true distribution is to our true distribution is
+to our true distribution, the less often that will distribution, the
+less often that will distribution, the less often that will happen,
+right? Like if we had a proposal happen, right? Like if we had a
+proposal happen, right? Like if we had a proposal distribution that put
+a lot of distribution that put a lot of distribution that put a lot of
+probability on these areas where D ofX probability on these areas where
+D ofX probability on these areas where D ofX is high, then this uh
+proportion which is high, then this uh proportion which is high, then
+this uh proportion which is D of X divided by some constant times is D
+of X divided by some constant times is D of X divided by some constant
+times some constant times P of X would often some constant times P of X
+would often some constant times P of X would often be high. So the
+probability of accepting be high. So the probability of accepting be
+high. So the probability of accepting every individual sample would be
+every individual sample would be every individual sample would be
+relatively high. So if we can define a relatively high. So if we can
+define a relatively high. So if we can define a proposal distribution
+that's closer to proposal distribution that's closer to proposal
+distribution that's closer to our true distribution, we can reject our
+true distribution, we can reject our true distribution, we can reject
+less often. Uh does this make sense? less often. Uh does this make
+sense? less often. Uh does this make sense? Yes. So how do we get a
+proposal Yes. So how do we get a proposal Yes. So how do we get a
+proposal distribution that's closer to the true distribution that's
+closer to the true distribution that's closer to the true distribution?
+distribution? distribution? Um well, we're going to do that by Um well,
+we're going to do that by Um well, we're going to do that by instead of
+taking some sort of simple instead of taking some sort of simple instead
+of taking some sort of simple distribution from statistics by learning
+distribution from statistics by learning distribution from statistics by
+learning a distribution um like a language model a distribution um like
+a language model a distribution um like a language model and then
+drawing from that distribution and then drawing from that distribution
+and then drawing from that distribution directly. directly. directly.
+But we actually don't care about finding But we actually don't care
+about finding But we actually don't care about finding a a large sample
+that's sort of a a large sample that's sort of a a large sample that's
+sort of characteristic of some target characteristic of some target
+characteristic of some target distribution of preference. Um what
+distribution of preference. Um what distribution of preference. Um what
+we're actually going to care about for we're actually going to care
+about for we're actually going to care about for the rest of today is
+finding the single the rest of today is finding the single the rest of
+today is finding the single highest point or some high point in our
+highest point or some high point in our highest point or some high point
+in our target distribution rather than sampling target distribution
+rather than sampling target distribution rather than sampling a bunch of
+things that are sort of a bunch of things that are sort of a bunch of
+things that are sort of characteristic of this curve. We want to
+characteristic of this curve. We want to characteristic of this curve.
+We want to sample one thing that is like near one sample one thing that
+is like near one sample one thing that is like near one of these peaks
+or as close to them as we of these peaks or as close to them as we of
+these peaks or as close to them as we can get. Um, if we have a
+distribution can get. Um, if we have a distribution can get. Um, if we
+have a distribution that's just in two dimensions like this, that's just
+in two dimensions like this, that's just in two dimensions like this,
+uh, this is really easy. We can draw uh, this is really easy. We can
+draw uh, this is really easy. We can draw this out and just take the
+max. Um, but this out and just take the max. Um, but this out and just
+take the max. Um, but we're operating over the space of all we're
+operating over the space of all we're operating over the space of all
+sequences of up to some length, maybe up sequences of up to some length,
+maybe up sequences of up to some length, maybe up to a couple thousand
+tokens in some to a couple thousand tokens in some to a couple thousand
+tokens in some language, which is of course a vastly language, which is
+of course a vastly language, which is of course a vastly more
+dimensional space than two. And so more dimensional space than two. And
+so more dimensional space than two. And so since we can't actually draw
+this out, since we can't actually draw this out, since we can't actually
+draw this out, what could we do instead? If we want to, we have some
+function um If we want to, we have some function um If we want to, we
+have some function um d ofx which gives us the d ofx which gives us the
+d ofx which gives us the preference or the target distribution
+preference or the target distribution preference or the target
+distribution likelihood or the reward of some likelihood or the reward
+of some likelihood or the reward of some individual point and we want to
+find the individual point and we want to find the individual point and
+we want to find the highest possible point. How could we highest
+possible point. How could we highest possible point. How could we
+approximate this if we knew our distribution? Yeah, go if we knew our
+distribution? Yeah, go if we knew our distribution? Yeah, go for it. for
+it. for it. &gt;&gt; Do gradient descent. Yeah, if we knew &gt;&gt; Do
+gradient descent. Yeah, if we knew &gt;&gt; Do gradient descent. Yeah,
+if we knew that our um distribution was somehow that our um distribution
+was somehow that our um distribution was somehow like well like convex,
+if we knew that like well like convex, if we knew that like well like
+convex, if we knew that we would find a minimum or find a we would find
+a minimum or find a we would find a minimum or find a maximum, then we
+could like try to maximum, then we could like try to maximum, then we
+could like try to descend in some direction, right? Um descend in some
+direction, right? Um descend in some direction, right? Um this could be
+sometimes true locally this could be sometimes true locally this could
+be sometimes true locally like maybe we can refine an output. Um like
+maybe we can refine an output. Um like maybe we can refine an output. Um
+but in general, we're going to have this but in general, we're going to
+have this but in general, we're going to have this sort of non-convex
+very complicated sort of non-convex very complicated sort of non-convex
+very complicated space of preference where some things space of
+preference where some things space of preference where some things that
+are close to each other are very that are close to each other are very
+that are close to each other are very good and some things that are far
+from good and some things that are far from good and some things that
+are far from each other are like very different in each other are like
+very different in each other are like very different in preference.
+preference. preference. Um yeah at least reverse should be more so you
+at least reverse should be more so you at least reverse should be more
+so you would get the distribution that should would get the distribution
+that should would get the distribution that should be the highest point.
+Can you say more be the highest point. Can you say more be the highest
+point. Can you say more about that? about that? about that? &gt;&gt;
+Like um you could um like take your &gt;&gt; Like um you could um like
+take your &gt;&gt; Like um you could um like take your proposal
+distribution and do like some proposal distribution and do like some
+proposal distribution and do like some kind of K divergence with a bunch
+of kind of K divergence with a bunch of kind of K divergence with a
+bunch of sample distributions and then try to um sample distributions
+and then try to um sample distributions and then try to um like yeah if
+you do reverse scale you like yeah if you do reverse scale you like yeah
+if you do reverse scale you would the prop the optimized solution would
+the prop the optimized solution would the prop the optimized solution
+would try to seek the mode of which is would try to seek the mode of
+which is would try to seek the mode of which is the highest point you
+seem to be the highest point you seem to be the highest point you seem
+to be &gt;&gt; reverse scale. &gt;&gt; reverse scale. &gt;&gt; reverse
+scale. This is This is This is I think this is not quite where we're I
+think this is not quite where we're I think this is not quite where
+we're headed, but this is an interesting headed, but this is an
+interesting headed, but this is an interesting thought. This is like
+this is closely thought. This is like this is closely thought. This is
+like this is closely related to the idea of KL divergence. &gt;&gt;
+Yeah, maybe we circle back in a sec &gt;&gt; Yeah, maybe we circle back
+in a sec &gt;&gt; Yeah, maybe we circle back in a sec because I think
+I'm not quite following because I think I'm not quite following because
+I think I'm not quite following what you're saying, but it does sound
+what you're saying, but it does sound what you're saying, but it does
+sound like the right direction. like the right direction. like the right
+direction. But yeah, so our our approach for at But yeah, so our our
+approach for at But yeah, so our our approach for at least for today is
+going to look a least for today is going to look a least for today is
+going to look a little bit like guess and check. We are little bit like
+guess and check. We are little bit like guess and check. We are going to
+take some distribution, some going to take some distribution, some going
+to take some distribution, some proposal that is we think is somewhat
+proposal that is we think is somewhat proposal that is we think is
+somewhat close to the distribution D because we close to the
+distribution D because we close to the distribution D because we would
+like to sample things that are would like to sample things that are
+would like to sample things that are likely to be high in D with higher
+likely to be high in D with higher likely to be high in D with higher
+probability. And then we're going to probability. And then we're going
+to probability. And then we're going to check which has the highest
+probability check which has the highest probability check which has the
+highest probability under D. So rather than doing this under D. So
+rather than doing this under D. So rather than doing this projection
+sampling thing where we're projection sampling thing where we're
+projection sampling thing where we're looking at D of X over CP of X,
+we're looking at D of X over CP of X, we're looking at D of X over CP of
+X, we're just going to check D of X and we're just going to check D of X
+and we're just going to check D of X and we're going to return the the
+highest going to return the the highest going to return the the highest
+probability thing under some um proposal probability thing under some um
+proposal probability thing under some um proposal under the target
+distribution. under the target distribution. under the target
+distribution. And when we talked about this for And when we talked about
+this for And when we talked about this for constrained decoding a couple
+of weeks constrained decoding a couple of weeks constrained decoding a
+couple of weeks ago, we were pretty much we were pretty ago, we were
+pretty much we were pretty ago, we were pretty much we were pretty
+strongly against this idea of rejection strongly against this idea of
+rejection strongly against this idea of rejection sampling, right? We
+said maybe if you sampling, right? We said maybe if you sampling, right?
+We said maybe if you wanted to generate things until you wanted to
+generate things until you wanted to generate things until you stopped
+until you generated some stopped until you generated some stopped until
+you generated some sequence that was not harmful or not sequence that
+was not harmful or not sequence that was not harmful or not about some
+topic or contained some word, about some topic or contained some word,
+about some topic or contained some word, you could wind up kind of stuck
+in this you could wind up kind of stuck in this you could wind up kind
+of stuck in this space where you're generating forever. space where
+you're generating forever. space where you're generating forever. Um the
+difference here is that we're Um the difference here is that we're Um
+the difference here is that we're only kind of interested in relative
+only kind of interested in relative only kind of interested in relative
+behavior. So we're going to say we think behavior. So we're going to say
+we think behavior. So we're going to say we think our proposal
+distribution, our language our proposal distribution, our language our
+proposal distribution, our language model is close enough that we're
+going model is close enough that we're going model is close enough that
+we're going to say we're going to get something to say we're going to
+get something to say we're going to get something reasonable out of it.
+So we're going to reasonable out of it. So we're going to reasonable out
+of it. So we're going to fix some value of n and say we're going fix
+some value of n and say we're going fix some value of n and say we're
+going to sample maybe 10, maybe a hundred to sample maybe 10, maybe a
+hundred to sample maybe 10, maybe a hundred things and we're not going
+to keep things and we're not going to keep things and we're not going to
+keep sampling if those are all low sampling if those are all low
+sampling if those are all low probability. We're going to sort of say
+probability. We're going to sort of say probability. We're going to sort
+of say that's as good as we got. Um so we're that's as good as we got.
+Um so we're that's as good as we got. Um so we're just going to return
+the sort of least just going to return the sort of least just going to
+return the sort of least bad of our samples. And if our bad of our
+samples. And if our bad of our samples. And if our distribution P lines
+up nicely with D, distribution P lines up nicely with D, distribution P
+lines up nicely with D, then hopefully there's going to be then
+hopefully there's going to be then hopefully there's going to be
+something in there that's relatively something in there that's
+relatively something in there that's relatively high probability. high
+probability. high probability. Um, and so this is exactly best of N. Um,
+and so this is exactly best of N. Um, and so this is exactly best of N.
+Um, we have some distribution of Um, we have some distribution of Um, we
+have some distribution of preference. We don't know how to get a
+preference. We don't know how to get a preference. We don't know how to
+get a sample from the preference distribution sample from the preference
+distribution sample from the preference distribution directly. So
+instead, we're going to directly. So instead, we're going to directly.
+So instead, we're going to draw samples from P and choose sort of draw
+samples from P and choose sort of draw samples from P and choose sort of
+the highest probability of those the highest probability of those the
+highest probability of those samples. samples. samples. Um, so this is
+like an extremely simple Um, so this is like an extremely simple Um, so
+this is like an extremely simple algorithm conceptually, right? We're
+algorithm conceptually, right? We're algorithm conceptually, right?
+We're going to sample n things. We're going to going to sample n things.
+We're going to going to sample n things. We're going to rank them
+according to something other rank them according to something other rank
+them according to something other than the log probability from our than
+the log probability from our than the log probability from our original
+model because if we were doing original model because if we were doing
+original model because if we were doing that, we would just be doing
+some kind that, we would just be doing some kind that, we would just be
+doing some kind of variant of mode seeking search and of variant of mode
+seeking search and of variant of mode seeking search and we'll return
+whichever one is best under we'll return whichever one is best under
+we'll return whichever one is best under some new ranking, right? Um, so
+for the some new ranking, right? Um, so for the some new ranking, right?
+Um, so for the rest of today, we're going to sort of rest of today,
+we're going to sort of rest of today, we're going to sort of talk about
+talk about talk about two things or really one thing here. two things or
+really one thing here. two things or really one thing here. We're going
+to talk about what something We're going to talk about what something
+We're going to talk about what something other than log props from your
+original other than log props from your original other than log props
+from your original model could possibly be. Um model could possibly be.
+Um model could possibly be. Um this is this is this is uh so best event
+can be viewed as a type uh so best event can be viewed as a type uh so
+best event can be viewed as a type of alignment. So today what we're
+going of alignment. So today what we're going of alignment. So today
+what we're going to be talking about is reward models to be talking
+about is reward models to be talking about is reward models
+predominantly which is what um people predominantly which is what um
+people predominantly which is what um people talk about when you talk
+about something talk about when you talk about something talk about when
+you talk about something like aligning to human values. You're like
+aligning to human values. You're like aligning to human values. You're
+usually doing reinforcement learning usually doing reinforcement
+learning usually doing reinforcement learning with a reward model. Um
+and so there's a with a reward model. Um and so there's a with a reward
+model. Um and so there's a nice view of best of n as a way of nice view
+of best of n as a way of nice view of best of n as a way of achieving
+inference time alignment. Um achieving inference time alignment. Um
+achieving inference time alignment. Um so the idea here is that you have
+like so the idea here is that you have like so the idea here is that you
+have like you is exactly this rejection sampling you is exactly this
+rejection sampling you is exactly this rejection sampling idea. You're
+trying to take a set of idea. You're trying to take a set of idea.
+You're trying to take a set of outputs drawn from one distribution and
+outputs drawn from one distribution and outputs drawn from one
+distribution and align them to a new distribution. Um and align them to
+a new distribution. Um and align them to a new distribution. Um and you
+can view this as trying to uh reduce you can view this as trying to uh
+reduce you can view this as trying to uh reduce the kale divergence
+between samples the kale divergence between samples the kale divergence
+between samples drawn from your best of end policy and drawn from your
+best of end policy and drawn from your best of end policy and your um
+target distribution. your um target distribution. your um target
+distribution. Um that is closely tied to the question Um that is closely
+tied to the question Um that is closely tied to the question of how we
+pick this value n like how do of how we pick this value n like how do of
+how we pick this value n like how do we decide how many things is enough
+to we decide how many things is enough to we decide how many things is
+enough to sample? Um there's this pretty sample? Um there's this pretty
+sample? Um there's this pretty frequently cited number in the frequently
+cited number in the frequently cited number in the literature which is
+that you can draw literature which is that you can draw literature which
+is that you can draw this sort of loose upper bound on the this sort of
+loose upper bound on the this sort of loose upper bound on the
+divergence between the KL divergence divergence between the KL
+divergence divergence between the KL divergence between your best of end
+outputs between your best of end outputs between your best of end
+outputs distribution and your target distribution and your target
+distribution and your target distribution as log n minus n minus one
+distribution as log n minus n minus one distribution as log n minus n
+minus one overn. Um and so what this means is if overn. Um and so what
+this means is if overn. Um and so what this means is if you this sort of
+best of n outputs you this sort of best of n outputs you this sort of
+best of n outputs distribution is if you had say a distribution is if
+you had say a distribution is if you had say a thousand um inputs and
+for each of them thousand um inputs and for each of them thousand um
+inputs and for each of them you did best of n with n equals 50 um you
+did best of n with n equals 50 um you did best of n with n equals 50 um
+you could calculate the expected you you could calculate the expected
+you you could calculate the expected you could bound the up the kl
+divergence could bound the up the kl divergence could bound the up the
+kl divergence between the distribution of your sort of between the
+distribution of your sort of between the distribution of your sort of
+best output from each of those and the best output from each of those
+and the best output from each of those and the distribution of your um
+target of your distribution of your um target of your distribution of
+your um target of your target which is sort of the preference target
+which is sort of the preference target which is sort of the preference
+distribution. distribution. distribution. at this value. Um this is
+often quoted at this value. Um this is often quoted at this value. Um
+this is often quoted as an exact value like this is this will as an
+exact value like this is this will as an exact value like this is this
+will be the KL divergence um or at least as a be the KL divergence um or
+at least as a be the KL divergence um or at least as a very tight bound.
+There's actually some very tight bound. There's actually some very tight
+bound. There's actually some very interesting work um in the theory very
+interesting work um in the theory very interesting work um in the theory
+direction which argues that this is not direction which argues that this
+is not direction which argues that this is not in tight upper bound for
+a number of in tight upper bound for a number of in tight upper bound
+for a number of sort of edge cases some of which do sort of edge cases
+some of which do sort of edge cases some of which do occur in practice.
+Um and so there's occur in practice. Um and so there's occur in
+practice. Um and so there's this really excellent paper by Barami at
+this really excellent paper by Barami at this really excellent paper by
+Barami at all. Um which is where this figure is all. Um which is where
+this figure is all. Um which is where this figure is from actually. So
+this dotted blue line from actually. So this dotted blue line from
+actually. So this dotted blue line here is that log n minus n minus one
+/n here is that log n minus n minus one /n here is that log n minus n
+minus one /n which is one bound of the kl divergence. which is one bound
+of the kl divergence. which is one bound of the kl divergence. This red
+line here is a much tighter This red line here is a much tighter This
+red line here is a much tighter sort of more complex bound. And this
+sort of more complex bound. And this sort of more complex bound. And
+this black line here or this black dots here black line here or this
+black dots here black line here or this black dots here are empirical
+kale divergence between a are empirical kale divergence between a are
+empirical kale divergence between a best of end policy and the uh target
+best of end policy and the uh target best of end policy and the uh
+target distribution as n grows um larger. &gt;&gt; Yeah. Uh so this the
+proposed estimator &gt;&gt; Yeah. Uh so this the proposed estimator
+&gt;&gt; Yeah. Uh so this the proposed estimator here I didn't write it
+out because it's here I didn't write it out because it's here I didn't
+write it out because it's uh kind of long but this is the um this uh
+kind of long but this is the um this uh kind of long but this is the um
+this is a new a tighter bound on the KL is a new a tighter bound on the
+KL is a new a tighter bound on the KL divergence. divergence.
+divergence. &gt;&gt; Okay. So it's tighter than &gt;&gt; Okay. So it's
+tighter than &gt;&gt; Okay. So it's tighter than &gt;&gt; Yeah. So this
+is sort of a this is the &gt;&gt; Yeah. So this is sort of a this is the
+&gt;&gt; Yeah. So this is sort of a this is the formula that you most
+likely see quoted formula that you most likely see quoted formula that
+you most likely see quoted in the literature. Um and this is an in the
+literature. Um and this is an in the literature. Um and this is an upper
+bound on the KL divergence. upper bound on the KL divergence. upper
+bound on the KL divergence. there's a much tighter sort of more there's
+a much tighter sort of more there's a much tighter sort of more complex
+upper bound. Um, which is I complex upper bound. Um, which is I complex
+upper bound. Um, which is I think it's like equation 25 in this think
+it's like equation 25 in this think it's like equation 25 in this paper.
+Um, and so there's a number of paper. Um, and so there's a number of
+paper. Um, and so there's a number of like there's a a long derivation
+to get like there's a a long derivation to get like there's a a long
+derivation to get to this tighter bound. Um, which I think to this
+tighter bound. Um, which I think to this tighter bound. Um, which I
+think is quite interesting to read, but we're is quite interesting to
+read, but we're is quite interesting to read, but we're not going to go
+through in depth today. Great. So, Great. So, Great. So, so this is not
+quite an answer to the so this is not quite an answer to the so this is
+not quite an answer to the question of what is the sort of best end
+question of what is the sort of best end question of what is the sort of
+best end to choose. Um, but it is at least to choose. Um, but it is at
+least to choose. Um, but it is at least partway to the answer, which is
+the partway to the answer, which is the partway to the answer, which is
+the higher the end, the closer you're higher the end, the closer you're
+higher the end, the closer you're getting to sort of the target getting
+to sort of the target getting to sort of the target distribution that
+you've defined. Um, distribution that you've defined. Um, distribution
+that you've defined. Um, we're going to take a step back and talk we're
+going to take a step back and talk we're going to take a step back and
+talk about how you define a target about how you define a target about
+how you define a target distribution. Um, and the way that this
+distribution. Um, and the way that this distribution. Um, and the way
+that this is most often parameterized is through a is most often
+parameterized is through a is most often parameterized is through a
+reward model. uh and reward models, at reward model. uh and reward
+models, at reward model. uh and reward models, at least in our normal
+conception of them, least in our normal conception of them, least in our
+normal conception of them, are models that were trained with a loss are
+models that were trained with a loss are models that were trained with a
+loss that is derived from this, which is the that is derived from this,
+which is the that is derived from this, which is the Bradley Terry model
+of preference. So Bradley Terry model of preference. So Bradley Terry
+model of preference. So the idea here is if you have two things the idea
+here is if you have two things the idea here is if you have two things
+and you're trying to make a pair-wise and you're trying to make a pair-
+wise and you're trying to make a pair-wise comparison between them, you
+say that comparison between them, you say that comparison between them,
+you say that the probability that thing I is better the probability that
+thing I is better the probability that thing I is better than thing J is
+related to this ratio of than thing J is related to this ratio of than
+thing J is related to this ratio of probabilities between them. So you
+can probabilities between them. So you can probabilities between them.
+So you can kind of eyeball this and say they have kind of eyeball this
+and say they have kind of eyeball this and say they have the same
+probability. It's a 50-50 shot. the same probability. It's a 50-50 shot.
+the same probability. It's a 50-50 shot. Um and of course as probability
+of I Um and of course as probability of I Um and of course as
+probability of I goes up it becomes more likely that goes up it becomes
+more likely that goes up it becomes more likely that that's the
+preferred item. Um we think that's the preferred item. Um we think
+that's the preferred item. Um we think about things not usually in about
+things not usually in about things not usually in probabilities but in
+log probabilities. probabilities but in log probabilities. probabilities
+but in log probabilities. So you'll see loss functions for reward So
+you'll see loss functions for reward So you'll see loss functions for
+reward models that take a form kind of like models that take a form kind
+of like models that take a form kind of like this where the reward of
+output one is this where the reward of output one is this where the
+reward of output one is uh related to the reward of output two uh
+related to the reward of output two uh related to the reward of output
+two in this way. We say the probability that in this way. We say the
+probability that in this way. We say the probability that y1 is better
+than y2 is the y1 is better than y2 is the y1 is better than y2 is the
+exponentiation over the sum of exponents exponentiation over the sum of
+exponents exponentiation over the sum of exponents which is exactly the
+same equation if which is exactly the same equation if which is exactly
+the same equation if your rewards are log probabilities. your rewards
+are log probabilities. your rewards are log probabilities. So how do we
+get a model that gives us So how do we get a model that gives us So how
+do we get a model that gives us this kind of output? Generally we will
+this kind of output? Generally we will this kind of output? Generally we
+will take an existing model um generally a take an existing model um
+generally a take an existing model um generally a relatively strong
+language model. Um if relatively strong language model. Um if relatively
+strong language model. Um if you want to get a scalar prediction you
+want to get a scalar prediction you want to get a scalar prediction
+you'll strip off the language modeling you'll strip off the language
+modeling you'll strip off the language modeling head and replace it with
+some kind of head and replace it with some kind of head and replace it
+with some kind of sequence classifier. Um and then you sequence
+classifier. Um and then you sequence classifier. Um and then you will
+train on pair-wise preference data. will train on pair-wise preference
+data. will train on pair-wise preference data. Um so data where you have
+like one input Um so data where you have like one input Um so data where
+you have like one input and two outputs, one that is chosen and and two
+outputs, one that is chosen and and two outputs, one that is chosen and
+one that is rejected or one that is good one that is rejected or one
+that is good one that is rejected or one that is good and one that is
+bad. Um and so the task and one that is bad. Um and so the task and one
+that is bad. Um and so the task is to predict whether Y1 or Y2 was the
+is to predict whether Y1 or Y2 was the is to predict whether Y1 or Y2
+was the CH or yeah whether Y1 was the chosen. So CH or yeah whether Y1
+was the chosen. So CH or yeah whether Y1 was the chosen. So probability
+Y1 is chosen over Y2. probability Y1 is chosen over Y2. probability Y1
+is chosen over Y2. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt;
+Ju just to clarify this is like one &gt;&gt; Ju just to clarify this is
+like one &gt;&gt; Ju just to clarify this is like one variety of reward
+model, right? It's got variety of reward model, right? It's got variety
+of reward model, right? It's got like a reward model can be any model
+like a reward model can be any model like a reward model can be any
+model that predicts that predicts that predicts &gt;&gt; a reward, but
+this is specifically the &gt;&gt; a reward, but this is specifically the
+&gt;&gt; a reward, but this is specifically the one that's for us. one
+that's for us. one that's for us. &gt;&gt; Yeah, we'll talk about
+generative reward &gt;&gt; Yeah, we'll talk about generative reward
+&gt;&gt; Yeah, we'll talk about generative reward in just a few minutes.
+in just a few minutes. in just a few minutes. But this But this But this
+&gt;&gt; the reason why I was saying this you &gt;&gt; the reason why I
+was saying this you &gt;&gt; the reason why I was saying this you just
+said what is a reward model to just said what is a reward model to just
+said what is a reward model to clarify that this is like one variety of
+clarify that this is like one variety of clarify that this is like one
+variety of reward. It's not like every every reward. It's not like every
+every reward. It's not like every every &gt;&gt; Yeah. So this um this
+is one variety of &gt;&gt; Yeah. So this um this is one variety of
+&gt;&gt; Yeah. So this um this is one variety of reward model that will
+give you reward model that will give you reward model that will give you
+generally a scalar reward value. Um, generally a scalar reward value.
+Um, generally a scalar reward value. Um, this is while I think a little
+less this is while I think a little less this is while I think a little
+less common than it was a year or two ago, common than it was a year or
+two ago, common than it was a year or two ago, still a really powerful
+way of training still a really powerful way of training still a really
+powerful way of training reward models and still a a version of reward
+models and still a a version of reward models and still a a version of
+reward modeling that is used in a lot of reward modeling that is used in
+a lot of reward modeling that is used in a lot of RHF. RHF. RHF. Um, but
+the Um, but the Um, but the this is sort of not the only approach this
+is sort of not the only approach this is sort of not the only approach
+and another approach that is gaining and another approach that is
+gaining and another approach that is gaining prominence is the idea of
+using a prominence is the idea of using a prominence is the idea of
+using a generative model as your reward model. generative model as your
+reward model. generative model as your reward model. So this is this
+seems like a lot of So this is this seems like a lot of So this is this
+seems like a lot of additional steps. If we are have a model additional
+steps. If we are have a model additional steps. If we are have a model
+that is sort of already good, can we that is sort of already good, can
+we that is sort of already good, can we just ask the model which of
+these just ask the model which of these just ask the model which of
+these outputs is better? Um and so this outputs is better? Um and so
+this outputs is better? Um and so this literature is closely related to
+the literature is closely related to the literature is closely related
+to the idea of using a language model as a idea of using a language
+model as a idea of using a language model as a judge because you are
+asking a model to judge because you are asking a model to judge because
+you are asking a model to judge between outputs. Um you can also judge
+between outputs. Um you can also judge between outputs. Um you can also
+train generative models to do this task. train generative models to do
+this task. train generative models to do this task. So you can SFT them.
+You can do RL on So you can SFT them. You can do RL on So you can SFT
+them. You can do RL on whether they've identified the preferred whether
+they've identified the preferred whether they've identified the
+preferred example or not. Um you can provide example or not. Um you can
+provide example or not. Um you can provide examples in context. you can
+do examples in context. you can do examples in context. you can do
+functionally anything you would do for functionally anything you would
+do for functionally anything you would do for any other language
+modeling task but in any other language modeling task but in any other
+language modeling task but in this reward modeling space. Um in this
+reward modeling space. Um in this reward modeling space. Um in
+particular I think there's a there's an particular I think there's a
+there's an particular I think there's a there's an interesting
+literature in asking reward interesting literature in asking reward
+interesting literature in asking reward models to justify which one is
+better. models to justify which one is better. models to justify which
+one is better. Um and this and much like other types of Um and this and
+much like other types of Um and this and much like other types of chain
+of thought improves performance. chain of thought improves performance.
+chain of thought improves performance. Um this also means that you can
+sort of Um this also means that you can sort of Um this also means that
+you can sort of step away from the idea of pair-wise step away from the
+idea of pair-wise step away from the idea of pair-wise preference. You
+could just ask for a preference. You could just ask for a preference.
+You could just ask for a sing you could ask if a single output is sing
+you could ask if a single output is sing you could ask if a single
+output is good. You could ask if a ranked list is good. You could ask if
+a ranked list is good. You could ask if a ranked list is good or rank
+you could ask to rank a good or rank you could ask to rank a good or
+rank you could ask to rank a list if you have several outputs that list
+if you have several outputs that list if you have several outputs that
+you're interested in considering. Um in you're interested in
+considering. Um in you're interested in considering. Um in practice pair
+wise preference is still practice pair wise preference is still practice
+pair wise preference is still quite popular um because it sort of quite
+popular um because it sort of quite popular um because it sort of mimics
+a natural type of feedback we get mimics a natural type of feedback we
+get mimics a natural type of feedback we get which is like picking
+between two which is like picking between two which is like picking
+between two candidates. Um candidates. Um candidates. Um so the nice
+thing about a generative so the nice thing about a generative so the
+nice thing about a generative reward model is you can do more reward
+model is you can do more reward model is you can do more different types
+of preference different types of preference different types of
+preference evaluation. You don't need to train a evaluation. You don't
+need to train a evaluation. You don't need to train a specialized model.
+You could even use an specialized model. You could even use an
+specialized model. You could even use an API model for this task. And if
+your API model for this task. And if your API model for this task. And
+if your task specifications or your preferred task specifications or
+your preferred task specifications or your preferred outputs change, if
+you have some notion outputs change, if you have some notion outputs
+change, if you have some notion that maybe something was okay to say
+that maybe something was okay to say that maybe something was okay to
+say before but it's not now or some before but it's not now or some
+before but it's not now or some information has changed and now you
+information has changed and now you information has changed and now you
+don't want your reward model to you know don't want your reward model to
+you know don't want your reward model to you know be trained to output
+like one person as be trained to output like one person as be trained to
+output like one person as the president if an election just the
+president if an election just the president if an election just happened
+and now another one is the happened and now another one is the happened
+and now another one is the president then the preference um ranking
+president then the preference um ranking president then the preference
+um ranking of those two outputs would change. So of those two outputs
+would change. So of those two outputs would change. So you can easily
+modify a model um more a you can easily modify a model um more a you can
+easily modify a model um more a generative reward model that you did not
+generative reward model that you did not generative reward model that
+you did not train for this task if the task train for this task if the
+task train for this task if the task specification changes.
+specification changes. specification changes. Um but generative reward
+models also Um but generative reward models also Um but generative
+reward models also have some uh minuses which is that they have some uh
+minuses which is that they have some uh minuses which is that they are
+inconsistent across calls. So um are inconsistent across calls. So um
+are inconsistent across calls. So um most API models are non-
+deterministic most API models are non-deterministic most API models are
+non-deterministic even at temperature zero. If you call even at
+temperature zero. If you call even at temperature zero. If you call the
+reward model twice and the first the reward model twice and the first
+the reward model twice and the first time it tells you A is better than
+B and time it tells you A is better than B and time it tells you A is
+better than B and the second time it tells you B is better the second
+time it tells you B is better the second time it tells you B is better
+than A, that's not really helpful. Um, than A, that's not really
+helpful. Um, than A, that's not really helpful. Um, in practice though,
+if you ask a you're in practice though, if you ask a you're in practice
+though, if you ask a you're not likely to see problems from not likely
+to see problems from not likely to see problems from non-determinism at
+temperature of zero. non-determinism at temperature of zero. non-
+determinism at temperature of zero. What you're more likely to see is if
+you What you're more likely to see is if you What you're more likely to
+see is if you change your instruction template change your instruction
+template change your instruction template slightly or the model updates
+behind the slightly or the model updates behind the slightly or the
+model updates behind the scenes and you don't know this because scenes
+and you don't know this because scenes and you don't know this because
+you're calling an API provider or you you're calling an API provider or
+you you're calling an API provider or you swap the order of the two
+inputs. If you swap the order of the two inputs. If you swap the order
+of the two inputs. If you say the preference between A B is that A say
+the preference between A B is that A say the preference between A B is
+that A is better, but the preference between BA is better, but the
+preference between BA is better, but the preference between BA is that B
+is better. Um, these are sort is that B is better. Um, these are sort is
+that B is better. Um, these are sort of these sort of sensitivities to
+input of these sort of sensitivities to input of these sort of
+sensitivities to input ordering and to format are general ordering and
+to format are general ordering and to format are general problems with
+language models. They're problems with language models. They're problems
+with language models. They're not exclusive to the reward modeling not
+exclusive to the reward modeling not exclusive to the reward modeling
+space. But if you're using a reward space. But if you're using a reward
+space. But if you're using a reward model that is also a generative
+model, model that is also a generative model, model that is also a
+generative model, you need to consider these as potential you need to
+consider these as potential you need to consider these as potential um
+issues or confounders. Um, another um issues or confounders. Um, another
+um issues or confounders. Um, another kind of strange thing about
+generative kind of strange thing about generative kind of strange thing
+about generative reward models which you don't see with a reward models
+which you don't see with a reward models which you don't see with a pair
+a pair-wise scalar model is that pair a pair-wise scalar model is that
+pair a pair-wise scalar model is that rewards are generally not
+transitive. So rewards are generally not transitive. So rewards are
+generally not transitive. So if you're ask your reward model is is A if
+you're ask your reward model is is A if you're ask your reward model is
+is A or B better and it says A is better and or B better and it says A
+is better and or B better and it says A is better and then you ask it is
+B or C better and it then you ask it is B or C better and it then you
+ask it is B or C better and it says B is better. Um, if you ask it is A
+says B is better. Um, if you ask it is A says B is better. Um, if you
+ask it is A or C better, you're not always going to or C better, you're
+not always going to or C better, you're not always going to get the
+answer that A is better, which get the answer that A is better, which
+get the answer that A is better, which is what you would expect. Um this
+is is what you would expect. Um this is is what you would expect. Um
+this is sort of um because the model doesn't sort of um because the
+model doesn't sort of um because the model doesn't have sort of like a
+mental it doesn't have sort of like a mental it doesn't have sort of
+like a mental it doesn't have a mental model of what came before. have a
+mental model of what came before. have a mental model of what came
+before. The model doesn't have like a a The model doesn't have like a a
+The model doesn't have like a a knowledge of what you've called and the
+knowledge of what you've called and the knowledge of what you've called
+and the model may be sort of not using the same model may be sort of not
+using the same model may be sort of not using the same heavy quotes
+criteria to grade across heavy quotes criteria to grade across heavy
+quotes criteria to grade across calls. Yeah. Is it so much the issue of
+calls. Yeah. Is it so much the issue of calls. Yeah. Is it so much the
+issue of the reward model or the nature of you the reward model or the
+nature of you the reward model or the nature of you know the things that
+we want to like um know the things that we want to like um know the
+things that we want to like um reward reward reward &gt;&gt; like you
+know Bulbasaur squirrel &gt;&gt; like you know Bulbasaur squirrel
+&gt;&gt; like you know Bulbasaur squirrel Charmander they're not
+transitive Charmander they're not transitive Charmander they're not
+transitive because they're like the weaknesses if because they're like
+the weaknesses if because they're like the weaknesses if you play
+Pokemon you play Pokemon you play Pokemon &gt;&gt; the thing is a is a
+is stronger it's &gt;&gt; the thing is a is a is stronger it's &gt;&gt;
+the thing is a is a is stronger it's rock paper scissors rock paper
+scissors rock paper scissors rock paper scissors rock paper scissors
+rock paper scissors is not trans but that is just how that is not trans
+but that is just how that is not trans but that is just how that works
+and if you encode that into a works and if you encode that into a works
+and if you encode that into a reward model it might not necessarily
+reward model it might not necessarily reward model it might not
+necessarily catch it might it might catch it, but catch it might it
+might catch it, but catch it might it might catch it, but that's really
+just because of the nature that's really just because of the nature
+that's really just because of the nature of the task and not because of
+the of the task and not because of the of the task and not because of
+the model, right? model, right? model, right? &gt;&gt; Yeah, you're
+saying like maybe reward &gt;&gt; Yeah, you're saying like maybe reward
+&gt;&gt; Yeah, you're saying like maybe reward models are not transitive
+because reward models are not transitive because reward models are not
+transitive because reward is not always transitive. is not always
+transitive. is not always transitive. &gt;&gt; Yeah, I think that's a
+solid point. Um I &gt;&gt; Yeah, I think that's a solid point. Um I
+&gt;&gt; Yeah, I think that's a solid point. Um I think that like they
+this phenomenon is think that like they this phenomenon is think that
+like they this phenomenon is maybe a little broader than the cases maybe
+a little broader than the cases maybe a little broader than the cases
+where the reward itself is not where the reward itself is not where the
+reward itself is not transitive, but there's certainly cases transitive,
+but there's certainly cases transitive, but there's certainly cases
+where maybe this isn't a property we where maybe this isn't a property
+we where maybe this isn't a property we need to enforce. need to
+enforce. need to enforce. &gt;&gt; Yeah. Yeah. How is this different
+from Elm as Yeah. How is this different from Elm as Yeah. How is this
+different from Elm as a judge? Um short answer is they're kind a judge?
+Um short answer is they're kind a judge? Um short answer is they're kind
+of overlapping. Um where this like a of overlapping. Um where this like
+a of overlapping. Um where this like a generative reward model can be
+seen as generative reward model can be seen as generative reward model
+can be seen as like one version of LM as a judge. Um like one version of
+LM as a judge. Um like one version of LM as a judge. Um often generative
+reward models are still often generative reward models are still often
+generative reward models are still framed as a pair-wise task whereas
+other framed as a pair-wise task whereas other framed as a pair-wise
+task whereas other LM as a judge um framings might be like LM as a judge
+um framings might be like LM as a judge um framings might be like to
+output a score based on a rubric. But to output a score based on a
+rubric. But to output a score based on a rubric. But you could certainly
+take a model that you could certainly take a model that you could
+certainly take a model that gives you a score based on a rubric and
+gives you a score based on a rubric and gives you a score based on a
+rubric and use that as a reward model too. Um, a use that as a reward
+model too. Um, a use that as a reward model too. Um, a reward model is
+really anything that reward model is really anything that reward model
+is really anything that gives you some signal about outputs and gives
+you some signal about outputs and gives you some signal about outputs
+and their quality. And so that could be a their quality. And so that
+could be a their quality. And so that could be a that could even be a
+human telling you that could even be a human telling you that could even
+be a human telling you which ones are good. Um, and in fact in I think a
+week from Um, and in fact in I think a week from Um, and in fact in I
+think a week from today we'll talk about um using rewards today we'll
+talk about um using rewards today we'll talk about um using rewards that
+are based on information you glean that are based on information you
+glean that are based on information you glean from other outputs from
+the same model. from other outputs from the same model. from other
+outputs from the same model. um which is a different type of framing um
+which is a different type of framing um which is a different type of
+framing this problem. this problem. this problem. So to do reward
+modeling we need to So to do reward modeling we need to So to do reward
+modeling we need to generate some kind of preference data or generate
+some kind of preference data or generate some kind of preference data or
+we need to generate some kind of data we need to generate some kind of
+data we need to generate some kind of data about what types of outputs
+are good. Um about what types of outputs are good. Um about what types
+of outputs are good. Um and to do this I thought we could take a and to
+do this I thought we could take a and to do this I thought we could take
+a look at some uh various types of outputs look at some uh various types
+of outputs look at some uh various types of outputs from models and try
+to sort of do this from models and try to sort of do this from models
+and try to sort of do this task as a group. Um so first we have a task
+as a group. Um so first we have a task as a group. Um so first we have a
+question. Um, does anyone want to question. Um, does anyone want to
+question. Um, does anyone want to volunteer opinions on what a good or
+bad volunteer opinions on what a good or bad volunteer opinions on what
+a good or bad answer to this question would look like? answer to this
+question would look like? answer to this question would look like? Like
+if I had to write preference data Like if I had to write preference data
+Like if I had to write preference data for this, what's a what's a bad
+answer? for this, what's a what's a bad answer? for this, what's a
+what's a bad answer? What's a good answer? This is a kind of hard
+question, right? This is a kind of hard question, right? This is a kind
+of hard question, right? What about a slightly easier question? What
+about a slightly easier question? What about a slightly easier question?
+Yeah. Yeah. Yeah. &gt;&gt; Why don't we put it in lina and we can
+&gt;&gt; Why don't we put it in lina and we can &gt;&gt; Why don't we
+put it in lina and we can decide which one we like better. decide which
+one we like better. decide which one we like better. &gt;&gt; Yeah. What
+did I say? What? How does a What did I say? What? How does a What did I
+say? What? How does a language model work? &gt;&gt; Let me agree to
+everything. And And And &gt;&gt; I think most people have seen this, but
+&gt;&gt; I think most people have seen this, but &gt;&gt; I think most
+people have seen this, but if you haven't seen this, this is a if you
+haven't seen this, this is a if you haven't seen this, this is a place
+where you can like run multiple place where you can like run multiple
+place where you can like run multiple language models and get get So the
+key here is that um the question So the key here is that um the question
+So the key here is that um the question of what's a good output for this
+is a of what's a good output for this is a of what's a good output for
+this is a really really broad space but a much really really broad space
+but a much really really broad space but a much easier question is which
+of two outputs easier question is which of two outputs easier question
+is which of two outputs for this are better. Um and we could go for this
+are better. Um and we could go for this are better. Um and we could go
+through and sort of read these. Um I'm through and sort of read these.
+Um I'm through and sort of read these. Um I'm curious does anyone have a
+guess of curious does anyone have a guess of curious does anyone have a
+guess of which model is which here just by pure which model is which
+here just by pure which model is which here just by pure style alone?
+single left is &gt;&gt; I think left &gt;&gt; I think left &gt;&gt; I
+think left &gt;&gt; looks looks like &gt;&gt; looks looks like &gt;&gt;
+looks looks like &gt;&gt; yeah that's that's why I asked this &gt;&gt;
+yeah that's that's why I asked this &gt;&gt; yeah that's that's why I
+asked this because I looked at this and I was like because I looked at
+this and I was like because I looked at this and I was like this is this
+is Claude this is this is Claude this is this is Claude &gt;&gt; I think
+it's probably not quite it &gt;&gt; I think it's probably not quite it
+&gt;&gt; I think it's probably not quite it doesn't make enough emojis
+doesn't make enough emojis doesn't make enough emojis &gt;&gt; but the
+lack of emojis makes it look &gt;&gt; but the lack of emojis makes it
+look &gt;&gt; but the lack of emojis makes it look like &gt;&gt; Claude
+doesn't give me emojis &gt;&gt; um &gt;&gt; um &gt;&gt; um why why don't
+we vote this will be a why why don't we vote this will be a why why
+don't we vote this will be a very high signal very high signal very high
+signal instance for instance for instance for &gt;&gt; yeah single-
+handedly subsidizing the &gt;&gt; yeah single-handedly subsidizing the
+&gt;&gt; yeah single-handedly subsidizing the data. data. data. &gt;&gt;
+Left is better. &gt;&gt; We think right is better. &gt;&gt; We think
+right is better. &gt;&gt; We think right is better. &gt;&gt; I think
+that's a slight win. &gt;&gt; I think that's a slight win. &gt;&gt; I
+think that's a slight win. &gt;&gt; Okay, cool. Let's go with &gt;&gt;
+Okay, cool. Let's go with &gt;&gt; Okay, cool. Let's go with &gt;&gt;
+All right. Why select left is better. &gt;&gt; All right. Why select
+left is better. &gt;&gt; All right. Why select left is better. &gt;&gt;
+So this kind of um preference data at &gt;&gt; So this kind of um
+preference data at &gt;&gt; So this kind of um preference data at scale
+is exactly how you generate a scale is exactly how you generate a scale
+is exactly how you generate a preference data set. Um Look at us go. It
+doesn't tell us what Look at us go. It doesn't tell us what Look at us
+go. It doesn't tell us what the other one was though, does it? the other
+one was though, does it? the other one was though, does it? &gt;&gt;
+Quen 3. &gt;&gt; Quen 3. &gt;&gt; Quen 3. &gt;&gt; Quen 3 max. &gt;&gt;
+Yeah, Claude likes headings. Um, so here &gt;&gt; Yeah, Claude likes
+headings. Um, so here &gt;&gt; Yeah, Claude likes headings. Um, so here
+we've seen I think live a couple both we've seen I think live a couple
+both we've seen I think live a couple both good and bad things about
+preference good and bad things about preference good and bad things
+about preference modeling. Um, the good is that it this modeling. Um,
+the good is that it this modeling. Um, the good is that it this is this
+question of like which of these is this question of like which of these
+is this question of like which of these is better is a lot easier to
+answer than is better is a lot easier to answer than is better is a lot
+easier to answer than the wide openen question of what is a the wide
+openen question of what is a the wide openen question of what is a good
+output, right? It's a lot easier to good output, right? It's a lot
+easier to good output, right? It's a lot easier to say I like A over B
+than it is to write say I like A over B than it is to write say I like A
+over B than it is to write a rubric for this question. Um, the bad a
+rubric for this question. Um, the bad a rubric for this question. Um,
+the bad is one, even in this short example, we is one, even in this
+short example, we is one, even in this short example, we had text that
+was too long for us to had text that was too long for us to had text
+that was too long for us to read without scrolling. Um, I didn't read
+without scrolling. Um, I didn't read without scrolling. Um, I didn't
+scroll through it probably long enough scroll through it probably long
+enough scroll through it probably long enough for everyone to fully read
+both answers. for everyone to fully read both answers. for everyone to
+fully read both answers. And so even though we voted on it and And so
+even though we voted on it and And so even though we voted on it and
+made kind of an aggregate decision, um made kind of an aggregate
+decision, um made kind of an aggregate decision, um we voted on it
+really without reading we voted on it really without reading we voted on
+it really without reading the whole thing. Um and in practice for the
+whole thing. Um and in practice for the whole thing. Um and in practice
+for annotators, this is quite common as annotators, this is quite common
+as annotators, this is quite common as well. Um we also disagree, right?
+We had well. Um we also disagree, right? We had well. Um we also
+disagree, right? We had two outputs that looked kind of two outputs that
+looked kind of two outputs that looked kind of reasonable. We didn't
+have a like maybe reasonable. We didn't have a like maybe reasonable. We
+didn't have a like maybe a super strong bias as a group between a super
+strong bias as a group between a super strong bias as a group between
+them, maybe partially because we didn't them, maybe partially because we
+didn't them, maybe partially because we didn't read the whole thing. Um,
+and then also read the whole thing. Um, and then also read the whole
+thing. Um, and then also we were able to pick up some stylistic we were
+able to pick up some stylistic we were able to pick up some stylistic
+features like I think we had a sense of features like I think we had a
+sense of features like I think we had a sense of which one of these
+models might be and which one of these models might be and which one of
+these models might be and if you have strong opinions about if you have
+strong opinions about if you have strong opinions about anthropic, good
+or bad, maybe that anthropic, good or bad, maybe that anthropic, good or
+bad, maybe that influence which one you voted for. Um, influence which
+one you voted for. Um, influence which one you voted for. Um, so
+preference modeling is quite so preference modeling is quite so
+preference modeling is quite powerful. Um, generally when we're doing
+powerful. Um, generally when we're doing powerful. Um, generally when
+we're doing preference modeling, we're not looking preference modeling,
+we're not looking preference modeling, we're not looking at questions
+that look like this. So at questions that look like this. So at
+questions that look like this. So we're not usually trying to pick out
+we're not usually trying to pick out we're not usually trying to pick
+out like correctness. Um although some like correctness. Um although
+some like correctness. Um although some preference modeling data sets do
+include preference modeling data sets do include preference modeling
+data sets do include things like in inserting misinformation things like
+in inserting misinformation things like in inserting misinformation or
+providing outofdate info. Generally or providing outofdate info.
+Generally or providing outofdate info. Generally though um we're trying
+to get that kind though um we're trying to get that kind though um we're
+trying to get that kind of information from pre-training or from of
+information from pre-training or from of information from pre-training
+or from supervised fine-tuning when we're doing supervised fine-tuning
+when we're doing supervised fine-tuning when we're doing preference
+modeling either to do RLHF or preference modeling either to do RLHF or
+preference modeling either to do RLHF or to do best of end. We're trying
+to get to do best of end. We're trying to get to do best of end. We're
+trying to get more at things like style style or more at things like
+style style or more at things like style style or verbosity. So if we
+have these two verbosity. So if we have these two verbosity. So if we
+have these two outputs here uh we could say like from a outputs here uh
+we could say like from a outputs here uh we could say like from a
+correctness level these are functionally correctness level these are
+functionally correctness level these are functionally equivalent. they
+both give us the right equivalent. they both give us the right
+equivalent. they both give us the right answer at the end. But if you
+want to answer at the end. But if you want to answer at the end. But if
+you want to train your model to do something that's train your model to
+do something that's train your model to do something that's more like
+reasoning or more like more like reasoning or more like more like
+reasoning or more like thinking, um you would prefer output thinking, um
+you would prefer output thinking, um you would prefer output two. If you
+want your model to output two. If you want your model to output two. If
+you want your model to output the minimum number of tokens possible, the
+minimum number of tokens possible, the minimum number of tokens
+possible, you'd prefer output one because this is you'd prefer output
+one because this is you'd prefer output one because this is maybe a
+simple enough question. It maybe a simple enough question. It maybe a
+simple enough question. It doesn't have to do all of that um doesn't
+have to do all of that um doesn't have to do all of that um
+multiplication or explanation. multiplication or explanation.
+multiplication or explanation. Um and preference modeling is also about
+Um and preference modeling is also about Um and preference modeling is
+also about imposing imposing imposing um your own notions of what how a
+model um your own notions of what how a model um your own notions of
+what how a model should interact with the world. Um, so should interact
+with the world. Um, so should interact with the world. Um, so which we
+were just talking about which we were just talking about which we were
+just talking about anthropic which I think has some of the anthropic
+which I think has some of the anthropic which I think has some of the
+more um like coherent and detailed more um like coherent and detailed
+more um like coherent and detailed messaging and what how they think
+their messaging and what how they think their messaging and what how
+they think their model should interact with the world. Um model should
+interact with the world. Um model should interact with the world. Um
+there's a variety of different opinions there's a variety of different
+opinions there's a variety of different opinions on questions like
+should a model answer on questions like should a model answer on
+questions like should a model answer things like what's my favorite
+food? Um things like what's my favorite food? Um things like what's my
+favorite food? Um should a model say give an age if you should a model
+say give an age if you should a model say give an age if you ask how old
+it is? Should a model tell ask how old it is? Should a model tell ask
+how old it is? Should a model tell you quote who it is? If you ask um
+you quote who it is? If you ask um you quote who it is? If you ask um
+should it say like I am a model built by should it say like I am a model
+built by should it say like I am a model built by anthropic? Should it
+say I am Claude? Um anthropic? Should it say I am Claude? Um anthropic?
+Should it say I am Claude? Um and these are all preferences that are and
+these are all preferences that are and these are all preferences that
+are defined broadly by whoever defined broadly by whoever defined
+broadly by whoever annotated the data or more upstream annotated the
+data or more upstream annotated the data or more upstream whoever wrote
+the annotation whoever wrote the annotation whoever wrote the annotation
+instructions for that data. Um so instructions for that data. Um so
+instructions for that data. Um so Anthropic probably has a different
+Anthropic probably has a different Anthropic probably has a different
+answer to this to OpenAI who probably answer to this to OpenAI who
+probably answer to this to OpenAI who probably has a different answer
+from this to you has a different answer from this to you has a different
+answer from this to you if you were to do this yourself. Um, if you were
+to do this yourself. Um, if you were to do this yourself. Um, this is
+also related to this notion of this is also related to this notion of
+this is also related to this notion of helpfulness versus harmfulness.
+Um, do helpfulness versus harmfulness. Um, do helpfulness versus
+harmfulness. Um, do you want your model to be able to answer you want
+your model to be able to answer you want your model to be able to answer
+questions um because you want it to be questions um because you want it
+to be questions um because you want it to be helpful or do you want the
+model to helpful or do you want the model to helpful or do you want the
+model to abstain from things that could be abstain from things that
+could be abstain from things that could be potentially harmful
+downstream? In what potentially harmful downstream? In what potentially
+harmful downstream? In what situation should it refuse? Should it
+situation should it refuse? Should it situation should it refuse? Should
+it refuse if it asks you if you ask it how refuse if it asks you if you
+ask it how refuse if it asks you if you ask it how to build a bomb?
+Should it refuse if it to build a bomb? Should it refuse if it to build
+a bomb? Should it refuse if it you ask it about a contentious political
+you ask it about a contentious political you ask it about a contentious
+political topic? Should it refuse if you ask it um topic? Should it
+refuse if you ask it um topic? Should it refuse if you ask it um to
+generate content that involves a to generate content that involves a to
+generate content that involves a minor? Um these are all like sort of
+minor? Um these are all like sort of minor? Um these are all like sort
+of riskmanagement style decisions that uh riskmanagement style decisions
+that uh riskmanagement style decisions that uh language modeling
+companies are making language modeling companies are making language
+modeling companies are making and they are by and large imposing these
+and they are by and large imposing these and they are by and large
+imposing these through the training of preference through the training
+of preference through the training of preference models like this. Um,
+the other place models like this. Um, the other place models like this.
+Um, the other place that you might see these trained, which that you
+might see these trained, which that you might see these trained, which
+is kind of closely related, and I think is kind of closely related, and
+I think is kind of closely related, and I think something we're not
+going to talk about something we're not going to talk about something
+we're not going to talk about too much elsewhere, um, is like content
+too much elsewhere, um, is like content too much elsewhere, um, is like
+content filtering. So, has anyone ever called a filtering. So, has
+anyone ever called a filtering. So, has anyone ever called a model and
+had it cut off mid response model and had it cut off mid response model
+and had it cut off mid response because of a content filter? because of
+a content filter? because of a content filter? &gt;&gt; Yes. What were
+what were folks asking &gt;&gt; Yes. What were what were folks asking
+&gt;&gt; Yes. What were what were folks asking about when this happened?
+about when this happened? about when this happened? No one wants to
+admit to it. No one wants to admit to it. No one wants to admit to it.
+Yeah, Yeah, Yeah, &gt;&gt; I I I asked Deepseek for good places to
+&gt;&gt; I I I asked Deepseek for good places to &gt;&gt; I I I asked
+Deepseek for good places to go uh do tourism in Beijing. go uh do
+tourism in Beijing. go uh do tourism in Beijing. &gt;&gt; So Deep Seek
+started talking about maybe &gt;&gt; So Deep Seek started talking about
+maybe &gt;&gt; So Deep Seek started talking about maybe Tanaman Square
+and then cut off. Tanaman Square and then cut off. Tanaman Square and
+then cut off. &gt;&gt; Um that was overdone overdone content &gt;&gt; Um
+that was overdone overdone content &gt;&gt; Um that was overdone
+overdone content filtering. I think filtering. I think filtering. I
+think &gt;&gt; I was um generating data for a um a &gt;&gt; I was um
+generating data for a um a &gt;&gt; I was um generating data for a um a
+story generation thing I was doing um story generation thing I was doing
+um story generation thing I was doing um for any val and had models sort
+of write for any val and had models sort of write for any val and had
+models sort of write themselves into content moderation holes themselves
+into content moderation holes themselves into content moderation holes
+where they'd start talking about maybe where they'd start talking about
+maybe where they'd start talking about maybe like a a fancy tattoo on a
+wrist and like a a fancy tattoo on a wrist and like a a fancy tattoo on
+a wrist and they'd start talking about the wrist and they'd start
+talking about the wrist and they'd start talking about the wrist and
+they start talking about how it was cut they start talking about how it
+was cut they start talking about how it was cut into the wrist and then
+it would get into the wrist and then it would get into the wrist and
+then it would get censored for self harm. Um and so these censored for
+self harm. Um and so these censored for self harm. Um and so these types
+of filters are not actually types of filters are not actually types of
+filters are not actually trained into the model. Generally these trained
+into the model. Generally these trained into the model. Generally these
+are applied post hawk. Um which is why are applied post hawk. Um which
+is why are applied post hawk. Um which is why you can see sort of
+outputs that you can see sort of outputs that you can see sort of
+outputs that partially cut off. Um and this is partially cut off. Um and
+this is partially cut off. Um and this is another type of reward model
+which given another type of reward model which given another type of
+reward model which given an output or a partial output says not an
+output or a partial output says not an output or a partial output says
+not is this a good output or not but is this is this a good output or
+not but is this is this a good output or not but is this a safe output
+for whatever we've decided a safe output for whatever we've decided a
+safe output for whatever we've decided is safe or unsafe. Um so that you
+can is safe or unsafe. Um so that you can is safe or unsafe. Um so that
+you can apply that's not best of end that's sort apply that's not best
+of end that's sort apply that's not best of end that's sort of like a a
+post hawk filtering step of like a a post hawk filtering step of like a
+a post hawk filtering step that you can apply using a similar type that
+you can apply using a similar type that you can apply using a similar
+type of model. of model. of model. Um the other issue with preference Um
+the other issue with preference Um the other issue with preference
+modeling is that preference models are modeling is that preference
+models are modeling is that preference models are generated from human
+labels. So they generated from human labels. So they generated from
+human labels. So they reflect sort of the biases of the people reflect
+sort of the biases of the people reflect sort of the biases of the
+people who labeled them. So if we were to who labeled them. So if we
+were to who labeled them. So if we were to decide between these two
+outputs which decide between these two outputs which decide between
+these two outputs which sort of start the same um does anyone sort of
+start the same um does anyone sort of start the same um does anyone have
+an opinion on whether one or two is have an opinion on whether one or
+two is have an opinion on whether one or two is better? Who would prefer
+one? Who would prefer two? Who would prefer two? Who would prefer two?
+All right, maybe 50/50, maybe slightly All right, maybe 50/50, maybe
+slightly All right, maybe 50/50, maybe slightly towards two. Um, in
+practice, especially towards two. Um, in practice, especially towards
+two. Um, in practice, especially if annotation instructions are not 100%
+if annotation instructions are not 100% if annotation instructions are
+not 100% comprehensive, people tend to prefer comprehensive, people tend
+to prefer comprehensive, people tend to prefer longer outputs. Um, this
+is especially longer outputs. Um, this is especially longer outputs. Um,
+this is especially true if the two outputs are um like not true if the
+two outputs are um like not true if the two outputs are um like not
+exact copies like this, but sort of exact copies like this, but sort of
+exact copies like this, but sort of similar. Um, and there's some sort
+of similar. Um, and there's some sort of similar. Um, and there's some
+sort of human cognitive bias um here. longer human cognitive bias um
+here. longer human cognitive bias um here. longer outputs annotators
+tend to describe as outputs annotators tend to describe as outputs
+annotators tend to describe as more detailed or more comprehensive. Um,
+more detailed or more comprehensive. Um, more detailed or more
+comprehensive. Um, if you are annotating for helpfulness, if you are
+annotating for helpfulness, if you are annotating for helpfulness,
+detailed and comprehensive sound like detailed and comprehensive sound
+like detailed and comprehensive sound like pretty reasonable things to
+be. Um, but pretty reasonable things to be. Um, but pretty reasonable
+things to be. Um, but the downstream effect of this is that the
+downstream effect of this is that the downstream effect of this is that
+while pretty much everything we've done while pretty much everything
+we've done while pretty much everything we've done so far has had to
+compensate for shorter so far has had to compensate for shorter so far
+has had to compensate for shorter things being lower probability, reward
+things being lower probability, reward things being lower probability,
+reward models have the opposite problem that models have the opposite
+problem that models have the opposite problem that longer things tend to
+be higher reward. longer things tend to be higher reward. longer things
+tend to be higher reward. Um, and this is a demonstration of this Um,
+and this is a demonstration of this Um, and this is a demonstration of
+this from a paper about RLHF. So this is from a paper about RLHF. So
+this is from a paper about RLHF. So this is about training not inference
+but it's about training not inference but it's about training not
+inference but it's the same type of reward modeling at the same type of
+reward modeling at the same type of reward modeling at stake. Um and you
+can see this is the stake. Um and you can see this is the stake. Um and
+you can see this is the correlation between the length of the
+correlation between the length of the correlation between the length of
+the output and tokens and the reward defined output and tokens and the
+reward defined output and tokens and the reward defined by a reasonably
+strong reward model. So by a reasonably strong reward model. So by a
+reasonably strong reward model. So even if your outputs are not by any
+even if your outputs are not by any even if your outputs are not by any
+surface attribute better even if your surface attribute better even if
+your surface attribute better even if your outputs are wrong if they are
+longer outputs are wrong if they are longer outputs are wrong if they
+are longer they are like more likely to receive they are like more
+likely to receive they are like more likely to receive high reward. Um
+and so in RLHF um people high reward. Um and so in RLHF um people high
+reward. Um and so in RLHF um people will do various things to correct
+for will do various things to correct for will do various things to
+correct for this including things like applying this including things
+like applying this including things like applying length penalties. Um
+otherwise when you length penalties. Um otherwise when you length
+penalties. Um otherwise when you train a model with um some sort of
+train a model with um some sort of train a model with um some sort of
+reward um augmented objective you will reward um augmented objective you
+will reward um augmented objective you will see the output space get
+longer um and see the output space get longer um and see the output
+space get longer um and therefore the reward go up even if the therefore
+the reward go up even if the therefore the reward go up even if the
+content doesn't necessarily improve. content doesn't necessarily
+improve. content doesn't necessarily improve. Um the other issue with
+reward modeling Um the other issue with reward modeling Um the other
+issue with reward modeling that we talked about very briefly when that
+we talked about very briefly when that we talked about very briefly when
+we talked about uh reward augmented we talked about uh reward augmented
+we talked about uh reward augmented decoding is that reward models are
+not decoding is that reward models are not decoding is that reward
+models are not always well defined over subsequences. always well
+defined over subsequences. always well defined over subsequences. Um so
+this is an issue not necessarily Um so this is an issue not necessarily
+Um so this is an issue not necessarily for best event where we would
+just for best event where we would just for best event where we would
+just sample all of these things in completion sample all of these things
+in completion sample all of these things in completion and then look at
+them. But for training and then look at them. But for training and then
+look at them. But for training with reward models or for doing things
+with reward models or for doing things with reward models or for doing
+things like content filtering where you might like content filtering
+where you might like content filtering where you might want to interrupt
+midway through. Um want to interrupt midway through. Um want to
+interrupt midway through. Um this is uh from Nathan Lambert's blog this
+is uh from Nathan Lambert's blog this is uh from Nathan Lambert's blog
+interconnects. Uh this is a sequence of interconnects. Uh this is a
+sequence of interconnects. Uh this is a sequence of the reward for each
+substring um going the reward for each substring um going the reward for
+each substring um going up to this full sentence. I love to walk up to
+this full sentence. I love to walk up to this full sentence. I love to
+walk the dog. What do you like? Um and you the dog. What do you like? Um
+and you the dog. What do you like? Um and you can see that the reward
+here is really can see that the reward here is really can see that the
+reward here is really really bouncy. It goes negative at really bouncy.
+It goes negative at really bouncy. It goes negative at several points.
+Um and what could this several points. Um and what could this several
+points. Um and what could this be? This could be partially that be? This
+could be partially that be? This could be partially that something like
+I love to walk is not a something like I love to walk is not a something
+like I love to walk is not a full sentence. And so if that was a full
+full sentence. And so if that was a full full sentence. And so if that
+was a full output, that would be low reward. Um but output, that would
+be low reward. Um but output, that would be low reward. Um but it could
+it also seems to be some kind it could it also seems to be some kind it
+could it also seems to be some kind of surface features. It's not clear
+why of surface features. It's not clear why of surface features. It's
+not clear why like um I love to walk the dog what is like um I love to
+walk the dog what is like um I love to walk the dog what is worse than I
+love to walk the dog what worse than I love to walk the dog what worse
+than I love to walk the dog what do um so you can try to learn uh models
+do um so you can try to learn uh models do um so you can try to learn uh
+models over subsequences and or over sort of over subsequences and or
+over sort of over subsequences and or over sort of subsets and in fact
+this is something subsets and in fact this is something subsets and in
+fact this is something that like something like a process that like
+something like a process that like something like a process reward model
+would be trained reward model would be trained reward model would be
+trained specifically to do but in general if you specifically to do but
+in general if you specifically to do but in general if you have a reward
+model that was not trained have a reward model that was not trained have
+a reward model that was not trained for this um you shouldn't try to
+apply for this um you shouldn't try to apply for this um you shouldn't
+try to apply it over subsequences at least without it over subsequences
+at least without it over subsequences at least without doing some kind
+of heavy pre-processing doing some kind of heavy pre-processing doing
+some kind of heavy pre-processing Um, the other issue with preference is
+Um, the other issue with preference is Um, the other issue with
+preference is that there's not always a meaningful that there's not
+always a meaningful that there's not always a meaningful pair-wise
+distinction. If you ask a pair-wise distinction. If you ask a pair-wise
+distinction. If you ask a model to name the color of the rainbow, model
+to name the color of the rainbow, model to name the color of the
+rainbow, um, is green or blue a better answer, um, is green or blue a
+better answer, um, is green or blue a better answer, right? right?
+right? &gt;&gt; Maybe we maybe we have a personal &gt;&gt; Maybe we
+maybe we have a personal &gt;&gt; Maybe we maybe we have a personal
+preference here, but by and large, these preference here, but by and
+large, these preference here, but by and large, these are re about the
+same quality output are re about the same quality output are re about
+the same quality output from the model, right? Um, and so pair from the
+model, right? Um, and so pair from the model, right? Um, and so pair
+wise preference can sometimes impose a wise preference can sometimes
+impose a wise preference can sometimes impose a sort of artificial um,
+sort of artificial um, sort of artificial um, uh, ranking between
+things. If you asked uh, ranking between things. If you asked uh,
+ranking between things. If you asked an annotator to label this, it's
+not an annotator to label this, it's not an annotator to label this,
+it's not clear what they would label. Um, and so clear what they would
+label. Um, and so clear what they would label. Um, and so one, if you're
+asking for annotations, one, if you're asking for annotations, one, if
+you're asking for annotations, you should allow for this. And two, um,
+you should allow for this. And two, um, you should allow for this. And
+two, um, it's helpful to sometimes check that it's helpful to sometimes
+check that it's helpful to sometimes check that reward models have
+reasonable behavior reward models have reasonable behavior reward models
+have reasonable behavior in these edge cases. In particular, if I in
+these edge cases. In particular, if I in these edge cases. In
+particular, if I asked for a scalar reward, like a asked for a scalar
+reward, like a asked for a scalar reward, like a prediction from 0 to
+one of whether prediction from 0 to one of whether prediction from 0 to
+one of whether green was better than blue, I would hope green was better
+than blue, I would hope green was better than blue, I would hope for an
+answer somewhere around 0.5. for an answer somewhere around 0.5. for an
+answer somewhere around 0.5. These are roughly the same quality. These
+are roughly the same quality. These are roughly the same quality. And so
+to kind of look at this in And so to kind of look at this in And so to
+kind of look at this in questions like this, um there's a number
+questions like this, um there's a number questions like this, um there's
+a number of different benchmarks for reward of different benchmarks for
+reward of different benchmarks for reward modeling. Um this one that
+came out uh I modeling. Um this one that came out uh I modeling. Um this
+one that came out uh I think near the end of the summer I think think
+near the end of the summer I think think near the end of the summer I
+think is quite good. Um and this is called is quite good. Um and this is
+called is quite good. Um and this is called reward bench v2. Um this is
+a grouping reward bench v2. Um this is a grouping reward bench v2. Um
+this is a grouping of a number of different reward modeling of a number
+of different reward modeling of a number of different reward modeling
+data sets. And so this is looking at data sets. And so this is looking
+at data sets. And so this is looking at whether the model behaves um as
+humans whether the model behaves um as humans whether the model behaves
+um as humans would on a number of labeling tasks would on a number of
+labeling tasks would on a number of labeling tasks related to different
+areas. So there's related to different areas. So there's related to
+different areas. So there's sort of a grouping here that is math sort of
+a grouping here that is math sort of a grouping here that is math
+related. There's a grouping here that is related. There's a grouping
+here that is related. There's a grouping here that is safety related
+questions. And so these safety related questions. And so these safety
+related questions. And so these are um somebody else's predefined notion
+are um somebody else's predefined notion are um somebody else's
+predefined notion of what types of things should be of what types of
+things should be of what types of things should be refused versus
+answered. Um this is refused versus answered. Um this is refused versus
+answered. Um this is another uh group. I think this is like a another uh
+group. I think this is like a another uh group. I think this is like a a
+different topic oriented group. Um and a different topic oriented group.
+Um and a different topic oriented group. Um and this is I think the
+first benchmark to this is I think the first benchmark to this is I
+think the first benchmark to include a notion of ties. So this is
+include a notion of ties. So this is include a notion of ties. So this
+is when the model is given a tie. Does it when the model is given a tie.
+Does it when the model is given a tie. Does it does it answer with
+something close to does it answer with something close to does it answer
+with something close to 0.5 or does it answer with an answer 0.5 or does
+it answer with an answer 0.5 or does it answer with an answer like these
+are equally good for a like these are equally good for a like these are
+equally good for a generative model. Um and you can see generative
+model. Um and you can see generative model. Um and you can see that the
+best models on this data set if that the best models on this data set if
+that the best models on this data set if we sort by overall score. Yes.
+Um vary we sort by overall score. Yes. Um vary we sort by overall score.
+Yes. Um vary pretty broadly. There's a number of pretty broadly. There's
+a number of pretty broadly. There's a number of models that are just
+generative models models that are just generative models models that are
+just generative models that were fine-tuned or maybe used that were
+fine-tuned or maybe used that were fine-tuned or maybe used directly
+like Gemini 2.5 Pro. Um and directly like Gemini 2.5 Pro. Um and
+directly like Gemini 2.5 Pro. Um and there's models on here that were
+there's models on here that were there's models on here that were
+specifically fine-tuned. So, Skywork um specifically fine-tuned. So,
+Skywork um specifically fine-tuned. So, Skywork um I think you might I
+think you'll see in I think you might I think you'll see in I think you
+might I think you'll see in homework 2 is a version of Llama 3.1
+homework 2 is a version of Llama 3.1 homework 2 is a version of Llama
+3.1 that had the language modeling head um that had the language
+modeling head um that had the language modeling head um torn off and
+replaced with a sequential torn off and replaced with a sequential torn
+off and replaced with a sequential classifier. classifier. classifier.
+Um so if you're trying to choose a model Um so if you're trying to
+choose a model Um so if you're trying to choose a model for something
+like best event on one of for something like best event on one of for
+something like best event on one of the shared tasks, um looking at a
+the shared tasks, um looking at a the shared tasks, um looking at a
+leaderboard like this is a pretty leaderboard like this is a pretty
+leaderboard like this is a pretty reasonable way to go. Um I don't think
+reasonable way to go. Um I don't think reasonable way to go. Um I don't
+think this lets you sort by parameters, but this lets you sort by
+parameters, but this lets you sort by parameters, but you can kind of
+look at a lot of these you can kind of look at a lot of these you can
+kind of look at a lot of these names and make a pretty reasonable names
+and make a pretty reasonable names and make a pretty reasonable guess.
+Um, of course, reward models are guess. Um, of course, reward models are
+guess. Um, of course, reward models are not equally good across all
+areas. So not equally good across all areas. So not equally good across
+all areas. So perhaps if you want to do reward perhaps if you want to do
+reward perhaps if you want to do reward modeling on a task like um
+answering modeling on a task like um answering modeling on a task like
+um answering questions about medical data, you would questions about
+medical data, you would questions about medical data, you would want a
+model that has more training data want a model that has more training
+data want a model that has more training data related to medicine or
+more sort of related to medicine or more sort of related to medicine or
+more sort of medical related knowledge. Um, if you medical related
+knowledge. Um, if you medical related knowledge. Um, if you are doing a
+task like um generating are doing a task like um generating are doing a
+task like um generating poetry in Dutch, you would want a model poetry
+in Dutch, you would want a model poetry in Dutch, you would want a model
+that has seen some Dutch. Um, so this is that has seen some Dutch. Um,
+so this is that has seen some Dutch. Um, so this is a a broad like
+useful framework, but you a a broad like useful framework, but you a a
+broad like useful framework, but you should also evaluate these models
+should also evaluate these models should also evaluate these models
+yourself. yourself. yourself. So who actually writes this preference So
+who actually writes this preference So who actually writes this
+preference data? Um, everything related to reward data? Um, everything
+related to reward data? Um, everything related to reward models to best
+defend RHF is determined models to best defend RHF is determined models
+to best defend RHF is determined pretty heavily on what the reward model
+pretty heavily on what the reward model pretty heavily on what the
+reward model says is good or wrong. Um, maybe in an says is good or
+wrong. Um, maybe in an says is good or wrong. Um, maybe in an ideal
+world, we would actually have a ideal world, we would actually have a
+ideal world, we would actually have a human do this task, but because we
+are human do this task, but because we are human do this task, but
+because we are doing this as a large scale training, doing this as a
+large scale training, doing this as a large scale training, this is not
+practical. So instead we're this is not practical. So instead we're this
+is not practical. So instead we're taking this approximation that we've
+taking this approximation that we've taking this approximation that
+we've learned from largely data somebody else learned from largely data
+somebody else learned from largely data somebody else wrote right. So at
+various points over wrote right. So at various points over wrote right.
+So at various points over the past few years the answer to this the past
+few years the answer to this the past few years the answer to this
+question has changed. Um maybe in 2022 question has changed. Um maybe in
+2022 question has changed. Um maybe in 2022 or so maybe 2021 I this
+would have been or so maybe 2021 I this would have been or so maybe 2021
+I this would have been largescale crowdsourcing efforts. Um largescale
+crowdsourcing efforts. Um largescale crowdsourcing efforts. Um Amazon
+Mechanical Turk prolific. Um for Amazon Mechanical Turk prolific. Um for
+Amazon Mechanical Turk prolific. Um for a couple of years this was
+predominantly a couple of years this was predominantly a couple of years
+this was predominantly contractors hired by a data annotation
+contractors hired by a data annotation contractors hired by a data
+annotation company like Scale AI. Um, in the last company like Scale AI.
+Um, in the last company like Scale AI. Um, in the last couple of years
+to months, this has couple of years to months, this has couple of years
+to months, this has often been experts hired by a large often been
+experts hired by a large often been experts hired by a large company
+annotating really specific company annotating really specific company
+annotating really specific preference data like which of these is a
+preference data like which of these is a preference data like which of
+these is a better proof for this like theoretical better proof for this
+like theoretical better proof for this like theoretical math claim. Um,
+and over really the last math claim. Um, and over really the last math
+claim. Um, and over really the last like 20ome years that the internet
+is like 20ome years that the internet is like 20ome years that the
+internet is around this has also been you. So we saw around this has
+also been you. So we saw around this has also been you. So we saw this
+with LM Marina. You can also see this with LM Marina. You can also see
+this with LM Marina. You can also see this um using pretty much any AI
+this um using pretty much any AI this um using pretty much any AI
+adjacent application um from chat GBT adjacent application um from chat
+GBT adjacent application um from chat GBT asking you for a pair-wise
+preference asking you for a pair-wise preference asking you for a pair-
+wise preference explicitly to signals like a a thumbs up explicitly to
+signals like a a thumbs up explicitly to signals like a a thumbs up or
+thumbs down button or a retry button or thumbs down button or a retry
+button or thumbs down button or a retry button for to indicate that
+maybe this wasn't a for to indicate that maybe this wasn't a for to
+indicate that maybe this wasn't a good output for you. Um this is also
+good output for you. Um this is also good output for you. Um this is
+also informed by whether you click through um informed by whether you
+click through um informed by whether you click through um after you see
+the Gemini summary. I after you see the Gemini summary. I after you see
+the Gemini summary. I would bet I don't actually work at would bet I
+don't actually work at would bet I don't actually work at Google. Um,
+this is informed by things Google. Um, this is informed by things
+Google. Um, this is informed by things like what how long do you spend
+on a like what how long do you spend on a like what how long do you
+spend on a section of the page? How quickly do you section of the page?
+How quickly do you section of the page? How quickly do you tab away? Do
+you continue in a tab away? Do you continue in a tab away? Do you
+continue in a conversation? Um, in the same way that conversation? Um,
+in the same way that conversation? Um, in the same way that uh for years
+people who work on search uh for years people who work on search uh for
+years people who work on search engines have been trying to elicit
+engines have been trying to elicit engines have been trying to elicit
+preference data from people, anyone who preference data from people,
+anyone who preference data from people, anyone who anyone whose language
+model you interact anyone whose language model you interact anyone whose
+language model you interact with is probably also trying to do the with
+is probably also trying to do the with is probably also trying to do the
+same thing. Um, and so this is a this same thing. Um, and so this is a
+this same thing. Um, and so this is a this sort of like preference data
+at scale is sort of like preference data at scale is sort of like
+preference data at scale is like not a malicious thing. This is a like
+not a malicious thing. This is a like not a malicious thing. This is a
+very normal sort of user study or user very normal sort of user study or
+user very normal sort of user study or user um preference data to try to
+get. But um preference data to try to get. But um preference data to try
+to get. But this is also where a a decent bit of the this is also where
+a a decent bit of the this is also where a a decent bit of the
+preference data is probably coming from preference data is probably
+coming from preference data is probably coming from is just interactions
+in the wild. Um and is just interactions in the wild. Um and is just
+interactions in the wild. Um and as more people interact with language
+as more people interact with language as more people interact with
+language models in more different ways, the sort models in more
+different ways, the sort models in more different ways, the sort of
+distribution of whose preference is of distribution of whose preference
+is of distribution of whose preference is represented is continually
+shifting. represented is continually shifting. represented is
+continually shifting. Um so that's reward models. I'm going to Um so
+that's reward models. I'm going to Um so that's reward models. I'm going
+to talk sort of briefly about the costs of talk sort of briefly about
+the costs of talk sort of briefly about the costs of best of n and then
+I believe in the um best of n and then I believe in the um best of n and
+then I believe in the um student presentations we'll also have student
+presentations we'll also have student presentations we'll also have some
+uh discussion of some of the some uh discussion of some of the some uh
+discussion of some of the pitfalls of using a roboard model. Um so
+pitfalls of using a roboard model. Um so pitfalls of using a roboard
+model. Um so best of n requires generating n outputs. best of n requires
+generating n outputs. best of n requires generating n outputs. Um how do
+you choose n? Um and how do Um how do you choose n? Um and how do Um how
+do you choose n? Um and how do you choose n sort of in such a way that
+you choose n sort of in such a way that you choose n sort of in such a
+way that you're not wasting effort. So maybe if you're not wasting
+effort. So maybe if you're not wasting effort. So maybe if you have a um
+a question like what's 2 you have a um a question like what's 2 you have
+a um a question like what's 2 plus two, you probably don't need to do
+plus two, you probably don't need to do plus two, you probably don't
+need to do like n equals 100 and choose from your like n equals 100 and
+choose from your like n equals 100 and choose from your 100 examples
+that probably all say 100 examples that probably all say 100 examples
+that probably all say something like four. Um so this is going something
+like four. Um so this is going something like four. Um so this is going
+to be certainly at least partially to be certainly at least partially to
+be certainly at least partially problem specific. Um if you know that
+problem specific. Um if you know that problem specific. Um if you know
+that your task is relatively easy or that you your task is relatively
+easy or that you your task is relatively easy or that you believe your
+task is sort of relatively believe your task is sort of relatively
+believe your task is sort of relatively well aligned to the target
+distribution. well aligned to the target distribution. well aligned to
+the target distribution. If you think your language model, your If you
+think your language model, your If you think your language model, your
+proposal is close to the actual target proposal is close to the actual
+target proposal is close to the actual target distribution, you might
+not need to distribution, you might not need to distribution, you might
+not need to sample as much. or maybe you could even sample as much. or
+maybe you could even sample as much. or maybe you could even do some
+type of mode seeeking search to do some type of mode seeeking search to
+do some type of mode seeeking search to try to wind up at the top of
+that try to wind up at the top of that try to wind up at the top of that
+distribution. distribution. distribution. Um, other ways to intro to
+reduce cost, Um, other ways to intro to reduce cost, Um, other ways to
+intro to reduce cost, you could choose to set the value of n you could
+choose to set the value of n you could choose to set the value of n um
+to be something related to your um to be something related to your um to
+be something related to your hardware. Like maybe if you can generate
+hardware. Like maybe if you can generate hardware. Like maybe if you can
+generate 32 things in a single batch, but you 32 things in a single
+batch, but you 32 things in a single batch, but you would have to use um
+a second batch or a would have to use um a second batch or a would have
+to use um a second batch or a second pass or a second GPU to generate
+second pass or a second GPU to generate second pass or a second GPU to
+generate the 33rd thing, you could set n to be the 33rd thing, you could
+set n to be the 33rd thing, you could set n to be 32. Um you can also
+experiment with 32. Um you can also experiment with 32. Um you can also
+experiment with different ways of generating with a different ways of
+generating with a different ways of generating with a smaller model
+versus using a larger smaller model versus using a larger smaller model
+versus using a larger reward model. So generation is more reward model.
+So generation is more reward model. So generation is more expensive than
+scoring. Um because when expensive than scoring. Um because when
+expensive than scoring. Um because when you generate you have to wait
+for each you generate you have to wait for each you generate you have to
+wait for each um uh new token to be generated um um uh new token to be
+generated um um uh new token to be generated um whereas when you're
+scoring you can pass whereas when you're scoring you can pass whereas
+when you're scoring you can pass everything through as one block. Um and
+everything through as one block. Um and everything through as one block.
+Um and also when you generate you're generating also when you generate
+you're generating also when you generate you're generating many things.
+When you're scoring you're many things. When you're scoring you're many
+things. When you're scoring you're scoring sort of only a few things. So
+scoring sort of only a few things. So scoring sort of only a few things.
+So you can play around with different you can play around with different
+you can play around with different variants of using a smaller model
+versus variants of using a smaller model versus variants of using a
+smaller model versus larger reward um and vice versa. Um larger reward
+um and vice versa. Um larger reward um and vice versa. Um you can vary
+decoding settings to get you can vary decoding settings to get you can
+vary decoding settings to get more unique outputs. So if you have um
+more unique outputs. So if you have um more unique outputs. So if you
+have um and if you know you're generating a 100 and if you know you're
+generating a 100 and if you know you're generating a 100 things and you
+know temperature sampling things and you know temperature sampling
+things and you know temperature sampling with temperature point 2 gives
+you only with temperature point 2 gives you only with temperature point
+2 gives you only maybe 20 unique things on average, you maybe 20 unique
+things on average, you maybe 20 unique things on average, you could try
+varying temperature. You could could try varying temperature. You could
+could try varying temperature. You could try different decoding
+strategies. Um try different decoding strategies. Um try different
+decoding strategies. Um and you can also try sampling from and you can
+also try sampling from and you can also try sampling from multiple
+models to get a set of multiple models to get a set of multiple models
+to get a set of candidates. The caveat for these last candidates. The
+caveat for these last candidates. The caveat for these last two here is
+that um this nice intuition two here is that um this nice intuition two
+here is that um this nice intuition we talked about that this is like a
+a we talked about that this is like a a we talked about that this is
+like a a variant of rejection sampling where we variant of rejection
+sampling where we variant of rejection sampling where we have a proposal
+distribution and a have a proposal distribution and a have a proposal
+distribution and a target distribution um are sort of not target
+distribution um are sort of not target distribution um are sort of not
+well defined if you are changing what well defined if you are changing
+what well defined if you are changing what your proposal distribution is
+across the your proposal distribution is across the your proposal
+distribution is across the process of sampling that set. So if you
+process of sampling that set. So if you process of sampling that set. So
+if you sample if you are doing best of 50 but sample if you are doing
+best of 50 but sample if you are doing best of 50 but you got 20 of
+those outputs from Quen you got 20 of those outputs from Quen you got 20
+of those outputs from Quen and 10 of those outputs from GPD5 and 20 and
+10 of those outputs from GPD5 and 20 and 10 of those outputs from GPD5
+and 20 of those outputs from Quen but with like of those outputs from
+Quen but with like of those outputs from Quen but with like a completely
+different set of decoding a completely different set of decoding a
+completely different set of decoding settings. Now you no longer have
+sort of settings. Now you no longer have sort of settings. Now you no
+longer have sort of one proposal distributions. You can't one proposal
+distributions. You can't one proposal distributions. You can't make this
+same like nice um theoretical make this same like nice um theoretical
+make this same like nice um theoretical intuition. Um this is still
+quite intuition. Um this is still quite intuition. Um this is still
+quite effective in practice though. Um and you effective in practice
+though. Um and you effective in practice though. Um and you can also
+train your model to be closer can also train your model to be closer can
+also train your model to be closer to the preference distribution. Um
+this to the preference distribution. Um this to the preference
+distribution. Um this is the idea behind RLHF. This is also um is the
+idea behind RLHF. This is also um is the idea behind RLHF. This is also
+um the one of the insights from the paper the one of the insights from
+the paper the one of the insights from the paper we just talked about
+reward bench which we just talked about reward bench which we just
+talked about reward bench which is that even if a model is better on is
+that even if a model is better on is that even if a model is better on
+this sort of absolute ranking of this sort of absolute ranking of this
+sort of absolute ranking of preference um a model that is from the
+preference um a model that is from the preference um a model that is
+from the same model family that you are using to same model family that
+you are using to same model family that you are using to generate the
+input the outputs is more generate the input the outputs is more
+generate the input the outputs is more likely to be a good preference
+model for likely to be a good preference model for likely to be a good
+preference model for that data um and this is sort of it's that data um
+and this is sort of it's that data um and this is sort of it's more
+likely to be a better model to do more likely to be a better model to do
+more likely to be a better model to do RLHF with and it's also more
+likely to RLHF with and it's also more likely to RLHF with and it's also
+more likely to be a better model for best event u and be a better model
+for best event u and be a better model for best event u and the kind of
+intuition here is that these the kind of intuition here is that these
+the kind of intuition here is that these models um have similar
+distributions, models um have similar distributions, models um have
+similar distributions, right? Your proposal distribution, your right?
+Your proposal distribution, your right? Your proposal distribution, your
+generating model is placing high generating model is placing high
+generating model is placing high probability in places that your reward
+probability in places that your reward probability in places that your
+reward model is also likely to place high model is also likely to place
+high model is also likely to place high probability. And so you are
+sampling probability. And so you are sampling probability. And so you
+are sampling things um that sort of line up better things um that sort
+of line up better things um that sort of line up better with the notion
+of reward that model has with the notion of reward that model has with
+the notion of reward that model has defined. defined. defined. So to
+summarize um you can think of best So to summarize um you can think of
+best So to summarize um you can think of best of n and most other multis
+sample and of n and most other multis sample and of n and most other
+multis sample and reranking strategies as attempting to reranking
+strategies as attempting to reranking strategies as attempting to get
+closer to some kind of idealized get closer to some kind of idealized
+get closer to some kind of idealized distribution over outputs. We
+represent distribution over outputs. We represent distribution over
+outputs. We represent an idealized distribution which we don't an
+idealized distribution which we don't an idealized distribution which we
+don't actually know in practice by a reward actually know in practice by
+a reward actually know in practice by a reward model which tries to
+capture some notion model which tries to capture some notion model which
+tries to capture some notion of human preference for some subset of of
+human preference for some subset of of human preference for some subset
+of people that annotated its data. Um and people that annotated its
+data. Um and people that annotated its data. Um and generally best of
+end will improve with generally best of end will improve with generally
+best of end will improve with more samples or more cost. Um, but you
+more samples or more cost. Um, but you more samples or more cost. Um,
+but you can do things at training time to try to can do things at
+training time to try to can do things at training time to try to reduce
+the inference cost by trying reduce the inference cost by trying reduce
+the inference cost by trying training to be closer to the preference
+training to be closer to the preference training to be closer to the
+preference distribution. distribution. distribution. Um, and with that,
+I think we will turn Um, and with that, I think we will turn Um, and
+with that, I think we will turn it over to the student presenters unless
+it over to the student presenters unless it over to the student
+presenters unless anyone has any questions on best event anyone has any
+questions on best event anyone has any questions on best event or reward
+modeling. &gt;&gt; Great. &gt;&gt; Great. &gt;&gt; Great. &gt;&gt; Oh
+yeah, sorry. Um when you say that you &gt;&gt; Oh yeah, sorry. Um when
+you say that you &gt;&gt; Oh yeah, sorry. Um when you say that you
+should like the reward model must be should like the reward model must
+be should like the reward model must be from the same family as the
+policy you from the same family as the policy you from the same family
+as the policy you are optimizing are optimizing are optimizing &gt;&gt;
+like isn't that like causing bias as &gt;&gt; like isn't that like
+causing bias as &gt;&gt; like isn't that like causing bias as well
+because you like if your reward well because you like if your reward
+well because you like if your reward model is bad at things which you
+want to model is bad at things which you want to model is bad at things
+which you want to train for train for train for &gt;&gt; then like the
+smaller version of that &gt;&gt; then like the smaller version of that
+&gt;&gt; then like the smaller version of that family will also be mad
+and like family will also be mad and like family will also be mad and
+like training will be unstable. training will be unstable. training will
+be unstable. &gt;&gt; Yeah. Like is it bad to have the reward &gt;&gt;
+Yeah. Like is it bad to have the reward &gt;&gt; Yeah. Like is it bad to
+have the reward model and the um base model be from the model and the um
+base model be from the model and the um base model be from the same
+family because they'll have like same family because they'll have like
+same family because they'll have like the same errors. Um I think this
+is like the same errors. Um I think this is like the same errors. Um I
+think this is like certainly possible. Um the I think the certainly
+possible. Um the I think the certainly possible. Um the I think the idea
+here is at least partially that idea here is at least partially that
+idea here is at least partially that like you have a better warm start
+if like you have a better warm start if like you have a better warm
+start if they have some agreement on what is they have some agreement on
+what is they have some agreement on what is likely to be good. Um, this
+is I believe likely to be good. Um, this is I believe likely to be good.
+Um, this is I believe also true even if you started from the also true
+even if you started from the also true even if you started from the same
+preference data, although I'm not same preference data, although I'm not
+same preference data, although I'm not actually sure if they run that
+actually sure if they run that actually sure if they run that
+experiment. But like your reward model experiment. But like your reward
+model experiment. But like your reward model is like some proportion the
+distribution is like some proportion the distribution is like some
+proportion the distribution over language that the base model has over
+language that the base model has over language that the base model has
+already learned and some proportion like already learned and some
+proportion like already learned and some proportion like this new
+preference data that you're this new preference data that you're this
+new preference data that you're trying to inject in. And the idea is
+trying to inject in. And the idea is trying to inject in. And the idea
+is that when you're doing reward modeling, that when you're doing reward
+modeling, that when you're doing reward modeling, you're mostly trying
+to inject in you're mostly trying to inject in you're mostly trying to
+inject in whatever you've learned from that whatever you've learned from
+that whatever you've learned from that preference data. And so you don't
+also preference data. And so you don't also preference data. And so you
+don't also need to be changing this like base need to be changing this
+like base need to be changing this like base distribution. Like maybe
+Quen thinks distribution. Like maybe Quen thinks distribution. Like
+maybe Quen thinks that like Chinese text is a little more that like
+Chinese text is a little more that like Chinese text is a little more
+likely than llama does because it was likely than llama does because it
+was likely than llama does because it was chained on more Chinese. And
+you don't chained on more Chinese. And you don't chained on more
+Chinese. And you don't actually need to be like upweing Chinese actually
+need to be like upweing Chinese actually need to be like upweing Chinese
+text when you're trying to um RLHF llama text when you're trying to um
+RLHF llama text when you're trying to um RLHF llama or conversely
+downweing it when you're or conversely downweing it when you're or
+conversely downweing it when you're trying to RLHF Quen. Um but it's
+trying to RLHF Quen. Um but it's trying to RLHF Quen. Um but it's
+definitely possible that like whatever definitely possible that like
+whatever definitely possible that like whatever pathologies you have in
+your reward pathologies you have in your reward pathologies you have in
+your reward model, you're also kind of injecting model, you're also kind
+of injecting model, you're also kind of injecting into the base model.
+Another another thing um just to note here is another thing um just to
+note here is another thing um just to note here is that when you have a
+reward model um that when you have a reward model um that when you have
+a reward model um when you generate you have to generate when you
+generate you have to generate when you generate you have to generate
+left to right um and you know that left to right um and you know that
+left to right um and you know that that's a little bit limiting you know
+that's a little bit limiting you know that's a little bit limiting you
+know also we're talking about inference also we're talking about
+inference also we're talking about inference algorithms our inference
+algorithms are algorithms our inference algorithms are algorithms our
+inference algorithms are limited too so sometimes it's easier limited
+too so sometimes it's easier limited too so sometimes it's easier like
+afterwards to take a second look like afterwards to take a second look
+like afterwards to take a second look and when I say easier it's like
+there and when I say easier it's like there and when I say easier it's
+like there are specific things that make it easier are specific things
+that make it easier are specific things that make it easier like having
+birectional like or being like having birectional like or being like
+having birectional like or being able to able to able to uh you know
+feed in to the model the uh you know feed in to the model the uh you
+know feed in to the model the entire output or prompt the model entire
+output or prompt the model entire output or prompt the model beforehand
+that it should be looking for beforehand that it should be looking for
+beforehand that it should be looking for particular things. use more
+reasoning particular things. use more reasoning particular things. use
+more reasoning like like like &gt;&gt; um and you can also like
+specifically &gt;&gt; um and you can also like specifically &gt;&gt; um
+and you can also like specifically train a model where like the only job
+is train a model where like the only job is train a model where like the
+only job is to give you a high score if it's a good to give you a high
+score if it's a good to give you a high score if it's a good output and
+a low score if it's bad output and a low score if it's bad output and a
+low score if it's bad output instead of using the model output instead
+of using the model output instead of using the model capacity to both
+generating and um and capacity to both generating and um and capacity to
+both generating and um and like evaluating. So um I think it tends like
+evaluating. So um I think it tends like evaluating. So um I think it
+tends to be the case that to be the case that to be the case that best
+of end plus a reward model best of end plus a reward model best of end
+plus a reward model can be better but it's not guaranteed can be better
+but it's not guaranteed can be better but it's not guaranteed like
+reward modeling is very very hard like reward modeling is very very hard
+like reward modeling is very very hard and like creating a small reward
+model and like creating a small reward model and like creating a small
+reward model that is like better than the GP5 that's that is like better
+than the GP5 that's that is like better than the GP5 that's generating
+the output or something like generating the output or something like
+generating the output or something like that is going to be you know
+very that is going to be you know very that is going to be you know very
+tricky. So um yeah I I don't want to tricky. So um yeah I I don't want
+to tricky. So um yeah I I don't want to minimize the the difficulty of
+this. minimize the the difficulty of this. minimize the the difficulty
+of this. It's it's definitely hard. It's it's definitely hard. It's it's
+definitely hard. &gt;&gt; Yeah, it's also possible to do both &gt;&gt;
+Yeah, it's also possible to do both &gt;&gt; Yeah, it's also possible to
+do both reward modeling um or both best event reward modeling um or both
+best event reward modeling um or both best event and trying to align a
+model to the and trying to align a model to the and trying to align a
+model to the reward model through something like RL. reward model
+through something like RL. reward model through something like RL. Um
+like one of the maybe a trivial case Um like one of the maybe a trivial
+case Um like one of the maybe a trivial case of the um it's harder to
+know while of the um it's harder to know while of the um it's harder to
+know while generating than it is after generating generating than it is
+after generating generating than it is after generating is if you set
+like a a 100 token max on is if you set like a a 100 token max on is if
+you set like a a 100 token max on your output. um you could have two
+your output. um you could have two your output. um you could have two
+outputs that look like perfectly outputs that look like perfectly
+outputs that look like perfectly reasonable for the first 90 some
+tokens, reasonable for the first 90 some tokens, reasonable for the
+first 90 some tokens, but one of them finishes within 100 but one of
+them finishes within 100 but one of them finishes within 100 tokens and
+the other one doesn't. Um and tokens and the other one doesn't. Um and
+tokens and the other one doesn't. Um and so even if you've RLHF your
+model that so even if you've RLHF your model that so even if you've RLHF
+your model that you could maybe if you set your you could maybe if you
+set your you could maybe if you set your generation um max length lower
+than you generation um max length lower than you generation um max
+length lower than you did during training, it could be very did during
+training, it could be very did during training, it could be very easy to
+end up in this situation. And so easy to end up in this situation. And
+so easy to end up in this situation. And so doing RLHF and then also
+doing best doing RLHF and then also doing best doing RLHF and then also
+doing best event on some small set of outputs can event on some small
+set of outputs can event on some small set of outputs can get you kind
+of the best of both worlds. get you kind of the best of both worlds. get
+you kind of the best of both worlds. It's easier to check at the end
+than at It's easier to check at the end than at It's easier to check at
+the end than at the beginning.

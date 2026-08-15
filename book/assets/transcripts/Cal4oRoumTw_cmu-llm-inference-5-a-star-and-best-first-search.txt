@@ -1,0 +1,1861 @@
+# cmu-llm-inference-5-a-star-and-best-first-search
+# video: https://www.youtube.com/watch?v=Cal4oRoumTw
+# captions: manual
+
+Okay, so uh welcome back everyone. Um I Okay, so uh welcome back
+everyone. Um I Okay, so uh welcome back everyone. Um I will be talking
+about best first search will be talking about best first search will be
+talking about best first search for language models. And um one one for
+language models. And um one one for language models. And um one one
+thing before I do that uh that I'd like thing before I do that uh that
+I'd like thing before I do that uh that I'd like to talk about a little
+bit is just kind to talk about a little bit is just kind to talk about a
+little bit is just kind of in general um on the way over here I of in
+general um on the way over here I of in general um on the way over here
+I was talking to Amanda about uh like the was talking to Amanda about uh
+like the was talking to Amanda about uh like the relative importance of
+the stuff we're relative importance of the stuff we're relative
+importance of the stuff we're talking about now um compared to like
+talking about now um compared to like talking about now um compared to
+like the stuff that's used more frequently the stuff that's used more
+frequently the stuff that's used more frequently now. Uh so like uh to
+give an example now. Uh so like uh to give an example now. Uh so like uh
+to give an example the stuff that's used frequently now is the stuff
+that's used frequently now is the stuff that's used frequently now is
+like sampling like sampling like sampling um greedy search maybe to a
+lesser um greedy search maybe to a lesser um greedy search maybe to a
+lesser extent some beam search and then the extent some beam search and
+then the extent some beam search and then the stuff that we're doing uh
+that I'm going stuff that we're doing uh that I'm going stuff that we're
+doing uh that I'm going to talk about today is probably used the to talk
+about today is probably used the to talk about today is probably used
+the least out of all the stuff we have but I least out of all the stuff
+we have but I least out of all the stuff we have but I actually think
+there's a reason for that actually think there's a reason for that
+actually think there's a reason for that um which is we have kind of
+like a GPT P GPD like one GPD like one GPD like one two uh things like
+this. These were like two uh things like this. These were like two uh
+things like this. These were like I don't know really I don't know
+really I don't know really really broken models. Um and so they had
+really broken models. Um and so they had really broken models. Um and so
+they had lots of problems and so if you like lots of problems and so if
+you like lots of problems and so if you like tried to find the highest
+probability tried to find the highest probability tried to find the
+highest probability output from them they would give you output from
+them they would give you output from them they would give you things
+that repeated over and over things that repeated over and over things
+that repeated over and over again. Uh so like you did green search
+again. Uh so like you did green search again. Uh so like you did green
+search or you did beam search it would give you or you did beam search
+it would give you or you did beam search it would give you like an
+output of length of zero uh and like an output of length of zero uh and
+like an output of length of zero uh and that would be completely
+useless. Um so that would be completely useless. Um so that would be
+completely useless. Um so in order to fix this basically what we in
+order to fix this basically what we in order to fix this basically what
+we did is we went in and we like broke did is we went in and we like
+broke did is we went in and we like broke inference. So we use sampling
+strategies inference. So we use sampling strategies inference. So we use
+sampling strategies where we didn't sample like directly where we didn't
+sample like directly where we didn't sample like directly from the
+distribution. We didn't use from the distribution. We didn't use from
+the distribution. We didn't use greedy search. We didn't use all of
+greedy search. We didn't use all of greedy search. We didn't use all of
+these other things. And so these other things. And so these other
+things. And so this was kind of like the era of let's this was kind of
+like the era of let's this was kind of like the era of let's um this was
+the era of like break break um this was the era of like break break um
+this was the era of like break break search search search to get better
+results. Um now we get to to get better results. Um now we get to to get
+better results. Um now we get to like GPT like GPT like GPT um three and
+four. We're starting to get um three and four. We're starting to get um
+three and four. We're starting to get like much better models. Like
+three like much better models. Like three like much better models. Like
+three still wasn't good enough. like four was still wasn't good enough.
+like four was still wasn't good enough. like four was uh was kind of
+like getting to be good uh was kind of like getting to be good uh was
+kind of like getting to be good enough uh where it's like okay now
+enough uh where it's like okay now enough uh where it's like okay now
+search actually works so let's just do search actually works so let's
+just do search actually works so let's just do greedy uh let's just do
+greedy uh greedy uh let's just do greedy uh greedy uh let's just do
+greedy uh outputs outputs outputs um and then we also have models like
+um um and then we also have models like um um and then we also have
+models like um you know I'll just stick with the open you know I'll just
+stick with the open you know I'll just stick with the open AI models so
+I'll say like 0 01 to04 AI models so I'll say like 0 01 to04 AI models
+so I'll say like 0 01 to04 um now open AI like doesn't even allow um now
+open AI like doesn't even allow um now open AI like doesn't even allow
+you to do things other than temperature you to do things other than
+temperature you to do things other than temperature equals to one. It
+like forces you to equals to one. It like forces you to equals to one.
+It like forces you to sample from the model. Um and so this is sample
+from the model. Um and so this is sample from the model. Um and so this
+is like they give you no choice. Um I think like they give you no
+choice. Um I think like they give you no choice. Um I think a lot of
+other people have just been a lot of other people have just been a lot
+of other people have just been following this and just sampling from
+following this and just sampling from following this and just sampling
+from the model with temperature one. And so the model with temperature
+one. And so the model with temperature one. And so the idea is like okay
+um we will the idea is like okay um we will the idea is like okay um we
+will just sample directly from the model's just sample directly from the
+model's just sample directly from the model's distribution because the
+model has been distribution because the model has been distribution
+because the model has been trained to be reasonably good when we trained
+to be reasonably good when we trained to be reasonably good when we
+sample directly from the distribution. sample directly from the
+distribution. sample directly from the distribution. Um, Um, Um, but
+like greedy search actually kind of but like greedy search actually kind
+of but like greedy search actually kind of works with like our best
+models. Um, and works with like our best models. Um, and works with like
+our best models. Um, and it actually works better than sampling it
+actually works better than sampling it actually works better than
+sampling with temperature one. And so that kind with temperature one.
+And so that kind with temperature one. And so that kind of makes me
+think that it's like now is of makes me think that it's like now is of
+makes me think that it's like now is the time to go back to like
+actually the time to go back to like actually the time to go back to
+like actually searching better. And like one way that searching better.
+And like one way that searching better. And like one way that people
+search better is they, you know, people search better is they, you know,
+people search better is they, you know, do really long rollouts of
+reasoning do really long rollouts of reasoning do really long rollouts
+of reasoning models and um and sample lots of outputs models and um and
+sample lots of outputs models and um and sample lots of outputs and and
+things like this. And you know, and and things like this. And you know,
+and and things like this. And you know, maybe maybe that's good. We're
+going to maybe maybe that's good. We're going to maybe maybe that's
+good. We're going to be talking a lot about that, but maybe be talking a
+lot about that, but maybe be talking a lot about that, but maybe also we
+really want to be looking for also we really want to be looking for also
+we really want to be looking for the things where we get the highest the
+things where we get the highest the things where we get the highest
+model score. Um, and so maybe maybe now model score. Um, and so maybe
+maybe now model score. Um, and so maybe maybe now is the time to
+reconsider these methods is the time to reconsider these methods is the
+time to reconsider these methods that search efficiently for the things
+that search efficiently for the things that search efficiently for the
+things that have very high model scores. So, that have very high model
+scores. So, that have very high model scores. So, um, that's kind of on
+a high level my um, that's kind of on a high level my um, that's kind of
+on a high level my thinking about this before we go into thinking about
+this before we go into thinking about this before we go into the
+details. Um the details. Um the details. Um any any any any any any
+comments or or thoughts? comments or or thoughts? comments or or
+thoughts? Okay, cool. Um Okay, cool. Um Okay, cool. Um so just to go
+back to what we were so just to go back to what we were so just to go
+back to what we were talking about before uh last time we talking about
+before uh last time we talking about before uh last time we talked about
+like things like greedy talked about like things like greedy talked
+about like things like greedy search and beam search and um to give a
+search and beam search and um to give a search and beam search and um to
+give a kind of outline, let's see if I can make kind of outline, let's
+see if I can make kind of outline, let's see if I can make that bigger.
+Okay, there we go. Um so that bigger. Okay, there we go. Um so that
+bigger. Okay, there we go. Um so greedy search basically selected the
+greedy search basically selected the greedy search basically selected
+the highest uh probability token at each highest uh probability token at
+each highest uh probability token at each step and um it's you know very
+fast but step and um it's you know very fast but step and um it's you
+know very fast but it's myopic. It can make uh very bad it's myopic. It
+can make uh very bad it's myopic. It can make uh very bad local
+decisions uh when a better global local decisions uh when a better
+global local decisions uh when a better global decision would be
+possible. Um no no decision would be possible. Um no no decision would
+be possible. Um no no backtracking of any variety is possible.
+backtracking of any variety is possible. backtracking of any variety is
+possible. Uh no cons consideration of multiple Uh no cons consideration
+of multiple Uh no cons consideration of multiple hypotheses. Um in
+contrast to this beam hypotheses. Um in contrast to this beam
+hypotheses. Um in contrast to this beam search uh maintained top K
+hypotheses search uh maintained top K hypotheses search uh maintained
+top K hypotheses um explored multiple paths um explored multiple paths
+um explored multiple paths simultaneously and gave uh if you have a
+simultaneously and gave uh if you have a simultaneously and gave uh if
+you have a good model it will give you better good model it will give
+you better good model it will give you better quality than greedy
+search. Um what's quality than greedy search. Um what's quality than
+greedy search. Um what's just to make sure that everybody's awake just
+to make sure that everybody's awake just to make sure that everybody's
+awake and paying attention. What's the and paying attention. What's the
+and paying attention. What's the relationship between these two?
+relationship between these two? relationship between these two? &gt;&gt;
+Yeah, &gt;&gt; Yeah, &gt;&gt; Yeah, &gt;&gt; you have a beam one.
+&gt;&gt; you have a beam one. &gt;&gt; you have a beam one. &gt;&gt;
+Yeah, exactly. So beam search with a a &gt;&gt; Yeah, exactly. So beam
+search with a a &gt;&gt; Yeah, exactly. So beam search with a a beam
+width of one is greedy search. beam width of one is greedy search. beam
+width of one is greedy search. Cool. Cool. Cool. So um So um So um I'm
+going to uh talk about search spaces I'm going to uh talk about search
+spaces I'm going to uh talk about search spaces as graphs here. Um
+because a lot of the as graphs here. Um because a lot of the as graphs
+here. Um because a lot of the algorithms that I will be talking about
+algorithms that I will be talking about algorithms that I will be
+talking about today were originally created for search today were
+originally created for search today were originally created for search
+over graphs. Um over graphs. Um over graphs. Um and we can represent it
+specifically as and we can represent it specifically as and we can
+represent it specifically as a weighted uh finite state automaton. a
+weighted uh finite state automaton. a weighted uh finite state
+automaton. And how many people have done this in And how many people
+have done this in And how many people have done this in some class?
+That's like 10 to 20% of people. Okay, That's like 10 to 20% of people.
+Okay, That's like 10 to 20% of people. Okay, that that's great. This is
+another place that that's great. This is another place that that's
+great. This is another place where I get to feel the 2025 because where
+I get to feel the 2025 because where I get to feel the 2025 because this
+used to be like a staple of this used to be like a staple of this used
+to be like a staple of computer science curriculum, but it's computer
+science curriculum, but it's computer science curriculum, but it's not
+anymore. So, um Okay, cool. So um not anymore. So, um Okay, cool. So um
+not anymore. So, um Okay, cool. So um basically s is a finite set of
+states basically s is a finite set of states basically s is a finite set
+of states and um so the these are all the states and um so the these are
+all the states and um so the these are all the states that we have in
+our graph. Um sigma is a that we have in our graph. Um sigma is a that
+we have in our graph. Um sigma is a finite alphabet. So alphabet is
+another finite alphabet. So alphabet is another finite alphabet. So
+alphabet is another term for vocabulary. So we could also term for
+vocabulary. So we could also term for vocabulary. So we could also say
+it's the vocabulary of our language say it's the vocabulary of our
+language say it's the vocabulary of our language model. Um we have
+transitions uh where model. Um we have transitions uh where model. Um we
+have transitions uh where basically you take a take in a state um
+basically you take a take in a state um basically you take a take in a
+state um you take a element from the vocabulary you take a element from
+the vocabulary you take a element from the vocabulary and transition to
+a next state. Uh s0 is and transition to a next state. Uh s0 is and
+transition to a next state. Uh s0 is the initial state. Um we also have
+a the initial state. Um we also have a the initial state. Um we also
+have a sync state where things uh things end or sync state where things
+uh things end or sync state where things uh things end or a set of sync
+states. um yeah a set of a set of sync states. um yeah a set of a set of
+sync states. um yeah a set of final states and we call that f and w is
+final states and we call that f and w is final states and we call that f
+and w is uh a weight where we assign real weights uh a weight where we
+assign real weights uh a weight where we assign real weights to
+transitions and in particular uh to transitions and in particular uh to
+transitions and in particular uh things are a lot easier if you limit
+things are a lot easier if you limit things are a lot easier if you
+limit yourselves to purely positive or purely yourselves to purely
+positive or purely yourselves to purely positive or purely negative uh
+outputs here. negative uh outputs here. negative uh outputs here. Um so
+this is an example graph uh maybe Um so this is an example graph uh
+maybe Um so this is an example graph uh maybe a little bit small. Okay,
+there we go. a little bit small. Okay, there we go. a little bit small.
+Okay, there we go. Um and so uh here s0 is the initial Um and so uh here
+s0 is the initial Um and so uh here s0 is the initial state uh and uh or
+I guess you could state uh and uh or I guess you could state uh and uh
+or I guess you could call it S10 is the final state and then call it S10
+is the final state and then call it S10 is the final state and then we
+have um we have um we have um essentially uh elements of the essentially
+uh elements of the essentially uh elements of the vocabulary here. Our
+vocabulary is ABC vocabulary here. Our vocabulary is ABC vocabulary
+here. Our vocabulary is ABC end of sentence and we have uh each one end
+of sentence and we have uh each one end of sentence and we have uh each
+one of them is weighted. So here each one of of them is weighted. So
+here each one of of them is weighted. So here each one of them is
+weighted with a probability. them is weighted with a probability. them
+is weighted with a probability. Um and because this is a probability all
+Um and because this is a probability all Um and because this is a
+probability all of these need to add to one uh coming of these need to
+add to one uh coming of these need to add to one uh coming out of the
+out of the like node here. out of the out of the like node here. out of
+the out of the like node here. All good. Okay. Cool. Okay. Cool. Okay.
+Cool. So there's a number of different ways to So there's a number of
+different ways to So there's a number of different ways to express edge
+weights. Um, express edge weights. Um, express edge weights. Um, and
+I'll I'll just talk about these kind and I'll I'll just talk about these
+kind and I'll I'll just talk about these kind of in the abstract, but
+like if you're of in the abstract, but like if you're of in the
+abstract, but like if you're interested in math, there's actually a
+interested in math, there's actually a interested in math, there's
+actually a concept called a semi- ring uh that concept called a semi-
+ring uh that concept called a semi- ring uh that allows you to do all
+kinds of crazy allows you to do all kinds of crazy allows you to do all
+kinds of crazy things uh to express uh edge weights. things uh to
+express uh edge weights. things uh to express uh edge weights. So, um if
+you're bored of hearing me So, um if you're bored of hearing me So, um
+if you're bored of hearing me talk, you can look up what a semi- ring
+talk, you can look up what a semi- ring talk, you can look up what a
+semi- ring is and and try to figure out uh what's is and and try to
+figure out uh what's is and and try to figure out uh what's going on
+here. But basically um some of going on here. But basically um some of
+going on here. But basically um some of the things you define when you
+want to the things you define when you want to the things you define
+when you want to define edge weights are you define the define edge
+weights are you define the define edge weights are you define the range
+in which the edge weight is valid. range in which the edge weight is
+valid. range in which the edge weight is valid. So this uh for a
+probability this would So this uh for a probability this would So this
+uh for a probability this would be between zero and one. Um then you be
+between zero and one. Um then you be between zero and one. Um then you
+define a addition function. What was that? What was that? What was that?
+Um you define an addition function and Um you define an addition
+function and Um you define an addition function and actually when you
+define a semi- ring actually when you define a semi- ring actually when
+you define a semi- ring the addition function is uh written like the
+addition function is uh written like the addition function is uh written
+like this. Um and what that means is it's this. Um and what that means
+is it's this. Um and what that means is it's abstracted away addition.
+uh and it's abstracted away addition. uh and it's abstracted away
+addition. uh and it's what happens when you combine together what
+happens when you combine together what happens when you combine together
+two uh edges. So um in the case of a two uh edges. So um in the case of
+a two uh edges. So um in the case of a probability this function is uh
+is a probability this function is uh is a probability this function is
+uh is a multiplication function or no actually multiplication function
+or no actually multiplication function or no actually sorry this is like
+abstracted away sorry this is like abstracted away sorry this is like
+abstracted away multip so this is a multiplication um a multip so this
+is a multiplication um a multip so this is a multiplication um a
+multiplication function and so here um multiplication function and so
+here um multiplication function and so here um you multiply weights
+together um the way you multiply weights together um the way you
+multiply weights together um the way you you do the best path is you
+take the you you do the best path is you take the you you do the best
+path is you take the argamax argamax argamax um and uh The example of uh
+an example um and uh The example of uh an example um and uh The example
+of uh an example path would be like 0.5 time 0.3 time path would be like
+0.5 time 0.3 time path would be like 0.5 time 0.3 time 0.2. 0.2. 0.2. Um
+another thing we can express is log Um another thing we can express is
+log Um another thing we can express is log probabilities. And so um the
+range for probabilities. And so um the range for probabilities. And so
+um the range for log probabilities is obviously minus log probabilities
+is obviously minus log probabilities is obviously minus infinity to
+zero. Um we add the weights infinity to zero. Um we add the weights
+infinity to zero. Um we add the weights together. uh when we're doing
+path together. uh when we're doing path together. uh when we're doing
+path scoring um the best path would be the scoring um the best path
+would be the scoring um the best path would be the arg max which is the
+highest sum and arg max which is the highest sum and arg max which is
+the highest sum and then we can take uh log p uh log path then we can
+take uh log p uh log path then we can take uh log p uh log path like
+that and then negative log like that and then negative log like that and
+then negative log probabilities of course we do this. So probabilities
+of course we do this. So probabilities of course we do this. So
+typically when we're doing um uh search typically when we're doing um uh
+search typically when we're doing um uh search we usually do uh shortest
+uh path we usually do uh shortest uh path we usually do uh shortest uh
+path searches and so because uh we we searches and so because uh we we
+searches and so because uh we we typically do shortest paths where we
+typically do shortest paths where we typically do shortest paths where
+we start with zero um then uh it's typical start with zero um then uh
+it's typical start with zero um then uh it's typical to use like
+negative log probabilities to use like negative log probabilities to use
+like negative log probabilities to express paths. So I'll be doing that
+to express paths. So I'll be doing that to express paths. So I'll be
+doing that for the rest of the time. for the rest of the time. for the
+rest of the time. There's also um if if you go all the way There's also
+um if if you go all the way There's also um if if you go all the way to
+the semi- ring form uh formulation to the semi- ring form uh formulation
+to the semi- ring form uh formulation you can have like also um instead
+of you can have like also um instead of you can have like also um
+instead of doing this like best path uh you you do doing this like best
+path uh you you do doing this like best path uh you you do like you
+replace the um so when you're you replace the um so when you're you
+replace the um so when you're searching for a best path you you do
+searching for a best path you you do searching for a best path you you
+do this as the argmax and when you're this as the argmax and when you're
+this as the argmax and when you're searching for the sum of the
+searching for the sum of the searching for the sum of the probabilities
+over all the paths you probabilities over all the paths you
+probabilities over all the paths you like add the probabilities together
+and like add the probabilities together and like add the probabilities
+together and other stuff like that. There's lots of other stuff like
+that. There's lots of other stuff like that. There's lots of uh lots of
+fancy stuff you can do there, uh lots of fancy stuff you can do there,
+uh lots of fancy stuff you can do there, but I'll I'll skip over that
+because we but I'll I'll skip over that because we but I'll I'll skip
+over that because we don't use it very much for uh for don't use it very
+much for uh for don't use it very much for uh for language models. Cool.
+Um so this is our language models. Cool. Um so this is our language
+models. Cool. Um so this is our graph with negative log probabilities in
+graph with negative log probabilities in graph with negative log
+probabilities in it. it. it. So greedy search um I I think everybody So
+greedy search um I I think everybody So greedy search um I I think
+everybody knows what greedy search looks like knows what greedy search
+looks like knows what greedy search looks like already, but I want to
+give the example already, but I want to give the example already, but I
+want to give the example of greedy search here so I can contrast of
+greedy search here so I can contrast of greedy search here so I can
+contrast it with um like uh you know the other it with um like uh you
+know the other it with um like uh you know the other varieties of search
+that we're going to varieties of search that we're going to varieties of
+search that we're going to use. But use. But use. But what uh every time
+what we do is we what uh every time what we do is we what uh every time
+what we do is we essentially find the uh you know best essentially find
+the uh you know best essentially find the uh you know best edge. So in
+this case that would be the edge. So in this case that would be the
+edge. So in this case that would be the lowest scoring edge and we uh we
+follow lowest scoring edge and we uh we follow lowest scoring edge and
+we uh we follow it and so over here we have a priority Q it and so over
+here we have a priority Q it and so over here we have a priority Q and
+this is like the next hypothesis and this is like the next hypothesis
+and this is like the next hypothesis that we want to expand. that we
+want to expand. that we want to expand. So um previously our priority Q
+was S0. So um previously our priority Q was S0. So um previously our
+priority Q was S0. It had a score of zero. Um, it had a It had a score
+of zero. Um, it had a It had a score of zero. Um, it had a score of
+zero, an overall score of zero. score of zero, an overall score of zero.
+score of zero, an overall score of zero. And this h is going to be uh a
+huristic And this h is going to be uh a huristic And this h is going to
+be uh a huristic function that I'll talk about uh a function that I'll
+talk about uh a function that I'll talk about uh a little bit later.
+little bit later. little bit later. So then we uh add the edge weight
+which So then we uh add the edge weight which So then we uh add the edge
+weight which was 0.69 and then we get the score of was 0.69 and then we
+get the score of was 0.69 and then we get the score of 0.69 total score
+of 0.69 and we have a 0.69 total score of 0.69 and we have a 0.69 total
+score of 0.69 and we have a priority Q of size one. And the reason
+priority Q of size one. And the reason priority Q of size one. And the
+reason why the priority Q is of size one is why the priority Q is of
+size one is why the priority Q is of size one is because we're doing
+greedy search. So because we're doing greedy search. So because we're
+doing greedy search. So our Q size is limited to one. So it will our Q
+size is limited to one. So it will our Q size is limited to one. So it
+will never be uh never be larger than this. never be uh never be larger
+than this. never be uh never be larger than this. And so then we just
+expand the next one And so then we just expand the next one And so then
+we just expand the next one on the que. Um and so that happens to be on
+the que. Um and so that happens to be on the que. Um and so that happens
+to be this one. Add the scores together. this one. Add the scores
+together. this one. Add the scores together. Expand the next one on the
+queue and Expand the next one on the queue and Expand the next one on
+the queue and then uh finally get to our end state and then uh finally
+get to our end state and then uh finally get to our end state and
+terminate. terminate. terminate. So pretty okay or so um f is equal to g
+plus h. And right so um f is equal to g plus h. And right so um f is
+equal to g plus h. And right now we're defining h to always be zero. now
+we're defining h to always be zero. now we're defining h to always be
+zero. So we'll we'll uh change that in a So we'll we'll uh change that
+in a So we'll we'll uh change that in a second. second. second. Okay,
+Okay, Okay, cool. cool. cool. So So So next I'd like to go to beam
+search. And next I'd like to go to beam search. And next I'd like to go
+to beam search. And uh beam search looks very similar. The uh beam
+search looks very similar. The uh beam search looks very similar. The
+only difference is that um after we only difference is that um after we
+only difference is that um after we expand now our priority Q size is
+not expand now our priority Q size is not expand now our priority Q size
+is not one but it's two. one but it's two. one but it's two. Um and so
+we now have two things on the Um and so we now have two things on the Um
+and so we now have two things on the priority queue. Um these are
+ordered in priority queue. Um these are ordered in priority queue. Um
+these are ordered in a particular order. Uh so for beam a particular
+order. Uh so for beam a particular order. Uh so for beam search the
+search the search the there's two conditions about which there's two
+conditions about which there's two conditions about which hypothesis we
+expand next. Does anybody hypothesis we expand next. Does anybody
+hypothesis we expand next. Does anybody have an idea what those two
+conditions have an idea what those two conditions have an idea what
+those two conditions might be? Which ones uh which ones do we expand
+Which ones uh which ones do we expand Which ones uh which ones do we
+expand first and which ones or so actually let first and which ones or
+so actually let first and which ones or so actually let me put it this
+way. Why why is S1 not uh me put it this way. Why why is S1 not uh me
+put it this way. Why why is S1 not uh S0 to S1 not on here? &gt;&gt;
+Yeah, &gt;&gt; Yeah, &gt;&gt; Yeah, &gt;&gt; we want it to have the
+lowest. &gt;&gt; we want it to have the lowest. &gt;&gt; we want it to
+have the lowest. &gt;&gt; Yeah, it's the one that has the lowest
+&gt;&gt; Yeah, it's the one that has the lowest &gt;&gt; Yeah, it's the
+one that has the lowest score. So we pruned it off. So when we score. So
+we pruned it off. So when we score. So we pruned it off. So when we
+choose the priority, we consider the choose the priority, we consider
+the choose the priority, we consider the score, right? and we consider
+better score, right? and we consider better score, right? and we
+consider better scoring ones more than the other ones. scoring ones more
+than the other ones. scoring ones more than the other ones. Um maybe
+I'll expand the next one. So um Um maybe I'll expand the next one. So um
+Um maybe I'll expand the next one. So um we had S0 to S2 and we expanded
+some we had S0 to S2 and we expanded some we had S0 to S2 and we
+expanded some hypotheses here. Um so there's one other hypotheses here.
+Um so there's one other hypotheses here. Um so there's one other thing
+we consider when deciding which thing we consider when deciding which
+thing we consider when deciding which one to expand next. Um what's the
+other one to expand next. Um what's the other one to expand next. Um
+what's the other thing we consider when deciding which thing we consider
+when deciding which thing we consider when deciding which one to expand
+next? one to expand next? one to expand next? &gt;&gt; Yeah, the length.
+Yeah, exactly. So &gt;&gt; Yeah, the length. Yeah, exactly. So &gt;&gt;
+Yeah, the length. Yeah, exactly. So basically what we do for beam surge
+is basically what we do for beam surge is basically what we do for beam
+surge is we expand the shorter ones first and we expand the shorter ones
+first and we expand the shorter ones first and then um we make sure that
+the size of then um we make sure that the size of then um we make sure
+that the size of the elements on the queue is always uh the elements on
+the queue is always uh the elements on the queue is always uh no larger
+than the beam size for each no larger than the beam size for each no
+larger than the beam size for each length. So right now we have one of
+length. So right now we have one of length. So right now we have one of
+length uh one of length two and two of length uh one of length two and
+two of length uh one of length two and two of length three. And then
+when we expand length three. And then when we expand length three. And
+then when we expand this one, now we only have uh two of this one, now
+we only have uh two of this one, now we only have uh two of length three
+here. Um because our beam length three here. Um because our beam length
+three here. Um because our beam uh sorry, our beam size is two in this
+uh sorry, our beam size is two in this uh sorry, our beam size is two in
+this example. example. example. Say that uh that clear. Say that uh that
+clear. Say that uh that clear. Cool. Cool. Cool. Okay. So um then we
+keep on expanding. Okay. So um then we keep on expanding. Okay. So um
+then we keep on expanding. We expand S0, S2, S4. Um and we uh so We
+expand S0, S2, S4. Um and we uh so We expand S0, S2, S4. Um and we uh so
+then we expand s3 s5 because that's a then we expand s3 s5 because
+that's a then we expand s3 s5 because that's a shorter one. And now we
+have uh our best shorter one. And now we have uh our best shorter one.
+And now we have uh our best uh output which is uh negative log uh output
+which is uh negative log uh output which is uh negative log probability
+of 2.43. probability of 2.43. probability of 2.43. And notably this is
+different than the And notably this is different than the And notably
+this is different than the one we found using greedy search. The one we
+found using greedy search. The one we found using greedy search. The one
+we found using greedy search was s0 one we found using greedy search was
+s0 one we found using greedy search was s0 s2 s4 s8. Um, one other thing
+I'd like s2 s4 s8. Um, one other thing I'd like s2 s4 s8. Um, one other
+thing I'd like everybody to pay attention to is how everybody to pay
+attention to is how everybody to pay attention to is how many steps it
+took me to uh finish the many steps it took me to uh finish the many
+steps it took me to uh finish the search. So here we finished the search
+search. So here we finished the search search. So here we finished the
+search with uh six steps. with uh six steps. with uh six steps. In the
+previous one we finished it with In the previous one we finished it with
+In the previous one we finished it with four steps. So like greedy
+search is four steps. So like greedy search is four steps. So like
+greedy search is more efficient, right? Um we we were more efficient,
+right? Um we we were more efficient, right? Um we we were able to see
+this. Um, able to see this. Um, able to see this. Um, so for beam
+search, uh, is beam search so for beam search, uh, is beam search so for
+beam search, uh, is beam search guaranteed to get the correct answer?
+guaranteed to get the correct answer? guaranteed to get the correct
+answer? Uh, will it get the shortest path Uh, will it get the shortest
+path Uh, will it get the shortest path through this graph? No. I see
+people saying no. Um, yeah, No. I see people saying no. Um, yeah, No. I
+see people saying no. Um, yeah, that's correct. It's an approximate
+that's correct. It's an approximate that's correct. It's an approximate
+search algorithm. And uh, it can be a search algorithm. And uh, it can
+be a search algorithm. And uh, it can be a very efficient approximate
+search very efficient approximate search very efficient approximate
+search algorithm. It can be better than greedy algorithm. It can be
+better than greedy algorithm. It can be better than greedy search, but
+it it will not be guaranteed search, but it it will not be guaranteed
+search, but it it will not be guaranteed to get the best answer. Cool.
+So now I'd like to talk about um Cool. So now I'd like to talk about um
+Cool. So now I'd like to talk about um optimal search algorithms. Um and
+optimal search algorithms. Um and optimal search algorithms. Um and
+optimal search algorithms are uh optimal search algorithms are uh
+optimal search algorithms are uh algorithms that can search through a
+algorithms that can search through a algorithms that can search through
+a graph and uh and find the best output. graph and uh and find the best
+output. graph and uh and find the best output. So I'm going to call this
+depth first So I'm going to call this depth first So I'm going to call
+this depth first search. It's very similar to Dixra's search. It's very
+similar to Dixra's search. It's very similar to Dixra's algorithm. uh if
+anybody has uh used algorithm. uh if anybody has uh used algorithm. uh
+if anybody has uh used Dextra's algorithm before um but I I'm Dextra's
+algorithm before um but I I'm Dextra's algorithm before um but I I'm not
+going to talk about Dextra's not going to talk about Dextra's not going
+to talk about Dextra's algorithm because it requires an algorithm
+because it requires an algorithm because it requires an additional step
+of backtracking which additional step of backtracking which additional
+step of backtracking which I'm not going to uh not going to be I'm not
+going to uh not going to be I'm not going to uh not going to be doing
+here but basically what it does is doing here but basically what it does
+is doing here but basically what it does is it systematically explores
+all paths um it systematically explores all paths um it systematically
+explores all paths um it's guaranteed to find the optimal it's
+guaranteed to find the optimal it's guaranteed to find the optimal
+solution um and sorry Dickstra is uh solution um and sorry Dickstra is
+uh solution um and sorry Dickstra is uh does backtracking does
+backtracking does backtracking um it will eventually find the path with
+um it will eventually find the path with um it will eventually find the
+path with minimum cost and the The reason why it's minimum cost and the
+The reason why it's minimum cost and the The reason why it's optimal is
+because it does an exhaustive optimal is because it does an exhaustive
+optimal is because it does an exhaustive search of the entire space and
+there's search of the entire space and there's search of the entire
+space and there's no pruning of potentially optimal paths. no pruning of
+potentially optimal paths. no pruning of potentially optimal paths. So
+you're always expanding the path that So you're always expanding the
+path that So you're always expanding the path that has the best score.
+And because of that has the best score. And because of that has the best
+score. And because of that um you will always find the path with um you
+will always find the path with um you will always find the path with the
+best score that ends up in the the best score that ends up in the the
+best score that ends up in the terminal uh node uh before any other one
+terminal uh node uh before any other one terminal uh node uh before any
+other one because you're kind of by definition because you're kind of by
+definition because you're kind of by definition you're searching them in
+the best uh in you're searching them in the best uh in you're searching
+them in the best uh in the order of the best score. the order of the
+best score. the order of the best score. So let's take a look at what
+that looks So let's take a look at what that looks So let's take a look
+at what that looks like in our our previous example. So the like in our
+our previous example. So the like in our our previous example. So the
+first thing we do is we expand all of first thing we do is we expand all
+of first thing we do is we expand all of them. Like notably we're not
+pruning any them. Like notably we're not pruning any them. Like notably
+we're not pruning any of out of our priority queue. Um so we of out of
+our priority queue. Um so we of out of our priority queue. Um so we are
+additionally expanding S1 which we are additionally expanding S1 which
+we are additionally expanding S1 which we didn't do when we were doing
+beam didn't do when we were doing beam didn't do when we were doing beam
+search. So um we have this uh here. Uh search. So um we have this uh
+here. Uh search. So um we have this uh here. Uh so we expand uh the best
+oops we expand so we expand uh the best oops we expand so we expand uh
+the best oops we expand the best one first. So that's test two. the best
+one first. So that's test two. the best one first. So that's test two.
+Uh then we do S0 to S3. Then we do S0 to Uh then we do S0 to S3. Then we
+do S0 to Uh then we do S0 to S3. Then we do S0 to S1. S1. S1. Uh S0 S2
+S4 S0 S3 S5. Uh S0 S2 S5 S0 S2 Uh S0 S2 S4 S0 S3 S5. Uh S0 S2 S5 S0 S2
+Uh S0 S2 S4 S0 S3 S5. Uh S0 S2 S5 S0 S2 S6 S0 S3 S5 S7. And then we uh
+we S6 S0 S3 S5 S7. And then we uh we S6 S0 S3 S5 S7. And then we uh we
+finally hit the end uh after nine steps. finally hit the end uh after
+nine steps. finally hit the end uh after nine steps. And so this is
+still manageable because And so this is still manageable because And so
+this is still manageable because we have a vocabulary size of three and
+we have a vocabulary size of three and we have a vocabulary size of
+three and uh we have uh because we have a uh we have uh because we have
+a uh we have uh because we have a vocabulary size of three. But imagine
+uh vocabulary size of three. But imagine uh vocabulary size of three.
+But imagine uh what would happen if we had a larger what would happen if
+we had a larger what would happen if we had a larger vocabulary size or
+a longer graph or vocabulary size or a longer graph or vocabulary size
+or a longer graph or something like that. Basically we would something
+like that. Basically we would something like that. Basically we would
+spend our entire time sitting right at spend our entire time sitting
+right at spend our entire time sitting right at the very beginning and
+searching around the very beginning and searching around the very
+beginning and searching around the various things at the very beginning
+the various things at the very beginning the various things at the very
+beginning unless we had a very very peaky unless we had a very very
+peaky unless we had a very very peaky probability distribution over the
+probability distribution over the probability distribution over the
+outputs. outputs. outputs. Cool. Um Cool. Um Cool. Um any uh any uh any
+uh any questions? Yeah. &gt;&gt; Yeah. So um G uh F equals G plus H
+which &gt;&gt; Yeah. So um G uh F equals G plus H which &gt;&gt; Yeah.
+So um G uh F equals G plus H which is not very helpful for you because
+you is not very helpful for you because you is not very helpful for you
+because you don't know what H is yet. But um G is don't know what H is
+yet. But um G is don't know what H is yet. But um G is the the actual
+score and H is a heristic the the actual score and H is a heristic the
+the actual score and H is a heristic function which I'm about to
+introduce I function which I'm about to introduce I function which I'm
+about to introduce I think in the next slide. So I'll I'll think in the
+next slide. So I'll I'll think in the next slide. So I'll I'll talk
+about that. And uh F is the the thing you actually And uh F is the the
+thing you actually And uh F is the the thing you actually use to
+prioritize search. use to prioritize search. use to prioritize search.
+Um so the next thing I'd like to talk Um so the next thing I'd like to
+talk Um so the next thing I'd like to talk about is AAR search. And AAR
+search is about is AAR search. And AAR search is about is AAR search.
+And AAR search is basically um a search method that is basically um a
+search method that is basically um a search method that is more
+efficient than a regular depth for more efficient than a regular depth
+for more efficient than a regular depth for search but still optimal. Um
+and so it search but still optimal. Um and so it search but still
+optimal. Um and so it doesn't have any of the optimality uh doesn't have
+any of the optimality uh doesn't have any of the optimality uh like
+issues or it it's guaranteed to like issues or it it's guaranteed to
+like issues or it it's guaranteed to find the best output. Um but it is
+not find the best output. Um but it is not find the best output. Um but
+it is not uh not quite as bad as a uh as um depth uh not quite as bad as
+a uh as um depth uh not quite as bad as a uh as um depth for search. And
+so basically we define for search. And so basically we define for
+search. And so basically we define the function that we use for scoring
+the function that we use for scoring the function that we use for
+scoring hypothesis as fals plus h hypothesis as fals plus h hypothesis
+as fals plus h um where uh g is the actual cost h is a um where uh g is
+the actual cost h is a um where uh g is the actual cost h is a heristic
+cost from n to the goal heristic cost from n to the goal heristic cost
+from n to the goal um and h is a heristic cost from n to um and h is a
+heristic cost from n to um and h is a heristic cost from n to the goal.
+So I don't know if I actually the goal. So I don't know if I actually
+the goal. So I don't know if I actually have a good example of this on
+the have a good example of this on the have a good example of this on
+the slide. So, um, let me see if I can write it here. So if I gave you
+this prefix, So if I gave you this prefix, So if I gave you this prefix,
+um, um, um, how much more uncertainty do you think how much more
+uncertainty do you think how much more uncertainty do you think there is
+in this sentence? there is in this sentence? there is in this sentence?
+Like how much more probability do you Like how much more probability do
+you Like how much more probability do you think it needs to spend to get
+to the think it needs to spend to get to the think it needs to spend to
+get to the end of the sentence? end of the sentence? end of the
+sentence? Any ideas? basically Any ideas? basically Any ideas? basically
+&gt;&gt; basically none. Right? So &gt;&gt; basically none. Right? So
+&gt;&gt; basically none. Right? So &gt;&gt; I I would say the log
+&gt;&gt; I I would say the log &gt;&gt; I I would say the log um the log
+probability of um the log probability of um the log probability of the
+rest of y the rest of y the rest of y um greater than uh where we are
+right um greater than uh where we are right um greater than uh where we
+are right now is is basically zero right or the we're is is basically
+zero right or the we're is is basically zero right or the we're using
+negative log probability so this using negative log probability so this
+using negative log probability so this is basically zero but if I said
+um like is basically zero but if I said um like is basically zero but if
+I said um like the the the um solution um solution um solution [Music]
+to to to the the the first 11 664 11 664 11 664 763 homework for for for
+kids. kids. kids. I would hope that a language model would I would hope
+that a language model would I would hope that a language model would
+spend a lot more probability thinking spend a lot more probability
+thinking spend a lot more probability thinking about the correct answer
+here. um uh if about the correct answer here. um uh if about the correct
+answer here. um uh if not we did a a bad job of uh writing the not we
+did a a bad job of uh writing the not we did a a bad job of uh writing
+the homework. So um so there you would homework. So um so there you
+would homework. So um so there you would expect that you need to spend a
+lot more expect that you need to spend a lot more expect that you need
+to spend a lot more probability to finish this completion probability to
+finish this completion probability to finish this completion and so
+basically and so basically and so basically um hn is attemp attempts to
+be a um hn is attemp attempts to be a um hn is attemp attempts to be a
+prediction of how much more probability prediction of how much more
+probability prediction of how much more probability you're going to need
+to spend to uh to you're going to need to spend to uh to you're going to
+need to spend to uh to get to the end in the optimal path. Um get to the
+end in the optimal path. Um get to the end in the optimal path. Um so
+AAR search is optimal when a heristic so AAR search is optimal when a
+heristic so AAR search is optimal when a heristic is admissible and an
+admissible heristic is admissible and an admissible heristic is
+admissible and an admissible heristic is basically it never
+overestimates the is basically it never overestimates the is basically
+it never overestimates the true cost of the goal. It can true cost of
+the goal. It can true cost of the goal. It can underestimate the true
+cost of the goal underestimate the true cost of the goal underestimate
+the true cost of the goal but it can't overestimate the true cost but it
+can't overestimate the true cost but it can't overestimate the true cost
+of the goal. And so this provides a lower bound on And so this provides
+a lower bound on And so this provides a lower bound on the remaining
+cost. the remaining cost. the remaining cost. So let me give an example
+of this. So So let me give an example of this. So So let me give an
+example of this. So here a um a heristic function is typically a um a
+heristic function is typically a um a heristic function is typically
+designed to be something that you can um designed to be something that
+you can um designed to be something that you can um very quickly
+calculate but um never very quickly calculate but um never very quickly
+calculate but um never overestimates. So I can look at all of
+overestimates. So I can look at all of overestimates. So I can look at
+all of these these these um I can look at all of these uh inputs um I
+can look at all of these uh inputs um I can look at all of these uh
+inputs here and say okay well 0.693 693 is the here and say okay well
+0.693 693 is the here and say okay well 0.693 693 is the like lowest
+number in this row. So like like lowest number in this row. So like like
+lowest number in this row. So like maybe everything in this row should
+be maybe everything in this row should be maybe everything in this row
+should be like 0 uh like the heristic would be like 0 uh like the
+heristic would be like 0 uh like the heristic would be 0.5. So it's
+never going to be it's 0.5. So it's never going to be it's 0.5. So it's
+never going to be it's never going to cost less than 0.5 to go never
+going to cost less than 0.5 to go never going to cost less than 0.5 to
+go from this row to the end state. Um here from this row to the end
+state. Um here from this row to the end state. Um here again 0.5 is the
+lowest one in this row again 0.5 is the lowest one in this row again 0.5
+is the lowest one in this row and I know that 0.5 is the heristic and I
+know that 0.5 is the heristic and I know that 0.5 is the heristic
+function for this row. So maybe 0 uh or function for this row. So maybe
+0 uh or function for this row. So maybe 0 uh or maybe 1.0 maybe 1.0
+maybe 1.0 is a good heristic function for this is a good heristic
+function for this is a good heristic function for this row. So, I'm just
+going to assign h um row. So, I'm just going to assign h um row. So, I'm
+just going to assign h um h h h equals 0.5 for everything that ends in
+equals 0.5 for everything that ends in equals 0.5 for everything that
+ends in s4 to s6 and h equals 1.0 for everything s4 to s6 and h equals
+1.0 for everything s4 to s6 and h equals 1.0 for everything that ends in
+s1 to s3. that ends in s1 to s3. that ends in s1 to s3. Um and there are
+you can be creative Um and there are you can be creative Um and there
+are you can be creative with a heristic function and come up with a
+heristic function and come up with a heristic function and come up with
+something that you know is able to with something that you know is able
+to with something that you know is able to search for this efficiently.
+The one search for this efficiently. The one search for this
+efficiently. The one thing you can't have with a heristic thing you
+can't have with a heristic thing you can't have with a heristic function
+is have something that takes function is have something that takes
+function is have something that takes just as much time as the search
+just as much time as the search just as much time as the search
+algorithm itself. So like um you you algorithm itself. So like um you
+you algorithm itself. So like um you you need to come up with something
+that's need to come up with something that's need to come up with
+something that's like an approximation but not uh not like an
+approximation but not uh not like an approximation but not uh not good.
+So let let's try to do a search good. So let let's try to do a search
+good. So let let's try to do a search with this. And basically for s0 um
+uh s0 with this. And basically for s0 um uh s0 with this. And basically
+for s0 um uh s0 to s2 we have a heristic function of to s2 we have a
+heristic function of to s2 we have a heristic function of one. So now we
+have like 0.69 + 1 is one. So now we have like 0.69 + 1 is one. So now
+we have like 0.69 + 1 is equal to 1.69. Um, so all of these we equal to
+1.69. Um, so all of these we equal to 1.69. Um, so all of these we
+basically boosted their score by one and basically boosted their score
+by one and basically boosted their score by one and remember when I
+boost their score by one remember when I boost their score by one
+remember when I boost their score by one that makes the score worse
+because like that makes the score worse because like that makes the
+score worse because like lower scores are better. lower scores are
+better. lower scores are better. So now I will um So now I will um So
+now I will um expand uh S2. expand uh S2. expand uh S2. And And And
+despite the fact that I expanded S2, I despite the fact that I expanded
+S2, I despite the fact that I expanded S2, I still have a better um I
+still have a still have a better um I still have a still have a better
+um I still have a better score for S0, S2, S4 because better score for
+S0, S2, S4 because better score for S0, S2, S4 because essentially its
+heristic function went essentially its heristic function went
+essentially its heristic function went down. And so now the heristic
+function down. And so now the heristic function down. And so now the
+heristic function is lower because I've made more progress is lower
+because I've made more progress is lower because I've made more progress
+with this uh with this output. And that with this uh with this output.
+And that with this uh with this output. And that um means it's still
+better than s0 s3 um means it's still better than s0 s3 um means it's
+still better than s0 s3 which had made less progress. So we can which
+had made less progress. So we can which had made less progress. So we
+can see it's f is 2.11. So I'm not expanding see it's f is 2.11. So I'm
+not expanding see it's f is 2.11. So I'm not expanding all of the ones
+at the very beginning all of the ones at the very beginning all of the
+ones at the very beginning first. I'm expanding like one that has first.
+I'm expanding like one that has first. I'm expanding like one that has
+made more progress. And so let me made more progress. And so let me made
+more progress. And so let me continue doing that. Um however when I
+continue doing that. Um however when I continue doing that. Um however
+when I expanded this next one now um the actual expanded this next one
+now um the actual expanded this next one now um the actual cost of doing
+doing this took over. And cost of doing doing this took over. And cost
+of doing doing this took over. And so now I started expanding the S0 s3.
+Um so now I started expanding the S0 s3. Um so now I started expanding
+the S0 s3. Um so I will go through I'll continue like so I will go
+through I'll continue like so I will go through I'll continue like
+sorting these by f sorting these by f sorting these by f and uh and
+expanding and uh and expanding and uh and expanding and I finally get to
+this uh this thing and I finally get to this uh this thing and I finally
+get to this uh this thing here and that reaches the end. And so here and
+that reaches the end. And so here and that reaches the end. And so
+you'll notice that I've reached the end you'll notice that I've reached
+the end you'll notice that I've reached the end and found the optimal
+output but I never and found the optimal output but I never and found
+the optimal output but I never expanded the first one. Um, I never
+expanded the first one. Um, I never expanded the first one. Um, I never
+expanded the S0 to S1 thing because the expanded the S0 to S1 thing
+because the expanded the S0 to S1 thing because the heristic function
+plus the actual score heristic function plus the actual score heristic
+function plus the actual score never got like low enough that I would
+never got like low enough that I would never got like low enough that I
+would expand that. Um, and you can also take a expand that. Um, and you
+can also take a expand that. Um, and you can also take a look notice I
+finished on step eight look notice I finished on step eight look notice
+I finished on step eight here. So, um, that is faster than last here.
+So, um, that is faster than last here. So, um, that is faster than last
+time. time. time. That is faster than last time when I That is faster
+than last time when I That is faster than last time when I finished on
+step nine because I didn't finished on step nine because I didn't
+finished on step nine because I didn't have to expand that extra
+hypothesis have to expand that extra hypothesis have to expand that
+extra hypothesis that I expanded maybe a six. Cool. So, um this is the
+basic idea fals Cool. So, um this is the basic idea fals Cool. So, um
+this is the basic idea fals plus hn where hn is some prediction of plus
+hn where hn is some prediction of plus hn where hn is some prediction of
+how much probability you're going to how much probability you're going
+to how much probability you're going to spend going all the way to the
+end. Um spend going all the way to the end. Um spend going all the way
+to the end. Um is this clear? Any questions? Yeah. is this clear? Any
+questions? Yeah. is this clear? Any questions? Yeah. &gt;&gt; Where that
+we never overestimate the &gt;&gt; Where that we never overestimate the
+&gt;&gt; Where that we never overestimate the true cost. true cost. true
+cost. Um, where do you use the fact that you Um, where do you use the
+fact that you Um, where do you use the fact that you never overestimate
+the true cost? So, never overestimate the true cost? So, never
+overestimate the true cost? So, that's a great question. Um, what would
+that's a great question. Um, what would that's a great question. Um,
+what would happen if you had the ability to happen if you had the
+ability to happen if you had the ability to overestimate the true cost?
+Like what overestimate the true cost? Like what overestimate the true
+cost? Like what what if you didn't have an admissible what if you didn't
+have an admissible what if you didn't have an admissible heristic? Yeah,
+heristic? Yeah, heristic? Yeah, &gt;&gt; you might deviate from the
+optimal &gt;&gt; you might deviate from the optimal &gt;&gt; you might
+deviate from the optimal solution. You're not guaranteed to solution.
+You're not guaranteed to solution. You're not guaranteed to deviate from
+the optimal solution, but deviate from the optimal solution, but deviate
+from the optimal solution, but you might. Yeah, you might. Yeah, you
+might. Yeah, &gt;&gt; we have the same question. Then how is &gt;&gt; we
+have the same question. Then how is &gt;&gt; we have the same question.
+Then how is it possible when uh the it possible when uh the it possible
+when uh the hypothetical cost is lower than the true hypothetical cost
+is lower than the true hypothetical cost is lower than the true cost
+then it might select the wrong part cost then it might select the wrong
+part cost then it might select the wrong part from your existing
+problem. &gt;&gt; Uh &gt;&gt; Uh &gt;&gt; Uh sorry could you say that
+again? sorry could you say that again? sorry could you say that again?
+&gt;&gt; So basically it's not possible to &gt;&gt; So basically it's
+not possible to &gt;&gt; So basically it's not possible to overestimate
+that but how is it possible overestimate that but how is it possible
+overestimate that but how is it possible to run this algorithm when we
+can to run this algorithm when we can to run this algorithm when we can
+underestimate the results? How is it underestimate the results? How is
+it underestimate the results? How is it possible to run this algorithm
+when you possible to run this algorithm when you possible to run this
+algorithm when you can underestimate the true cost? Um can underestimate
+the true cost? Um can underestimate the true cost? Um well, if you can
+underestimate the um well, if you can underestimate the um well, if you
+can underestimate the um wait so it should never overestimate the wait
+so it should never overestimate the wait so it should never overestimate
+the true cost. It can underestimate the true true cost. It can
+underestimate the true true cost. It can underestimate the true cost. In
+fact, depth for a search is cost. In fact, depth for a search is cost.
+In fact, depth for a search is when you always when the heristic when
+you always when the heristic when you always when the heristic function
+is zero and will always be less function is zero and will always be less
+function is zero and will always be less than or equal to the true cost,
+right? than or equal to the true cost, right? than or equal to the true
+cost, right? So like it's okay to underestimate. It's So like it's okay
+to underestimate. It's So like it's okay to underestimate. It's just not
+okay to overestimate. Yeah. just not okay to overestimate. Yeah. just
+not okay to overestimate. Yeah. &gt;&gt; I see how like a more perhaps
+extreme scenario a more perhaps extreme scenario a more perhaps extreme
+scenario everything was overestimated everything was overestimated
+everything was overestimated consistently by the same amount.
+consistently by the same amount. consistently by the same amount.
+&gt;&gt; That's I mean that's that's that's &gt;&gt; That's I mean
+that's that's that's &gt;&gt; That's I mean that's that's that's
+equivalent underestimating by equivalent underestimating by equivalent
+underestimating by corresponding amount. So these two corresponding
+amount. So these two corresponding amount. So these two scenarios become
+functionally the same. scenarios become functionally the same. scenarios
+become functionally the same. &gt;&gt; Yeah. So um great great points.
+um &gt;&gt; Yeah. So um great great points. um &gt;&gt; Yeah. So um
+great great points. um the heristic function here the heristic function
+here the heristic function here underestimates the true cost. So like
+underestimates the true cost. So like underestimates the true cost. So
+like when I used the heristic function going when I used the heristic
+function going when I used the heristic function going from uh s0 to s3
+my heristic function from uh s0 to s3 my heristic function from uh s0 to
+s3 my heristic function was 1.0 and the true cost was 2.43. So I was 1.0
+and the true cost was 2.43. So I was 1.0 and the true cost was 2.43. So
+I I underestimated it. But the the reason I underestimated it. But the
+the reason I underestimated it. But the the reason why that's not a
+problem is because you why that's not a problem is because you why
+that's not a problem is because you always follow the shortest path. And
+so always follow the shortest path. And so always follow the shortest
+path. And so the shortest path will um the shortest path will um the
+shortest path will um you might have to expand more paths. So you might
+have to expand more paths. So you might have to expand more paths. So if
+you have a bad heristic you might if you have a bad heristic you might
+if you have a bad heristic you might have to expand more but it won't
+cause have to expand more but it won't cause have to expand more but it
+won't cause you to fail. you to fail. you to fail. &gt;&gt; What Martin
+found is that like that &gt;&gt; What Martin found is that like that
+&gt;&gt; What Martin found is that like that strong strong strong state
+there that it must never state there that it must never state there that
+it must never overestimate the true cost of because overestimate the
+true cost of because overestimate the true cost of because every example
+which you get if I was to every example which you get if I was to every
+example which you get if I was to take this underestimate heristic and
+add take this underestimate heristic and add take this underestimate
+heristic and add 10 units to whatever predicted for every 10 units to
+whatever predicted for every 10 units to whatever predicted for every
+single node single node single node &gt;&gt; then it is consistently
+overestimated &gt;&gt; then it is consistently overestimated &gt;&gt;
+then it is consistently overestimated but it has the same net impact as
+well but it has the same net impact as well but it has the same net
+impact as well underestimate. underestimate. underestimate. &gt;&gt;
+Okay. So then your um ju just to &gt;&gt; Okay. So then your um ju just
+to &gt;&gt; Okay. So then your um ju just to rephrase in case people
+couldn't hear rephrase in case people couldn't hear rephrase in case
+people couldn't hear like what what if it was a perfect like what what
+if it was a perfect like what what if it was a perfect heristic function
+and it could always um heristic function and it could always um heristic
+function and it could always um you know exactly predict the future you
+know exactly predict the future you know exactly predict the future
+cost. That would be great. You know you cost. That would be great. You
+know you cost. That would be great. You know you would only have to take
+one step through would only have to take one step through would only
+have to take one step through the graph and you would always get it the
+graph and you would always get it the graph and you would always get it
+right every time. Um but you added 10 to right every time. Um but you
+added 10 to right every time. Um but you added 10 to every co uh every
+co uh every co uh you you added 10 to every cost. you you added 10 to
+every cost. you you added 10 to every cost. &gt;&gt; Every cost. Yeah.
+Um so that would be a &gt;&gt; Every cost. Yeah. Um so that would be a
+&gt;&gt; Every cost. Yeah. Um so that would be a good heristic function
+that would help good heristic function that would help good heristic
+function that would help you out. But um the that would help you you
+out. But um the that would help you you out. But um the that would help
+you be successful at searching. But that is be successful at searching.
+But that is be successful at searching. But that is an example where you
+overestimate but an example where you overestimate but an example where
+you overestimate but are successful despite the fact that are successful
+despite the fact that are successful despite the fact that you're
+overestimating. So if you ever if you're overestimating. So if you ever
+if you're overestimating. So if you ever if you overestimate and you
+can't say like you overestimate and you can't say like you overestimate
+and you can't say like oh the relative order is the same then oh the
+relative order is the same then oh the relative order is the same then
+uh like the relative order of the cost uh like the relative order of the
+cost uh like the relative order of the cost is the same then you might
+make is the same then you might make is the same then you might make
+mistakes. mistakes. mistakes. So it um yeah being an admissible So it um
+yeah being an admissible So it um yeah being an admissible heristic is
+not a necessary condition to heristic is not a necessary condition to
+heristic is not a necessary condition to do good search but it is it is
+a do good search but it is it is a do good search but it is it is a
+sufficient condition to do good search. sufficient condition to do good
+search. sufficient condition to do good search. Yeah Yeah Yeah &gt;&gt;
+I'm not convinced about the sufficiency &gt;&gt; I'm not convinced about
+the sufficiency &gt;&gt; I'm not convinced about the sufficiency of it.
+of it. of it. &gt;&gt; You're not convinced about the &gt;&gt; You're
+not convinced about the &gt;&gt; You're not convinced about the
+efficiency efficiency efficiency &gt;&gt; or sufficiency. &gt;&gt; or
+sufficiency. &gt;&gt; or sufficiency. &gt;&gt; Never mind. I think like
+&gt;&gt; yeah I mean it's okay if you have &gt;&gt; yeah I mean it's
+okay if you have &gt;&gt; yeah I mean it's okay if you have questions.
+questions. questions. &gt;&gt; I'm just like not convinced but &gt;&gt;
+I'm just like not convinced but &gt;&gt; I'm just like not convinced but
+&gt;&gt; Okay. &gt;&gt; Okay. &gt;&gt; Okay. never since I don't see
+like how never since I don't see like how never since I don't see like
+how &gt;&gt; from what I understand you want to add &gt;&gt; from what I
+understand you want to add &gt;&gt; from what I understand you want to
+add 10 to every as like that's a very 10 to every as like that's a very
+10 to every as like that's a very pathological example pathological
+example pathological example &gt;&gt; but I'm just not convinced about
+using &gt;&gt; but I'm just not convinced about using &gt;&gt; but I'm
+just not convinced about using the hypothesis the hypothesis the
+hypothesis &gt;&gt; well so the reason so the reason why let &gt;&gt;
+well so the reason so the reason why let &gt;&gt; well so the reason so
+the reason why let me let me put it this way um we're me let me put it
+this way um we're me let me put it this way um we're sorting by f
+sorting by f sorting by f let me go back So we're searching we're
+searching for So we're searching we're searching for So we're searching
+we're searching for arg arg arg min min min uh f uh f uh f of the path
+um what we call path. of the path um what we call path. of the path um
+what we call path. So, we're we're trying to find the thing So, we're
+we're trying to find the thing So, we're we're trying to find the thing
+with the lowest uh the lowest in here. with the lowest uh the lowest in
+here. with the lowest uh the lowest in here. So, the Um so this is the
+definition right um Um so this is the definition right um Um so this is
+the definition right um when you have finished when you have when you
+have finished when you have when you have finished when you have
+terminated search um h uh hy will become terminated search um h uh hy
+will become terminated search um h uh hy will become zero because
+there's no more cost left zero because there's no more cost left zero
+because there's no more cost left and you're done in the fin in your in
+and you're done in the fin in your in and you're done in the fin in your
+in the final set. So um fy the final set. So um fy the final set. So um
+fy equals equals equals um let's say fyt uh which is like when it has
+reached the uh which is like when it has reached the uh which is like
+when it has reached the terminal state is equal to g y terminal state is
+equal to g y terminal state is equal to g y and so any intermediate
+state going to and so any intermediate state going to and so any
+intermediate state going to gy gy gy if hy if hy if hy is um guaranteed
+to be less than h star is um guaranteed to be less than h star is um
+guaranteed to be less than h star YT key. In other words, it doesn't it
+YT key. In other words, it doesn't it YT key. In other words, it doesn't
+it never overestimates cost. Then this is never overestimates cost. Then
+this is never overestimates cost. Then this is guaranteed to be less
+than uh what this guaranteed to be less than uh what this guaranteed to
+be less than uh what this would be in the final state. And so that would
+be in the final state. And so that would be in the final state. And so
+that means you will never rank um you will means you will never rank um
+you will means you will never rank um you will never rank that
+hypothesis never rank that hypothesis never rank that hypothesis better
+than the one uh that you get in better than the one uh that you get in
+better than the one uh that you get in the final state. And so uh that
+that the final state. And so uh that that the final state. And so uh
+that that means that means that means that once you reach a final state,
+you know once you reach a final state, you know once you reach a final
+state, you know that's better than all of the other that's better than
+all of the other that's better than all of the other final states that
+you have for the final states that you have for the final states that
+you have for the partial hypothesis. partial hypothesis. partial
+hypothesis. &gt;&gt; I see. Now there's an implicit &gt;&gt; I see. Now
+there's an implicit &gt;&gt; I see. Now there's an implicit assumption
+that h is like a well behaved assumption that h is like a well behaved
+assumption that h is like a well behaved function because otherwise I
+could just function because otherwise I could just function because
+otherwise I could just make a discrete function. So this is make a
+discrete function. So this is make a discrete function. So this is
+satisfied pointwise but uh I can still satisfied pointwise but uh I can
+still satisfied pointwise but uh I can still construct those
+pathological examples. construct those pathological examples. construct
+those pathological examples. &gt;&gt; Right? So as I said before an
+admissible &gt;&gt; Right? So as I said before an admissible &gt;&gt;
+Right? So as I said before an admissible heristic is a sufficient
+condition but heristic is a sufficient condition but heristic is a
+sufficient condition but it's not a necessary condition. So you it's not
+a necessary condition. So you it's not a necessary condition. So you can
+come up with another function that can come up with another function
+that can come up with another function that still will give you a good
+result but still will give you a good result but still will give you a
+good result but this will like if you satisfy this you this will like if
+you satisfy this you this will like if you satisfy this you will get a
+good result that's will get a good result that's will get a good result
+that's guaranteed. Yeah. guaranteed. Yeah. guaranteed. Yeah. &gt;&gt;
+Okay. Yeah and thank you for the &gt;&gt; Okay. Yeah and thank you for
+the &gt;&gt; Okay. Yeah and thank you for the question that wasn't you
+know super question that wasn't you know super question that wasn't you
+know super clear in my exposition but happy to clear in my exposition
+but happy to clear in my exposition but happy to happy to clarify. Cool.
+Um so happy to clarify. Cool. Um so happy to clarify. Cool. Um so why
+don't we use uh AAR search in uh why don't we use uh AAR search in uh
+why don't we use uh AAR search in uh transformer language models or RNN
+transformer language models or RNN transformer language models or RNN
+language models or basically any strong language models or basically any
+strong language models or basically any strong language model we have
+now um the reason language model we have now um the reason language
+model we have now um the reason is this um this is is this um this is is
+this um this is a uh kind of like what the graph for a a uh kind of like
+what the graph for a a uh kind of like what the graph for a transformer
+language model looks like. transformer language model looks like.
+transformer language model looks like. If you have a vocabulary size of
+ABC, basically every token you generate um basically every token you
+generate um basically every token you generate um you exponentially grow
+your graph and you exponentially grow your graph and you exponentially
+grow your graph and um um um your if your vocabulary is very large, your
+if your vocabulary is very large, your if your vocabulary is very large,
+this graph, you know, very quickly this graph, you know, very quickly
+this graph, you know, very quickly becomes very large and you will be
+stuck becomes very large and you will be stuck becomes very large and
+you will be stuck at the beginning of the graph. And at the beginning of
+the graph. And at the beginning of the graph. And what's even worse is
+uh like this is one what's even worse is uh like this is one what's even
+worse is uh like this is one thing the everex expanding uh search graph
+the everex expanding uh search graph the everex expanding uh search
+graph exponential um exp uh exponential exponential um exp uh
+exponential exponential um exp uh exponential growth. The second thing
+is there's no growth. The second thing is there's no growth. The second
+thing is there's no it it it's very very difficult to come it it it's
+very very difficult to come it it it's very very difficult to come up
+with an admissible heristic. Um and up with an admissible heristic. Um
+and up with an admissible heristic. Um and the reason why is because a
+the reason why is because a the reason why is because a transformer-
+based language model is you transformer-based language model is you
+transformer-based language model is you know huge uh very hard to
+comprehend and know huge uh very hard to comprehend and know huge uh
+very hard to comprehend and it is quite possible that you could it is
+quite possible that you could it is quite possible that you could
+suddenly hit a sweet spot and pay like suddenly hit a sweet spot and pay
+like suddenly hit a sweet spot and pay like zero cost for the rest of
+the time like zero cost for the rest of the time like zero cost for the
+rest of the time like um if I if I told you um please um if I if I told
+you um please um if I if I told you um please uh please say hello and
+then recite the uh please say hello and then recite the uh please say
+hello and then recite the US Constitution US Constitution US
+Constitution um a transformer language model by you um a transformer
+language model by you um a transformer language model by you or please
+give a greeting and then or please give a greeting and then or please
+give a greeting and then recite the the US Constitution might be recite
+the the US Constitution might be recite the the US Constitution might be
+like greetings. It's it's nice to hear like greetings. It's it's nice to
+hear like greetings. It's it's nice to hear that you're interested in
+the that you're interested in the that you're interested in the
+constitution. The uh US constitution is constitution. The uh US
+constitution is constitution. The uh US constitution is and then it
+would generate like and then it would generate like and then it would
+generate like thousands of tokens with like thousands of tokens with
+like thousands of tokens with like probability of one because it's
+exactly probability of one because it's exactly probability of one
+because it's exactly memorized the US constitution, right? So memorized
+the US constitution, right? So memorized the US constitution, right? So
+it's hard to come up with this sort of it's hard to come up with this
+sort of it's hard to come up with this sort of admissible heristic.
+admissible heristic. admissible heristic. Um so what do we do? Um there
+there's Um so what do we do? Um there there's Um so what do we do? Um
+there there's two things that we can do. One thing is two things that we
+can do. One thing is two things that we can do. One thing is maybe
+necessary, maybe not necessary. maybe necessary, maybe not necessary.
+maybe necessary, maybe not necessary. Um, another thing is uh is
+certainly Um, another thing is uh is certainly Um, another thing is uh
+is certainly necessary if you want to use an AAR uh necessary if you
+want to use an AAR uh necessary if you want to use an AAR uh style
+algorithm with this. So the first style algorithm with this. So the
+first style algorithm with this. So the first thing that may or may not
+be necessary thing that may or may not be necessary thing that may or
+may not be necessary is hypothesis recombination. And we kind is
+hypothesis recombination. And we kind is hypothesis recombination. And
+we kind of touched on this a bit in diverse beam of touched on this a
+bit in diverse beam of touched on this a bit in diverse beam search. So
+this may sound a little bit search. So this may sound a little bit
+search. So this may sound a little bit like diverse beam search. Um but
+the like diverse beam search. Um but the like diverse beam search. Um
+but the basic idea is that we want to group uh basic idea is that we
+want to group uh basic idea is that we want to group uh similar states
+together um to reduce the similar states together um to reduce the
+similar states together um to reduce the number of hypotheses that we're
+dealing number of hypotheses that we're dealing number of hypotheses
+that we're dealing with to allow us to more efficiently with to allow us
+to more efficiently with to allow us to more efficiently search um over
+outputs. search um over outputs. search um over outputs. And um the way
+we do this is we can And um the way we do this is we can And um the way
+we do this is we can cluster hypotheses together with similar cluster
+hypotheses together with similar cluster hypotheses together with
+similar um um um representations of some variety and keep
+representations of some variety and keep representations of some variety
+and keep the best of each for each cluster. the best of each for each
+cluster. the best of each for each cluster. And so the benefits of this
+is this And so the benefits of this is this And so the benefits of this
+is this reduces exponential growth while reduces exponential growth
+while reduces exponential growth while maintaining quality um and
+enables maintaining quality um and enables maintaining quality um and
+enables practical uh you know varieties of practical uh you know
+varieties of practical uh you know varieties of algorithms. So if we um
+if we do this algorithms. So if we um if we do this algorithms. So if we
+um if we do this basically we would expand um and then basically we
+would expand um and then basically we would expand um and then combine
+together uh like similar combine together uh like similar combine
+together uh like similar hypotheses hypotheses hypotheses um and uh do
+this over and over again. um and uh do this over and over again. um and
+uh do this over and over again. Here it went from A to A and B to B and
+Here it went from A to A and B to B and Here it went from A to A and B
+to B and B to C. that's like obviously not uh not B to C. that's like
+obviously not uh not B to C. that's like obviously not uh not necessary
+but um you can uh combine necessary but um you can uh combine necessary
+but um you can uh combine things together uh to like reduce the things
+together uh to like reduce the things together uh to like reduce the
+search space search space search space and there's a number of criteria
+that and there's a number of criteria that and there's a number of
+criteria that you can use for doing this. Um the first you can use for
+doing this. Um the first you can use for doing this. Um the first one is
+uh engram based clustering and so one is uh engram based clustering and
+so one is uh engram based clustering and so the basic idea is if you
+look at shared the basic idea is if you look at shared the basic idea is
+if you look at shared recent word contexts um you cluster if recent word
+contexts um you cluster if recent word contexts um you cluster if the
+recent words are the same. the recent words are the same. the recent
+words are the same. Um so this uh you can look at surface Um so this uh
+you can look at surface Um so this uh you can look at surface form
+simplity. It's very easy to form simplity. It's very easy to form
+simplity. It's very easy to implement in cache. Um it can work implement
+in cache. Um it can work implement in cache. Um it can work together
+with beam search together with beam search together with beam search and
+the uh truncation length controls and the uh truncation length controls
+and the uh truncation length controls precision. So if you um precision.
+So if you um precision. So if you um set the length of n to be infinity
+then set the length of n to be infinity then set the length of n to be
+infinity then this is equal to no hypothesis this is equal to no
+hypothesis this is equal to no hypothesis recombination. If you said the
+length of recombination. If you said the length of recombination. If you
+said the length of n to be short like two or three, you n to be short
+like two or three, you n to be short like two or three, you would
+recombine all things where the would recombine all things where the
+would recombine all things where the most recent words were, you know, a
+most recent words were, you know, a most recent words were, you know, a
+particular two or three words. particular two or three words. particular
+two or three words. Um, however, Um, however, Um, however, this might
+not be the best because, you this might not be the best because, you
+this might not be the best because, you know, you could uh get something
+that know, you could uh get something that know, you could uh get
+something that was very different previously but was very different
+previously but was very different previously but similar for the most
+recent uh words. similar for the most recent uh words. similar for the
+most recent uh words. And so another way you can do this is And so
+another way you can do this is And so another way you can do this is
+through um hidden vector distance. And through um hidden vector
+distance. And through um hidden vector distance. And basically if you
+have uh the basically if you have uh the basically if you have uh the
+representations of your current state uh representations of your current
+state uh representations of your current state uh you can cluster things
+together. So you you can cluster things together. So you you can cluster
+things together. So you can use like uklidian similarity cosine can use
+like uklidian similarity cosine can use like uklidian similarity cosine
+similarity um or things like the kale similarity um or things like the
+kale similarity um or things like the kale divergence between the
+distributions um divergence between the distributions um divergence
+between the distributions um uh induced over the next token. Um uh
+induced over the next token. Um uh induced over the next token. Um and
+and and there's um an actually kind of old paper there's um an actually
+kind of old paper there's um an actually kind of old paper that
+discusses all of these and compares that discusses all of these and
+compares that discusses all of these and compares them uh using older
+models. I haven't them uh using older models. I haven't them uh using
+older models. I haven't seen that much uh doing this with newer seen
+that much uh doing this with newer seen that much uh doing this with
+newer models um other than outside of the models um other than outside
+of the models um other than outside of the context of or inside the
+context of context of or inside the context of context of or inside the
+context of diverse beam search. Uh but this is diverse beam search. Uh
+but this is diverse beam search. Uh but this is certainly like if you
+want to move in certainly like if you want to move in certainly like if
+you want to move in the direction of using these kind of the direction
+of using these kind of the direction of using these kind of like more uh
+optimality oriented search like more uh optimality oriented search like
+more uh optimality oriented search algorithms. I think this is certainly
+algorithms. I think this is certainly algorithms. I think this is
+certainly something you could consider because you something you could
+consider because you something you could consider because you don't want
+to sacrifice the diversity uh don't want to sacrifice the diversity uh
+don't want to sacrifice the diversity uh of the uh the space that you're
+of the uh the space that you're of the uh the space that you're
+searching over. So uh this is one uh one searching over. So uh this is
+one uh one searching over. So uh this is one uh one thing any questions
+about this? Yeah. thing any questions about this? Yeah. thing any
+questions about this? Yeah. &gt;&gt; So visualize the how you compute
+the &gt;&gt; So visualize the how you compute the &gt;&gt; So visualize
+the how you compute the dynamic. dynamic. dynamic. &gt;&gt; Yeah.
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; You have multiple different
+&gt;&gt; You have multiple different &gt;&gt; You have multiple
+different threads gen branches these things then threads gen branches
+these things then threads gen branches these things then so what are you
+doing like are you so what are you doing like are you so what are you
+doing like are you taking the entire set of logs and taking the entire
+set of logs and taking the entire set of logs and they're like computing
+K dions and how they're like computing K dions and how they're like
+computing K dions and how we maintain these logs in memory. we maintain
+these logs in memory. we maintain these logs in memory. &gt;&gt; Yeah.
+So basically it would be like next &gt;&gt; Yeah. So basically it would
+be like next &gt;&gt; Yeah. So basically it would be like next So you
+only use this for clustering. So So you only use this for clustering. So
+So you only use this for clustering. So what you would do is you would
+calculate what you would do is you would calculate what you would do is
+you would calculate the probability over the next token for the
+probability over the next token for the probability over the next token
+for each of the um like each of the each of the um like each of the each
+of the um like each of the hidden states that you're searching hidden
+states that you're searching hidden states that you're searching over.
+So like let's say you had you know over. So like let's say you had you
+know over. So like let's say you had you know um um um 16 if you had a
+beam size of 16 or 16 if you had a beam size of 16 or 16 if you had a
+beam size of 16 or something like that. If you calculated something like
+that. If you calculated something like that. If you calculated the
+probability over the next token, the probability over the next token,
+the probability over the next token, which you probably want to do
+anyway if which you probably want to do anyway if which you probably
+want to do anyway if you're doing beam search, then you you're doing
+beam search, then you you're doing beam search, then you calculate the
+kale divergence between calculate the kale divergence between calculate
+the kale divergence between each of those 16. So you'd have like a each
+of those 16. So you'd have like a each of those 16. So you'd have like a
+16x5 matrix of kale divergences or I 16x5 matrix of kale divergences or
+I 16x5 matrix of kale divergences or I guess 16 by 16 if you're doing it
+like guess 16 by 16 if you're doing it like guess 16 by 16 if you're
+doing it like birectionally. And then you would prune birectionally. And
+then you would prune birectionally. And then you would prune out the
+ones where the kale divergence out the ones where the kale divergence
+out the ones where the kale divergence is like relatively low. is like
+relatively low. is like relatively low. So um like let's say You have um
+So you have all of your histories here, So you have all of your
+histories here, So you have all of your histories here, right? And so
+then um for all of them right? And so then um for all of them right? And
+so then um for all of them you calculate you calculate you calculate P Y
+of T given Y of P uh Y of less than P Y of T given Y of P uh Y of less
+than P Y of T given Y of P uh Y of less than T. And so this is the
+probability T. And so this is the probability T. And so this is the
+probability distribution over all the words in the distribution over all
+the words in the distribution over all the words in the vocabulary. And
+so that gives you a vocabulary. And so that gives you a vocabulary. And
+so that gives you a whole bunch of probability vectors. whole bunch of
+probability vectors. whole bunch of probability vectors. you can
+concatenate them into a matrix you can concatenate them into a matrix
+you can concatenate them into a matrix of probabilities and then you can
+of probabilities and then you can of probabilities and then you can
+calculate the um like kale divergence calculate the um like kale
+divergence calculate the um like kale divergence between all of the
+columns in that between all of the columns in that between all of the
+columns in that matrix matrix matrix &gt;&gt; in this case like the
+hidden state &gt;&gt; in this case like the hidden state &gt;&gt; in
+this case like the hidden state you're refering to is just the logic
+you're refering to is just the logic you're refering to is just the
+logic &gt;&gt; the yeah yeah it's essentially the logit &gt;&gt; the
+yeah yeah it's essentially the logit &gt;&gt; the yeah yeah it's
+essentially the logit so um I actually maybe uh similarity in so um I
+actually maybe uh similarity in so um I actually maybe uh similarity in
+neural representations is not the neural representations is not the
+neural representations is not the correct term here so I I should
+actually correct term here so I I should actually correct term here so I
+I should actually probably fix that it this would be more probably fix
+that it this would be more probably fix that it this would be more like
+similarity between the probability like similarity between the
+probability like similarity between the probability distribution.
+distribution. distribution. &gt;&gt; No. &gt;&gt; No. &gt;&gt; No.
+&gt;&gt; Okay. Yeah. Thank you. Yes. &gt;&gt; Together. &gt;&gt; Um,
+&gt;&gt; Um, &gt;&gt; Um, good question. It seems like a good good
+question. It seems like a good good question. It seems like a good
+research uh, you know, a good research research uh, you know, a good
+research research uh, you know, a good research uh, topic. Like I think
+even just like uh, topic. Like I think even just like uh, topic. Like I
+think even just like looking into looking into looking into when things
+temporarily look similar and when things temporarily look similar and
+when things temporarily look similar and then end up looking different
+later. Uh then end up looking different later. Uh then end up looking
+different later. Uh I don't know of any like work that looks I don't
+know of any like work that looks I don't know of any like work that
+looks into that. into that. into that. Cool. Um so the next thing I'd
+like to talk about so the next thing I'd like to talk about so the next
+thing I'd like to talk about is future cost. Um and future cost is an is
+future cost. Um and future cost is an is future cost. Um and future cost
+is an inadmissible but useful heristic. So inadmissible but useful
+heristic. So inadmissible but useful heristic. So this is exactly uh the
+case when we this is exactly uh the case when we this is exactly uh the
+case when we don't have a heristic that satisfies um don't have a
+heristic that satisfies um don't have a heristic that satisfies um uh
+you know admissibility but still uh you know admissibility but still uh
+you know admissibility but still could be useful. Um and this has been
+could be useful. Um and this has been could be useful. Um and this has
+been around for actually a long time. Um but around for actually a long
+time. Um but around for actually a long time. Um but the uh this paper
+modeling future cost the uh this paper modeling future cost the uh this
+paper modeling future cost in neural machine translation talks in neural
+machine translation talks in neural machine translation talks about it
+from a you know kind of neural about it from a you know kind of neural
+about it from a you know kind of neural model perspective and model
+perspective and model perspective and what you do is you learn to
+predict the what you do is you learn to predict the what you do is you
+learn to predict the cost of completing a partial sequence. cost of
+completing a partial sequence. cost of completing a partial sequence. Um
+the future cost uh prediction Um the future cost uh prediction Um the
+future cost uh prediction basically is just um given all of the
+basically is just um given all of the basically is just um given all of
+the information that you have now predict information that you have now
+predict information that you have now predict the cost of the completion
+the cost of the completion the cost of the completion uh according to
+whatever search uh according to whatever search uh according to whatever
+search algorithm you use. And algorithm you use. And algorithm you use.
+And the way you integrate this into search the way you integrate this
+into search the way you integrate this into search is you can have um
+this multiplied by is you can have um this multiplied by is you can have
+um this multiplied by some discount. Uh so you uh use the log some
+discount. Uh so you uh use the log some discount. Uh so you uh use the
+log probability of what you've done up until probability of what you've
+done up until probability of what you've done up until this point and
+then you multiply uh this point and then you multiply uh this point and
+then you multiply uh multiply this in. And so what this is multiply this
+in. And so what this is multiply this in. And so what this is doing is
+this is essentially making this doing is this is essentially making this
+doing is this is essentially making this more admissible, right? It's
+making it more admissible, right? It's making it more admissible, right?
+It's making it closer to admissible. Um because if we closer to
+admissible. Um because if we closer to admissible. Um because if we set
+this to zero, it is admissible, set this to zero, it is admissible, set
+this to zero, it is admissible, right? It's guaranteed to be admissible
+right? It's guaranteed to be admissible right? It's guaranteed to be
+admissible because it's zero and zero is uh never because it's zero and
+zero is uh never because it's zero and zero is uh never going to
+underestimate. going to underestimate. going to underestimate. Um and
+the way we train this is we have Um and the way we train this is we have
+Um and the way we train this is we have a loss to uh essentially try to
+fit this a loss to uh essentially try to fit this a loss to uh
+essentially try to fit this function. function. function. Um there's a
+couple ways we can use the Um there's a couple ways we can use the Um
+there's a couple ways we can use the future cost. Um uh the first way is
+that future cost. Um uh the first way is that future cost. Um uh the
+first way is that we can actually take the model um take we can actually
+take the model um take we can actually take the model um take the model
+that we were trying to train the model that we were trying to train the
+model that we were trying to train and we can try to get it to fit the
+uh and we can try to get it to fit the uh and we can try to get it to
+fit the uh fit the score of not the fit the score of not the fit the
+score of not the current cost but the current cost plus current cost but
+the current cost plus current cost but the current cost plus the cost
+that we're going to pay in the the cost that we're going to pay in the
+the cost that we're going to pay in the future. Um future. Um future. Um
+and the second thing is we can train a and the second thing is we can
+train a and the second thing is we can train a future cost predictor
+after the main future cost predictor after the main future cost
+predictor after the main model and um use completed sequences to model
+and um use completed sequences to model and um use completed sequences
+to learn uh the cost patterns. Um learn uh the cost patterns. Um learn
+uh the cost patterns. Um and so uh both approaches uh try to and so uh
+both approaches uh try to and so uh both approaches uh try to estimate
+uh this heristic function. But estimate uh this heristic function. But
+estimate uh this heristic function. But um the actually maybe I should
+write um the actually maybe I should write um the actually maybe I
+should write here but basically um the auxiliary loss here but basically
+um the auxiliary loss here but basically um the auxiliary loss during
+training is you uh try to p during training is you uh try to p during
+training is you uh try to p predict um you try to train essentially
+predict um you try to train essentially predict um you try to train
+essentially the same model that uh is able to the same model that uh is
+able to the same model that uh is able to predict the auxiliary loss
+while you're predict the auxiliary loss while you're predict the
+auxiliary loss while you're training the um uh while you're training
+training the um uh while you're training training the um uh while you're
+training the uh representations. This is also the uh representations.
+This is also the uh representations. This is also faster because you can
+train them both faster because you can train them both faster because
+you can train them both at the same time. So uh like uh this can at the
+same time. So uh like uh this can at the same time. So uh like uh this
+can be helpful as well. Um be helpful as well. Um be helpful as well. Um
+if you have done reinforcement learning, if you have done reinforcement
+learning, if you have done reinforcement learning, this is very similar
+to like a value this is very similar to like a value this is very
+similar to like a value function you learn in reinforcement function you
+learn in reinforcement function you learn in reinforcement learning. Um
+where the reward for the learning. Um where the reward for the learning.
+Um where the reward for the value function is the overall like log value
+function is the overall like log value function is the overall like log
+probability of the entire sequence. So probability of the entire
+sequence. So probability of the entire sequence. So it's uh it's similar
+in that way as it's uh it's similar in that way as it's uh it's similar
+in that way as well. well. well. Cool. Any questions? Okay. And um now
+now I'm getting into Okay. And um now now I'm getting into Okay. And um
+now now I'm getting into some papers. Um so some papers. Um so some
+papers. Um so here um in this uh in this experiment, here um in this uh
+in this experiment, here um in this uh in this experiment, this is like
+2020, so take it with a this is like 2020, so take it with a this is
+like 2020, so take it with a grain of salt. It's not, you know, the
+grain of salt. It's not, you know, the grain of salt. It's not, you
+know, the same as what we have for LOMs now. Um same as what we have for
+LOMs now. Um same as what we have for LOMs now. Um but they were able to
+demonstrate some but they were able to demonstrate some but they were
+able to demonstrate some pretty uh you know good gains on uh pretty uh
+you know good gains on uh pretty uh you know good gains on uh machine
+translation performance using uh machine translation performance using
+uh machine translation performance using uh pretty strong baselines. So
+this is a a pretty strong baselines. So this is a a pretty strong
+baselines. So this is a a nice uh paper about that. Cool. Um any any
+questions here? This is Cool. Um any any questions here? This is Cool.
+Um any any questions here? This is actually not that hard uh to to
+actually not that hard uh to to actually not that hard uh to to
+implement. So basically you just need to implement. So basically you
+just need to implement. So basically you just need to um have a se
+separate prediction head um have a se separate prediction head um have a
+se separate prediction head that in addition to predict predicting that
+in addition to predict predicting that in addition to predict predicting
+the probability regresses to the full the probability regresses to the
+full the probability regresses to the full sequence probability that you
+calculate sequence probability that you calculate sequence probability
+that you calculate during trading. during trading. during trading.
+&gt;&gt; Yeah. So in fact in a nutshell what's &gt;&gt; Yeah. So in fact
+in a nutshell what's &gt;&gt; Yeah. So in fact in a nutshell what's
+going on is that we modify the training going on is that we modify the
+training going on is that we modify the training loop to uh to sort of
+create that loop to uh to sort of create that loop to uh to sort of
+create that heristic function for us to estimate how heristic function
+for us to estimate how heristic function for us to estimate how much
+further the completions are and much further the completions are and
+much further the completions are and that helps us when we decide if
+that has that helps us when we decide if that has that helps us when we
+decide if that has also been like you know beam also been like you know
+beam also been like you know beam recombination and just a decoding
+part. recombination and just a decoding part. recombination and just a
+decoding part. &gt;&gt; Yeah. So um yeah and it's not it's not a
+&gt;&gt; Yeah. So um yeah and it's not it's not a &gt;&gt; Yeah. So um
+yeah and it's not it's not a star decoding because it's now a not an
+star decoding because it's now a not an star decoding because it's now a
+not an admissible heristic but you still add admissible heristic but you
+still add admissible heristic but you still add that heristic in anyway.
+So it might that heristic in anyway. So it might that heristic in
+anyway. So it might make mistakes but those mistakes are um make
+mistakes but those mistakes are um make mistakes but those mistakes are
+um those mistakes are mistakes that are those mistakes are mistakes that
+are those mistakes are mistakes that are like like like hopefully less
+bad than setting your hopefully less bad than setting your hopefully
+less bad than setting your heristic function to zero essentially.
+heristic function to zero essentially. heristic function to zero
+essentially. &gt;&gt; Yeah. A star with a asterisk you know &gt;&gt;
+Yeah. A star with a asterisk you know &gt;&gt; Yeah. A star with a
+asterisk you know it's not actually a star. Um, yeah. &gt;&gt; So, the
+data, um, yeah, actually I I &gt;&gt; So, the data, um, yeah, actually I
+I &gt;&gt; So, the data, um, yeah, actually I I realized maybe I
+shouldn't have had that realized maybe I shouldn't have had that
+realized maybe I shouldn't have had that on my slide. Um, on my slide.
+Um, on my slide. Um, but your um, your loss function your loss function
+is basically this, your loss function is basically this, your loss
+function is basically this, right? Um this is the data you traded right?
+Um this is the data you traded right? Um this is the data you traded off
+of. So you you at every time step off of. So you you at every time step
+off of. So you you at every time step you try to predict the final score
+that you try to predict the final score that you try to predict the
+final score that you're going to get um uh by summing up you're going to
+get um uh by summing up you're going to get um uh by summing up all the
+losses over the entire No. So all the losses over the entire No. So all
+the losses over the entire No. So what is the ground truth score? what
+is the ground truth score? what is the ground truth score? &gt;&gt; This
+is the ground truth score. &gt;&gt; This is the ground truth score.
+&gt;&gt; This is the ground truth score. &gt;&gt; Okay. &gt;&gt; Okay.
+&gt;&gt; Okay. &gt;&gt; But the thing is like you can you can &gt;&gt;
+But the thing is like you can you can &gt;&gt; But the thing is like you
+can you can calculate this um by summing up all the calculate this um by
+summing up all the calculate this um by summing up all the log
+probabilities of all the tokens. But log probabilities of all the
+tokens. But log probabilities of all the tokens. But you want to predict
+this after you've you want to predict this after you've you want to
+predict this after you've predicted the first. predicted the first.
+predicted the first. &gt;&gt; Um and that's really hard, right? You
+&gt;&gt; Um and that's really hard, right? You &gt;&gt; Um and that's
+really hard, right? You don't know what tokens are going to come don't
+know what tokens are going to come don't know what tokens are going to
+come next. So like your regression is going next. So like your
+regression is going next. So like your regression is going to be hard at
+the very beginning and to be hard at the very beginning and to be hard
+at the very beginning and it's going to get easier and easier. And it's
+going to get easier and easier. And it's going to get easier and easier.
+And so that's kind of like the whole point so that's kind of like the
+whole point so that's kind of like the whole point of the heristic
+function. Yeah. And then of the heristic function. Yeah. And then of the
+heristic function. Yeah. And then um but actually because it's a
+heristic um but actually because it's a heristic um but actually because
+it's a heristic function, you're going to be function, you're going to
+be function, you're going to be um it actually sorry, it's probably not
+um it actually sorry, it's probably not um it actually sorry, it's
+probably not this. It is probably T this. It is probably T this. It is
+probably T if I is your current um if I is your current state, it's
+going if I is your current state, it's going if I is your current state,
+it's going to be um to be um to be um this. So you're going to add up
+all the this. So you're going to add up all the this. So you're going to
+add up all the um all the ones you get in the future. um all the ones
+you get in the future. um all the ones you get in the future. So at time
+step one at time step zero or So at time step one at time step zero or
+So at time step one at time step zero or at time step one it's going to
+be like at time step one it's going to be like at time step one it's
+going to be like all the ones from one to you know the all the ones from
+one to you know the all the ones from one to you know the end. At time
+step two it's going to be end. At time step two it's going to be end. At
+time step two it's going to be all the ones from time step two to the
+all the ones from time step two to the all the ones from time step two
+to the end. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah.
+It it's basically whether you train um It it's basically whether you
+train um It it's basically whether you train um train it together with
+the model that train it together with the model that train it together
+with the model that you're training or whether you you train you're
+training or whether you you train you're training or whether you you
+train it uh afterwards. Um so like if you it uh afterwards. Um so like
+if you it uh afterwards. Um so like if you train it together uh while
+you're train it together uh while you're train it together uh while
+you're training your you know LLM or whatever training your you know LLM
+or whatever training your you know LLM or whatever or if you have an LLM
+already and then or if you have an LLM already and then or if you have
+an LLM already and then you train a model to predict that you train a
+model to predict that you train a model to predict that afterwards.
+&gt;&gt; Yeah, exactly. Yeah. Yeah, Yeah, Yeah, &gt;&gt; why not
+specific patterns? I trained on &gt;&gt; why not specific patterns? I
+trained on &gt;&gt; why not specific patterns? I trained on the
+sequences the model generates. Um, Um, Um, so this is particularly this
+is particularly this is particularly in the case where you're using like
+a in the case where you're using like a in the case where you're using
+like a different model or different model or different model or um where
+you're using a different base um where you're using a different base um
+where you're using a different base model or something like that uh to
+train model or something like that uh to train model or something like
+that uh to train the future cost predictor. um it might the future cost
+predictor. um it might the future cost predictor. um it might be be be
+the case that you would actually want to the case that you would
+actually want to the case that you would actually want to update the
+model's parameters update the model's parameters update the model's
+parameters uh to make this prediction without uh to make this prediction
+without uh to make this prediction without training the full model. So
+like to give training the full model. So like to give training the full
+model. So like to give another example like let's say you have another
+example like let's say you have another example like let's say you have
+a deepseek a deepseek a deepseek v3 or something like that and you want
+v3 or something like that and you want v3 or something like that and you
+want to train a future cost for it but you to train a future cost for it
+but you to train a future cost for it but you don't want to train
+deepseek with v3 don't want to train deepseek with v3 don't want to
+train deepseek with v3 because it has too many parameters for because it
+has too many parameters for because it has too many parameters for you
+to train. Um and so if that's the you to train. Um and so if that's the
+you to train. Um and so if that's the case then you know training
+deepseek v3 case then you know training deepseek v3 case then you know
+training deepseek v3 itself like deepseek might have its you itself like
+deepseek might have its you itself like deepseek might have its you know
+idea of what's going to be coming know idea of what's going to be coming
+know idea of what's going to be coming next but your small quen model
+doesn't next but your small quen model doesn't next but your small quen
+model doesn't have as good an idea of like what have as good an idea of
+like what have as good an idea of like what deepseek is going to predict
+next. So deepseek is going to predict next. So deepseek is going to
+predict next. So &gt;&gt; why you train it on other model &gt;&gt; why
+you train it on other model &gt;&gt; why you train it on other model
+sequences you're trying to improve that sequences you're trying to
+improve that sequences you're trying to improve that specific model
+itself. Yeah, I mean have specific model itself. Yeah, I mean have
+specific model itself. Yeah, I mean have you tried to train a 400
+billion you tried to train a 400 billion you tried to train a 400
+billion parameter model before? So you might want to use a smaller model
+So you might want to use a smaller model So you might want to use a
+smaller model for your homework assignment is kind of for your homework
+assignment is kind of for your homework assignment is kind of mainly the
+the main motivation I guess. mainly the the main motivation I guess.
+mainly the the main motivation I guess. Yeah. Yeah. Um cool. Okay. Yeah.
+Yeah. Um cool. Okay. Yeah. Yeah. Um cool. Okay. So um yeah, next I would
+like to talk So um yeah, next I would like to talk So um yeah, next I
+would like to talk about best first uh beam search. Um, so about best
+first uh beam search. Um, so about best first uh beam search. Um, so
+best for beam search. This best for beam search. This best for beam
+search. This paper is a little bit of a methods paper is a little bit of
+a methods paper is a little bit of a methods paper, but I actually like
+it better as paper, but I actually like it better as paper, but I
+actually like it better as a survey paper that kind of organizes a
+survey paper that kind of organizes a survey paper that kind of
+organizes some of the other methods. And um so the some of the other
+methods. And um so the some of the other methods. And um so the problem
+with standard beam search uh problem with standard beam search uh
+problem with standard beam search uh that they're trying to overcome is
+that they're trying to overcome is that they're trying to overcome is
+number one um it's uh kind of like number one um it's uh kind of like
+number one um it's uh kind of like practically it always expands all of
+the practically it always expands all of the practically it always
+expands all of the inputs um within your beam. And so like inputs um
+within your beam. And so like inputs um within your beam. And so like
+let's say you have a 16 a beam size of let's say you have a 16 a beam
+size of let's say you have a 16 a beam size of 16 or 32 or something
+like that. It 16 or 32 or something like that. It 16 or 32 or something
+like that. It could be the case that like most of could be the case that
+like most of could be the case that like most of those 16 are just not
+good like kind of those 16 are just not good like kind of those 16 are
+just not good like kind of obviously really low probability obviously
+really low probability obviously really low probability solutions and
+it's not worth initially solutions and it's not worth initially
+solutions and it's not worth initially exploring uh and expanding them.
+Um so exploring uh and expanding them. Um so exploring uh and expanding
+them. Um so what they uh use is they use score-based what they uh use is
+they use score-based what they uh use is they use score-based
+prioritization like a star while prioritization like a star while
+prioritization like a star while maintaining beam constraints and
+maintaining beam constraints and maintaining beam constraints and
+demonstrate that they get um in a 10x demonstrate that they get um in a
+10x demonstrate that they get um in a 10x speed up over standard beam
+search with speed up over standard beam search with speed up over
+standard beam search with identical results. So this algorithm is
+identical results. So this algorithm is identical results. So this
+algorithm is like the most important part of the like the most important
+part of the like the most important part of the paper. Um it's based on
+a lot of the paper. Um it's based on a lot of the paper. Um it's based
+on a lot of the stuff that I've talked about so far. Uh stuff that I've
+talked about so far. Uh stuff that I've talked about so far. Uh but it
+has a pretty elegant formulation but it has a pretty elegant formulation
+but it has a pretty elegant formulation of how you like parameterize the
+of how you like parameterize the of how you like parameterize the
+comparator, the stopping criterion, the comparator, the stopping
+criterion, the comparator, the stopping criterion, the maximum beam size
+in the heristic maximum beam size in the heristic maximum beam size in
+the heristic function. And so um function. And so um function. And so um
+basically uh scores can um there's a few basically uh scores can um
+there's a few basically uh scores can um there's a few things. Um scores
+can only decrease uh things. Um scores can only decrease uh things. Um
+scores can only decrease uh when extended. So um when extended. So um
+when extended. So um basically the uh score here I I guess in basically
+the uh score here I I guess in basically the uh score here I I guess in
+this case uh they they focused on this case uh they they focused on this
+case uh they they focused on decreasing scores. So like log decreasing
+scores. So like log decreasing scores. So like log probabilities getting
+worse. Um so the probabilities getting worse. Um so the probabilities
+getting worse. Um so the log probability of a new uh output is log
+probability of a new uh output is log probability of a new uh output is
+going to be worse than log probability going to be worse than log
+probability going to be worse than log probability of a current output.
+Um and they do of a current output. Um and they do of a current output.
+Um and they do early pruning to remove hypotheses early pruning to
+remove hypotheses early pruning to remove hypotheses guaranteed to fall
+off the beam and guaranteed to fall off the beam and guaranteed to fall
+off the beam and early termination. So they stop when a early
+termination. So they stop when a early termination. So they stop when a
+complete hypothesis is found. And this complete hypothesis is found. And
+this complete hypothesis is found. And this is my favorite part of the
+paper which is my favorite part of the paper which is my favorite part
+of the paper which is basically like they demonstrate that is basically
+like they demonstrate that is basically like they demonstrate that all
+of these algorithms like some of the all of these algorithms like some
+of the all of these algorithms like some of the algorithms that we
+talked about so far algorithms that we talked about so far algorithms
+that we talked about so far um including uh beam search uh best um
+including uh beam search uh best um including uh beam search uh best
+first search um aar search and breath first search um aar search and
+breath first search um aar search and breath first search all um kind of
+can be first search all um kind of can be first search all um kind of
+can be parameterized by looking at a parameterized by looking at a
+parameterized by looking at a comparator. Um and so like as we talked
+comparator. Um and so like as we talked comparator. Um and so like as we
+talked about beam search always prioritizes about beam search always
+prioritizes about beam search always prioritizes things that are
+shorter. Um so uh in things that are shorter. Um so uh in things that
+are shorter. Um so uh in this case it first looks at whether the this
+case it first looks at whether the this case it first looks at whether
+the output is short. Um and then it uh looks output is short. Um and
+then it uh looks output is short. Um and then it uh looks at if the
+output is the same length it at if the output is the same length it at
+if the output is the same length it prioritizes based on score. So this
+is prioritizes based on score. So this is prioritizes based on score. So
+this is beam search like I talked about before. beam search like I
+talked about before. beam search like I talked about before. Um best for
+a search on the other hand Um best for a search on the other hand Um
+best for a search on the other hand always prioritizes based on score.
+Uh always prioritizes based on score. Uh always prioritizes based on
+score. Uh but if the score is the same then it but if the score is the
+same then it but if the score is the same then it prioritizes based on
+length. So um you prioritizes based on length. So um you prioritizes
+based on length. So um you can uh you can do this and then um you can uh
+you can do this and then um you can uh you can do this and then um you
+also have K. So K is either equal to the also have K. So K is either
+equal to the also have K. So K is either equal to the beam size or um
+for best first search beam size or um for best first search beam size or
+um for best first search it's infinite. And so you can um uh best it's
+infinite. And so you can um uh best it's infinite. And so you can um uh
+best first search needs to be infinite if you first search needs to be
+infinite if you first search needs to be infinite if you want uh
+accuracy guarantees. And then want uh accuracy guarantees. And then want
+uh accuracy guarantees. And then the final thing they have is a heristic
+the final thing they have is a heristic the final thing they have is a
+heristic function. So beam search doesn't have function. So beam search
+doesn't have function. So beam search doesn't have one. Best search
+doesn't have one but a one. Best search doesn't have one but a one. Best
+search doesn't have one but a star search does have one. So that's star
+search does have one. So that's star search does have one. So that's
+like the only difference between best like the only difference between
+best like the only difference between best first and AAR search. Um so
+they also first and AAR search. Um so they also first and AAR search. Um
+so they also add some interesting new things here add some interesting
+new things here add some interesting new things here like AAR beam
+search. Um I would say like AAR beam search. Um I would say like AAR
+beam search. Um I would say this is beam search with a future cost this
+is beam search with a future cost this is beam search with a future cost
+where the future cost is an admissible where the future cost is an
+admissible where the future cost is an admissible heristic. So um what
+they don't list in heristic. So um what they don't list in heristic. So
+um what they don't list in here is what if the heristic is not here is
+what if the heristic is not here is what if the heristic is not
+admissible? Well uh you can still do it. admissible? Well uh you can
+still do it. admissible? Well uh you can still do it. It you just might
+lose your accuracy It you just might lose your accuracy It you just
+might lose your accuracy guarantees. Um and then for best first
+guarantees. Um and then for best first guarantees. Um and then for best
+first beam search uh basically um what they beam search uh basically um
+what they beam search uh basically um what they did is they did is they
+did is they uh they sort on score as opposed to uh they sort on score as
+opposed to uh they sort on score as opposed to sorting on length. Um but
+they set the sorting on length. Um but they set the sorting on length.
+Um but they set the beam size equal to K. Um so they allow beam size
+equal to K. Um so they allow beam size equal to K. Um so they allow this
+pruning to make sure that it this pruning to make sure that it this
+pruning to make sure that it doesn't get out of uh get out of hand.
+doesn't get out of uh get out of hand. doesn't get out of uh get out of
+hand. So I I I really like this paper a lot So I I I really like this
+paper a lot So I I I really like this paper a lot because it kind of
+like organizes all because it kind of like organizes all because it kind
+of like organizes all these ideas and demonstrates how they're these
+ideas and demonstrates how they're these ideas and demonstrates how
+they're conceptually similar. It also could be a conceptually similar.
+It also could be a conceptually similar. It also could be a good
+starting point if you want to work good starting point if you want to
+work good starting point if you want to work on any of the methods that
+we talked on any of the methods that we talked on any of the methods
+that we talked about today. about today. about today. And their results
+are um are nice. And their results are um are nice. And their results
+are um are nice. Basically, they demonstrate that you can Basically,
+they demonstrate that you can Basically, they demonstrate that you can u
+maintain uh you can maintain the score u maintain uh you can maintain
+the score u maintain uh you can maintain the score that you get from
+beam search with uh that you get from beam search with uh that you get
+from beam search with uh great accuracy improvements or um that great
+accuracy improvements or um that great accuracy improvements or um that
+also allows you to increase beam sizes. also allows you to increase beam
+sizes. also allows you to increase beam sizes. So if you increase the
+beam size, So if you increase the beam size, So if you increase the beam
+size, typically you'll do a better job at typically you'll do a better
+job at typically you'll do a better job at search. search. search. Um
+some issues are are memory overhead Um some issues are are memory
+overhead Um some issues are are memory overhead and implementation
+complexity, but it's and implementation complexity, but it's and
+implementation complexity, but it's actually not that bad, I guess.
+actually not that bad, I guess. actually not that bad, I guess. Cool. Uh
+any any questions about this Cool. Uh any any questions about this Cool.
+Uh any any questions about this part? Okay. Um so actually our paper
+Okay. Um so actually our paper Okay. Um so actually our paper
+presentation is about the next paper presentation is about the next
+paper presentation is about the next paper that I was going to talk
+about. So, I that I was going to talk about. So, I that I was going to
+talk about. So, I might uh turn it over to our paper might uh turn it
+over to our paper might uh turn it over to our paper presentation to do
+the paper presentation to do the paper presentation to do the paper
+presentation today and I'll add any uh presentation today and I'll add
+any uh presentation today and I'll add any uh commentary that I have
+about

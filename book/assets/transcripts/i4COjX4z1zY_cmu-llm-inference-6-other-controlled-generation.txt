@@ -1,0 +1,2634 @@
+# cmu-llm-inference-6-other-controlled-generation
+# video: https://www.youtube.com/watch?v=i4COjX4z1zY
+# captions: manual
+
+I'll give everyone kind of a sec. Great. I'll give everyone kind of a
+sec. Great. I'll give everyone kind of a sec. Great. So, today we're
+going to be talking So, today we're going to be talking So, today we're
+going to be talking about kind of a continuation of what we about kind
+of a continuation of what we about kind of a continuation of what we
+started talking about at the very end of started talking about at the
+very end of started talking about at the very end of uh Tuesday's
+lecture, which is various uh Tuesday's lecture, which is various uh
+Tuesday's lecture, which is various ways to control or to constrain ways
+to control or to constrain ways to control or to constrain generation.
+Um, and I'll use these more generation. Um, and I'll use these more
+generation. Um, and I'll use these more or less interchangeably uh
+throughout. or less interchangeably uh throughout. or less
+interchangeably uh throughout. Um, also just as a note, I'm sure almost
+Um, also just as a note, I'm sure almost Um, also just as a note, I'm
+sure almost everyone saw, but homework one came out everyone saw, but
+homework one came out everyone saw, but homework one came out at the end
+of last week. Um, we've seen at the end of last week. Um, we've seen at
+the end of last week. Um, we've seen a number of questions on Piaza
+about it. a number of questions on Piaza about it. a number of questions
+on Piaza about it. Um, so that's great. Um, feel free also Um, so that's
+great. Um, feel free also Um, so that's great. Um, feel free also to
+come to office hours and in to come to office hours and in to come to
+office hours and in particular there's been kind of a number particular
+there's been kind of a number particular there's been kind of a number
+of questions about the question of the of questions about the question
+of the of questions about the question of the beam search puzzle. Um,
+and there will beam search puzzle. Um, and there will beam search
+puzzle. Um, and there will be I think a little bit of a hint for be I
+think a little bit of a hint for be I think a little bit of a hint for
+that in one of the things we'll talk that in one of the things we'll
+talk that in one of the things we'll talk about today. Um, so keep an
+eye out for about today. Um, so keep an eye out for about today. Um, so
+keep an eye out for that. Um, and with that uh in mind um that. Um, and
+with that uh in mind um that. Um, and with that uh in mind um today
+we're going to talk kind of about today we're going to talk kind of
+about today we're going to talk kind of about two different broad sets
+of constraints. two different broad sets of constraints. two different
+broad sets of constraints. We're going to talk about these We're going
+to talk about these We're going to talk about these syntactic
+constraints. constraints that syntactic constraints. constraints that
+syntactic constraints. constraints that are very easy to write down as
+sort of a are very easy to write down as sort of a are very easy to
+write down as sort of a list of allowable or unallowable tokens. list of
+allowable or unallowable tokens. list of allowable or unallowable
+tokens. Um, and then we'll talk about some more Um, and then we'll talk
+about some more Um, and then we'll talk about some more semantic
+constraints that are a little semantic constraints that are a little
+semantic constraints that are a little bit harder to define in that way.
+Um, bit harder to define in that way. Um, bit harder to define in that
+way. Um, and we'll make a connection between that and we'll make a
+connection between that and we'll make a connection between that and
+between like a token level notion of and between like a token level
+notion of and between like a token level notion of alignment. Um, which
+will sort of bring alignment. Um, which will sort of bring alignment.
+Um, which will sort of bring us a little bit close to talking about us a
+little bit close to talking about us a little bit close to talking about
+RHF. RHF. RHF. So over the last two lectures in both So over the last
+two lectures in both So over the last two lectures in both beam search
+and AAR and rest for search, beam search and AAR and rest for search,
+beam search and AAR and rest for search, we've kind of talked about ways
+of we've kind of talked about ways of we've kind of talked about ways of
+constraining output already. Um and this constraining output already. Um
+and this constraining output already. Um and this comes in the form of
+taking a search comes in the form of taking a search comes in the form
+of taking a search score that is not exactly the log score that is not
+exactly the log score that is not exactly the log probabilities out of
+the model. So we probabilities out of the model. So we probabilities out
+of the model. So we adjust our search scores for length when adjust our
+search scores for length when adjust our search scores for length when
+we apply a length penalty. We adjust our we apply a length penalty. We
+adjust our we apply a length penalty. We adjust our search scores to be
+diff to penalize search scores to be diff to penalize search scores to
+be diff to penalize similarity to or encourage different similarity to
+or encourage different similarity to or encourage different from
+difference from other partial from difference from other partial from
+difference from other partial outputs in diverse beam search. and we
+outputs in diverse beam search. and we outputs in diverse beam search.
+and we can factor in some additional heruristic can factor in some
+additional heruristic can factor in some additional heruristic for
+expected reward which is kind of for expected reward which is kind of
+for expected reward which is kind of where we left things off on Tuesday
+with where we left things off on Tuesday with where we left things off
+on Tuesday with neurologic aar ask. neurologic aar ask. neurologic aar
+ask. Um we are going to continue on this Um we are going to continue on
+this Um we are going to continue on this theme today talking about
+constraints theme today talking about constraints theme today talking
+about constraints that aim to produce an output that is that aim to
+produce an output that is that aim to produce an output that is high
+probability and satisfies some high probability and satisfies some high
+probability and satisfies some additional criteria on X. Um and what X
+additional criteria on X. Um and what X additional criteria on X. Um and
+what X is will change kind of over the course is will change kind of
+over the course is will change kind of over the course of the lecture.
+But in here we're no of the lecture. But in here we're no of the
+lecture. But in here we're no longer assuming that the best way to do
+longer assuming that the best way to do longer assuming that the best
+way to do this is through some kind of search this is through some kind
+of search this is through some kind of search although that might
+certainly be the although that might certainly be the although that
+might certainly be the answer. We're also going to consider answer.
+We're also going to consider answer. We're also going to consider first
+just modifying the probability first just modifying the probability
+first just modifying the probability distribution and then resampling
+from distribution and then resampling from distribution and then
+resampling from it. it. it. Um so in that process we'll talk about Um so
+in that process we'll talk about Um so in that process we'll talk about
+kind of a couple of different types of kind of a couple of different
+types of kind of a couple of different types of constraints. We're going
+to start with constraints. We're going to start with constraints. We're
+going to start with constraints that are uh what I'm saying constraints
+that are uh what I'm saying constraints that are uh what I'm saying in
+kind of a maybe sort of loose sense in kind of a maybe sort of loose
+sense in kind of a maybe sort of loose sense of the term verifiable
+which here I'm of the term verifiable which here I'm of the term
+verifiable which here I'm defining for the purposes of today that
+defining for the purposes of today that defining for the purposes of
+today that you can write some deterministic you can write some
+deterministic you can write some deterministic function to check if the
+constraint was function to check if the constraint was function to check
+if the constraint was satisfied at the end of generation. you satisfied
+at the end of generation. you satisfied at the end of generation. you
+can sort of make a list of all of the can sort of make a list of all of
+the can sort of make a list of all of the things that are allowable. Um,
+and we things that are allowable. Um, and we things that are allowable.
+Um, and we also care not just about if something is also care not just
+about if something is also care not just about if something is
+verifiable at the end of generation, but verifiable at the end of
+generation, but verifiable at the end of generation, but about whether
+it is verifiable at each about whether it is verifiable at each about
+whether it is verifiable at each individual token. Um, so you could
+individual token. Um, so you could individual token. Um, so you could
+imagine something like the output must imagine something like the output
+must imagine something like the output must be exactly 10 tokens long.
+That's be exactly 10 tokens long. That's be exactly 10 tokens long.
+That's obviously verifiable. It's very easy to obviously verifiable.
+It's very easy to obviously verifiable. It's very easy to check if that
+is true at the end of check if that is true at the end of check if that
+is true at the end of generation. But if in the course of generation.
+But if in the course of generation. But if in the course of generating
+that output, you're not you generating that output, you're not you
+generating that output, you're not you don't have confidence at each
+step that don't have confidence at each step that don't have confidence
+at each step that the choice you're making is going to the choice you're
+making is going to the choice you're making is going to lead to that
+output being that lead to that output being that lead to that output
+being that constraint being satisfied. It's sort of constraint being
+satisfied. It's sort of constraint being satisfied. It's sort of not
+token-wise verifiable. Whereas if not token-wise verifiable. Whereas if
+not token-wise verifiable. Whereas if your constraint was something like
+every your constraint was something like every your constraint was
+something like every token needs to start with a space or token needs to
+start with a space or token needs to start with a space or every um
+thing I output needs to be in every um thing I output needs to be in
+every um thing I output needs to be in Chinese or everything I am
+writing needs Chinese or everything I am writing needs Chinese or
+everything I am writing needs to be for instance valid JSON. this is to
+be for instance valid JSON. this is to be for instance valid JSON. this
+is something that you can determine if something that you can determine
+if something that you can determine if you're diverging from that
+constraint at you're diverging from that constraint at you're diverging
+from that constraint at any individual step of generation. Um any
+individual step of generation. Um any individual step of generation. Um
+and so of of course this is like a and so of of course this is like a
+and so of of course this is like a little bit easier to measure. So to
+kind little bit easier to measure. So to kind little bit easier to
+measure. So to kind of tie back to the last lecture um I've of tie back
+to the last lecture um I've of tie back to the last lecture um I've
+taken this constraint directly from the taken this constraint directly
+from the taken this constraint directly from the neurologic asteresque
+paper. Um the neurologic asteresque paper. Um the neurologic asteresque
+paper. Um the constraint is to write a sentence with constraint is to
+write a sentence with constraint is to write a sentence with these
+concepts car drive and snow. Um these concepts car drive and snow. Um
+these concepts car drive and snow. Um and in the context of this work
+this and in the context of this work this and in the context of this
+work this functionally means write a sentence that functionally means
+write a sentence that functionally means write a sentence that includes
+these three words. Um the this includes these three words. Um the this
+includes these three words. Um the this is clearly verifiable. The final
+output is clearly verifiable. The final output is clearly verifiable.
+The final output is a success if we have these words in is a success if
+we have these words in is a success if we have these words in it, but
+it's not token-wise verifiable. it, but it's not token-wise verifiable.
+it, but it's not token-wise verifiable. Right? If you start from the
+token Right? If you start from the token Right? If you start from the
+token 'the', there's no guarantee that you're 'the', there's no
+guarantee that you're 'the', there's no guarantee that you're going to
+wind up generating car or drive going to wind up generating car or drive
+going to wind up generating car or drive or snow. Um the intuition that
+we kind or snow. Um the intuition that we kind or snow. Um the intuition
+that we kind of talked about on Tuesday is that as um of talked about on
+Tuesday is that as um of talked about on Tuesday is that as um tries to
+estimate this huristic tries to estimate this huristic tries to estimate
+this huristic likelihood of satisfying the constraint likelihood of
+satisfying the constraint likelihood of satisfying the constraint by the
+end of the by the end of the uh by the end of the by the end of the uh
+by the end of the by the end of the uh generation. Um, and so if we have
+the generation. Um, and so if we have the generation. Um, and so if we
+have the start of our completion, I drive my car start of our
+completion, I drive my car start of our completion, I drive my car
+during the, um, we've already satisfied during the, um, we've already
+satisfied during the, um, we've already satisfied two of our three
+constraints. Um, maybe two of our three constraints. Um, maybe two of
+our three constraints. Um, maybe we have a couple of options for our
+next we have a couple of options for our next we have a couple of
+options for our next token. If we generate the next token, token. If we
+generate the next token, token. If we generate the next token, summer,
+um, that's a reasonably high summer, um, that's a reasonably high
+summer, um, that's a reasonably high probability completion. I drive my
+car probability completion. I drive my car probability completion. I
+drive my car during the summer is a valid sentence, during the summer is
+a valid sentence, during the summer is a valid sentence, but that might
+make it a little bit but that might make it a little bit but that might
+make it a little bit harder for us to get to the concept snow harder for
+us to get to the concept snow harder for us to get to the concept snow
+by the end of the generation. Whereas by the end of the generation.
+Whereas by the end of the generation. Whereas winter, maybe slightly
+lower winter, maybe slightly lower winter, maybe slightly lower
+probability. I don't like driving in the probability. I don't like
+driving in the probability. I don't like driving in the winter. um but
+much more likely to wind winter. um but much more likely to wind winter.
+um but much more likely to wind up with generating the token snow at up
+with generating the token snow at up with generating the token snow at
+some point. Right? So we have this some point. Right? So we have this
+some point. Right? So we have this intuition that maybe the probability
+of intuition that maybe the probability of intuition that maybe the
+probability of summer is slightly higher than the summer is slightly
+higher than the summer is slightly higher than the probability of of
+winter conditioned on probability of of winter conditioned on
+probability of of winter conditioned on this prefix. But if we do some
+type of this prefix. But if we do some type of this prefix. But if we do
+some type of look ahead um and here we're doing look look ahead um and
+here we're doing look look ahead um and here we're doing look ahead with
+a star. We can see that one ahead with a star. We can see that one ahead
+with a star. We can see that one of these is much more likely to lead to
+of these is much more likely to lead to of these is much more likely to
+lead to satisfying our constraint than the satisfying our constraint
+than the satisfying our constraint than the other. And so we apply some
+kind of other. And so we apply some kind of other. And so we apply some
+kind of reshaping or we choose the path that is reshaping or we choose
+the path that is reshaping or we choose the path that is more likely to
+satisfy our constraint. more likely to satisfy our constraint. more
+likely to satisfy our constraint. Right? And this is um this is like the
+Right? And this is um this is like the Right? And this is um this is
+like the idea behind a lot of these methods. idea behind a lot of these
+methods. idea behind a lot of these methods. Um so we're going to set
+that aside for Um so we're going to set that aside for Um so we're going
+to set that aside for a second and start with a easier case a second and
+start with a easier case a second and start with a easier case which is
+a case where we can tokenwise which is a case where we can tokenwise
+which is a case where we can tokenwise verify if we've satisfied our
+verify if we've satisfied our verify if we've satisfied our constraint.
+Um and this is a sort of constraint. Um and this is a sort of
+constraint. Um and this is a sort of like templatic generation. So you
+could like templatic generation. So you could like templatic generation.
+So you could imagine you have some requirement for imagine you have some
+requirement for imagine you have some requirement for the outputs of
+your language model like the outputs of your language model like the
+outputs of your language model like every time you talk to the user you
+every time you talk to the user you every time you talk to the user you
+should start your message with hello or should start your message with
+hello or should start your message with hello or you should always end
+every output with you should always end every output with you should
+always end every output with thanks for chatting with me or something
+thanks for chatting with me or something thanks for chatting with me or
+something like you should always output valid like you should always
+output valid like you should always output valid JSON. Um could you
+train a model to JSON. Um could you train a model to JSON. Um could you
+train a model to satisfy this constraint? satisfy this constraint?
+satisfy this constraint? You see some nas yeah like you could do You see
+some nas yeah like you could do You see some nas yeah like you could do
+some kind of you could give it a ton of some kind of you could give it a
+ton of some kind of you could give it a ton of training data that always
+has this um at training data that always has this um at training data
+that always has this um at the beginning of everything. If you give the
+beginning of everything. If you give the beginning of everything. If you
+give a training data that always ends with a training data that always
+ends with a training data that always ends with this, um would you be
+guaranteed that it this, um would you be guaranteed that it this, um
+would you be guaranteed that it would always do that though? No. Right?
+There's always some chance um No. Right? There's always some chance um
+No. Right? There's always some chance um especially if you're sampling
+that you especially if you're sampling that you especially if you're
+sampling that you wind up in a space of the probability wind up in a
+space of the probability wind up in a space of the probability
+distribution where your output ends distribution where your output ends
+distribution where your output ends strangely or maybe it's too long and
+it strangely or maybe it's too long and it strangely or maybe it's too
+long and it gets cut off. Um and particularly gets cut off. Um and
+particularly gets cut off. Um and particularly there's a wide space of
+valid JSON and there's a wide space of valid JSON and there's a wide
+space of valid JSON and it could write something really weird. it could
+write something really weird. it could write something really weird.
+Also, what if you wanted to change um Also, what if you wanted to change
+um Also, what if you wanted to change um your your uh constraint over
+time? If your your uh constraint over time? If your your uh constraint
+over time? If you wanted to change hello to bonjour you wanted to change
+hello to bonjour you wanted to change hello to bonjour for a week, uh
+maybe the Olympics are in for a week, uh maybe the Olympics are in for a
+week, uh maybe the Olympics are in Paris or something. Um you would you
+Paris or something. Um you would you Paris or something. Um you would
+you want to retrain your model entirely to want to retrain your model
+entirely to want to retrain your model entirely to do that? Probably
+not, right? So these do that? Probably not, right? So these do that?
+Probably not, right? So these are things that are possible to are things
+that are possible to are things that are possible to fine-tune the model
+to do, but because fine-tune the model to do, but because fine-tune the
+model to do, but because they are so relatively they are so relatively
+they are so relatively simple to enforce at inference time. Um simple to
+enforce at inference time. Um simple to enforce at inference time. Um
+these are things that are probably these are things that are probably
+these are things that are probably better to do as like an inference
+time better to do as like an inference time better to do as like an
+inference time modification or as a constraint on modification or as a
+constraint on modification or as a constraint on generation. Um we're
+going to spend some generation. Um we're going to spend some generation.
+Um we're going to spend some time on valid JSON, but for these first
+time on valid JSON, but for these first time on valid JSON, but for
+these first two, does anyone have a sense of how you two, does anyone
+have a sense of how you two, does anyone have a sense of how you would
+enforce these at inference time? Maybe just maybe for hello. Yeah. Maybe
+just maybe for hello. Yeah. Maybe just maybe for hello. Yeah. Sorry,
+what was that? &gt;&gt; Yeah, just like append hello at the very
+&gt;&gt; Yeah, just like append hello at the very &gt;&gt; Yeah, just
+like append hello at the very beginning of the Exactly. Yeah. And for
+beginning of the Exactly. Yeah. And for beginning of the Exactly. Yeah.
+And for um thanks for chatting with me at the um thanks for chatting
+with me at the um thanks for chatting with me at the end. end. end.
+&gt;&gt; Exactly. You could just you just append &gt;&gt; Exactly. You
+could just you just append &gt;&gt; Exactly. You could just you just
+append the output at the end. Um even outside the output at the end. Um
+even outside the output at the end. Um even outside of your sampling
+from the model. Um of your sampling from the model. Um of your sampling
+from the model. Um these are the kinds of things that are these are the
+kinds of things that are these are the kinds of things that are
+relatively easy to do if you have relatively easy to do if you have
+relatively easy to do if you have control over like a system, right? if
+control over like a system, right? if control over like a system, right?
+if you're like receiving inputs for an API. you're like receiving inputs
+for an API. you're like receiving inputs for an API. Um how however are
+we going to get the Um how however are we going to get the Um how
+however are we going to get the model to always output valid JSON? I
+model to always output valid JSON? I model to always output valid JSON?
+I think the reasonable um thing in 2025 to think the reasonable um thing
+in 2025 to think the reasonable um thing in 2025 to ask first is can you
+just ask the model ask first is can you just ask the model ask first is
+can you just ask the model to do this? Um and so I I passed to GPD5 to
+do this? Um and so I I passed to GPD5 to do this? Um and so I I passed
+to GPD5 this morning just convert this to a JSON this morning just
+convert this to a JSON this morning just convert this to a JSON for me.
+Um and of course GPD5 knows what for me. Um and of course GPD5 knows
+what for me. Um and of course GPD5 knows what JSON format looks like. Um
+but the sort JSON format looks like. Um but the sort JSON format looks
+like. Um but the sort of default here is that it also gives of default
+here is that it also gives of default here is that it also gives you a
+lot of little additional text on you a lot of little additional text on
+you a lot of little additional text on the sides. you know, it says,
+"Hi, I've the sides. you know, it says, "Hi, I've the sides. you know,
+it says, "Hi, I've done this thing for you. I made this done this thing
+for you. I made this done this thing for you. I made this change, which
+is probably reasonable. Do change, which is probably reasonable. Do
+change, which is probably reasonable. Do you want me to keep this
+format?" Um, so you want me to keep this format?" Um, so you want me to
+keep this format?" Um, so if you were calling this as like an API if you
+were calling this as like an API if you were calling this as like an API
+call, um, and you were expecting valid call, um, and you were expecting
+valid call, um, and you were expecting valid JSON as a result, um, this
+would be JSON as a result, um, this would be JSON as a result, um, this
+would be maybe not not the output you were maybe not not the output you
+were maybe not not the output you were looking for. Of course, but if we
+give looking for. Of course, but if we give looking for. Of course, but
+if we give our models more clear instructions, our models more clear
+instructions, our models more clear instructions, they're um, generally
+capable of they're um, generally capable of they're um, generally
+capable of following them. So then asked for just following them. So
+then asked for just following them. So then asked for just the object
+with no additional commentary the object with no additional commentary
+the object with no additional commentary or text. Um and or text. Um and
+or text. Um and uh Frontier model is perfectly capable uh Frontier model
+is perfectly capable uh Frontier model is perfectly capable of doing
+this. Um why are we then going of doing this. Um why are we then going
+of doing this. Um why are we then going to spend so much time today
+talking to spend so much time today talking to spend so much time today
+talking about JSON? Um I think for two reasons. about JSON? Um I think
+for two reasons. about JSON? Um I think for two reasons. So first these
+are kind of reasonable So first these are kind of reasonable So first
+these are kind of reasonable default choices, right? ID, name, and
+default choices, right? ID, name, and default choices, right? ID, name,
+and birthday. Maybe this is a format that birthday. Maybe this is a
+format that birthday. Maybe this is a format that looks kind of
+reasonable to me. But if looks kind of reasonable to me. But if looks
+kind of reasonable to me. But if I'm working in some kind of production
+I'm working in some kind of production I'm working in some kind of
+production environment and I have a specific format environment and I
+have a specific format environment and I have a specific format that all
+of my data is is formatted in that all of my data is is formatted in
+that all of my data is is formatted in and I'm not going to go like
+rename a and I'm not going to go like rename a and I'm not going to go
+like rename a key in my database because GPD5 decided key in my database
+because GPD5 decided key in my database because GPD5 decided that birth
+day sounded better than like that birth day sounded better than like
+that birth day sounded better than like um date of birth or something,
+right? So um date of birth or something, right? So um date of birth or
+something, right? So the ability to to interplay neatly with the ability
+to to interplay neatly with the ability to to interplay neatly with
+another format um it would be nice to another format um it would be nice
+to another format um it would be nice to have some kind of guarantee.
+And then have some kind of guarantee. And then have some kind of
+guarantee. And then similarly, while I think you're unlikely similarly,
+while I think you're unlikely similarly, while I think you're unlikely
+to ever get an output from GPD5 that to ever get an output from GPD5
+that to ever get an output from GPD5 that asks for valid JSON that's
+like asks for valid JSON that's like asks for valid JSON that's like
+catastrophically bad, um if you're maybe catastrophically bad, um if
+you're maybe catastrophically bad, um if you're maybe doing a million of
+these generations, doing a million of these generations, doing a million
+of these generations, you could get an output that looks a you could get
+an output that looks a you could get an output that looks a little weird
+or you could get an output little weird or you could get an output
+little weird or you could get an output that is like, I'm sorry, you've
+exceeded that is like, I'm sorry, you've exceeded that is like, I'm
+sorry, you've exceeded your rate limit. You want some kind of your rate
+limit. You want some kind of your rate limit. You want some kind of like
+validation if you're especially if like validation if you're especially
+if like validation if you're especially if you're using this in a larger
+um scale you're using this in a larger um scale you're using this in a
+larger um scale operation that you're going to actually operation that
+you're going to actually operation that you're going to actually get
+valid JSON out every time. um get valid JSON out every time. um get
+valid JSON out every time. um because the alternative is to get an
+because the alternative is to get an because the alternative is to get
+an output and then send it through a JSON output and then send it
+through a JSON output and then send it through a JSON checker anyway. So
+how do we enforce checker anyway. So how do we enforce checker anyway.
+So how do we enforce that our model is giving us something that our
+model is giving us something that our model is giving us something like
+valid JSON? like valid JSON? like valid JSON? Um the kind of key here is
+that this is Um the kind of key here is that this is Um the kind of key
+here is that this is a really narrow constraint at any a really narrow
+constraint at any a really narrow constraint at any individual decoding
+step. We have over individual decoding step. We have over individual
+decoding step. We have over 100,000 choices but only like maybe 10
+100,000 choices but only like maybe 10 100,000 choices but only like
+maybe 10 of them that will give us valid JSON at of them that will give
+us valid JSON at of them that will give us valid JSON at the end. Um so
+can we just write down the end. Um so can we just write down the end. Um
+so can we just write down all of the rules? all of the rules? all of the
+rules? Um, so here we're gonna uh talk through Um, so here we're gonna
+uh talk through Um, so here we're gonna uh talk through this with this
+example um from my friend this with this example um from my friend this
+with this example um from my friend Matt at USC. Taylor Swift was born
+Matt at USC. Taylor Swift was born Matt at USC. Taylor Swift was born
+December 13th, 1989. So we have these December 13th, 1989. So we have
+these December 13th, 1989. So we have these two keys and we've decided
+we want to two keys and we've decided we want to two keys and we've
+decided we want to name them name and birth year. name them name and
+birth year. name them name and birth year. Uh the idea here is that
+we're going to Uh the idea here is that we're going to Uh the idea here
+is that we're going to represent this schema as a state machine
+represent this schema as a state machine represent this schema as a
+state machine that kind of tracks our progress through that kind of
+tracks our progress through that kind of tracks our progress through the
+generation. So when we start our the generation. So when we start our
+the generation. So when we start our generation, generation, generation,
+there's only one valid token to start there's only one valid token to
+start there's only one valid token to start the JSON, which is the
+opening curly the JSON, which is the opening curly the JSON, which is
+the opening curly brace. So if we are in this state here, brace. So if
+we are in this state here, brace. So if we are in this state here, um,
+state zero in blue, we have a number um, state zero in blue, we have a
+number um, state zero in blue, we have a number of tokens that the model
+thinks might be of tokens that the model thinks might be of tokens that
+the model thinks might be more or less likely, um, but we're more or
+less likely, um, but we're more or less likely, um, but we're
+functionally going to cross out or functionally going to cross out or
+functionally going to cross out or ignore everything that isn't a valid
+ignore everything that isn't a valid ignore everything that isn't a
+valid sort of path to the next state. Um, once sort of path to the next
+state. Um, once sort of path to the next state. Um, once we get to state
+one, we have a number we we get to state one, we have a number we we get
+to state one, we have a number we have two options, right? We could emit
+have two options, right? We could emit have two options, right? We could
+emit name um colon uh quotes or birth year name um colon uh quotes or
+birth year name um colon uh quotes or birth year colon quotes. Um and if
+we emit name colon quotes. Um and if we emit name colon quotes. Um and
+if we emit name then we have we wind up in this state then we have we
+wind up in this state then we have we wind up in this state too where we
+can only output valid too where we can only output valid too where we
+can only output valid letters. Um this makes sense. Names are letters.
+Um this makes sense. Names are letters. Um this makes sense. Names are
+usually letters. Um if we emit birth usually letters. Um if we emit
+birth usually letters. Um if we emit birth year we get to this state
+where we can year we get to this state where we can year we get to this
+state where we can only output digits. Um and this is using only output
+digits. Um and this is using only output digits. Um and this is using
+like a reax specification of each of like a reax specification of each
+of like a reax specification of each of these. Um once we finish the
+name we these. Um once we finish the name we these. Um once we finish
+the name we need to end the quote. Once we finish a need to end the
+quote. Once we finish a need to end the quote. Once we finish a year, we
+can just end with a comma and year, we can just end with a comma and
+year, we can just end with a comma and then we can optionally generate
+the then we can optionally generate the then we can optionally generate
+the other key. And then in other key. And then in other key. And then in
+automa like this, it's traditional to automa like this, it's traditional
+to automa like this, it's traditional to draw sort of a second
+concentric circle draw sort of a second concentric circle draw sort of a
+second concentric circle to indicate the end or the accept state. to
+indicate the end or the accept state. to indicate the end or the accept
+state. So when you've finished, you output your So when you've finished,
+you output your So when you've finished, you output your final curly
+brace and you end the final curly brace and you end the final curly
+brace and you end the generation. generation. generation. Right? Does
+this kind of make sense? Right? Does this kind of make sense? Right?
+Does this kind of make sense? Yes. Um this is actually a little bit Yes.
+Um this is actually a little bit Yes. Um this is actually a little bit
+tricky in practice. um especially as tricky in practice. um especially
+as tricky in practice. um especially as these get a little more
+complicated. Um these get a little more complicated. Um these get a
+little more complicated. Um so in particular this uh finance data so in
+particular this uh finance data so in particular this uh finance data
+has at least two problems with it. Um I has at least two problems with
+it. Um I has at least two problems with it. Um I wonder if anyone can
+see what they are. wonder if anyone can see what they are. wonder if
+anyone can see what they are. Um this will output Um this will output Um
+this will output generally valid JSON but will it output generally valid
+JSON but will it output generally valid JSON but will it output kind of
+exactly what we were looking to kind of exactly what we were looking to
+kind of exactly what we were looking to specify? specify? specify?
+&gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; No uh limit.
+&gt;&gt; No uh limit. &gt;&gt; No uh limit. &gt;&gt; No length limit. uh
+say a little more &gt;&gt; No length limit. uh say a little more
+&gt;&gt; No length limit. uh say a little more about that. about that.
+about that. &gt;&gt; Like I guess you can like just do say &gt;&gt; Like
+I guess you can like just do say &gt;&gt; Like I guess you can like just
+do say two like forever like name or something. two like forever like
+name or something. two like forever like name or something. &gt;&gt;
+That's true. Yeah. So we could have like &gt;&gt; That's true. Yeah. So
+we could have like &gt;&gt; That's true. Yeah. So we could have like an
+infinite length name which is maybe an infinite length name which is
+maybe an infinite length name which is maybe like not what we want. Um I
+would we like not what we want. Um I would we like not what we want. Um
+I would we normally in JSON though like impose a normally in JSON though
+like impose a normally in JSON though like impose a limit on the length
+of the name. limit on the length of the name. limit on the length of the
+name. &gt;&gt; Probably not in JSON but like &gt;&gt; Probably not in
+JSON but like &gt;&gt; Probably not in JSON but like &gt;&gt; yeah maybe
+this is something like an &gt;&gt; yeah maybe this is something like an
+&gt;&gt; yeah maybe this is something like an additional criteria we'd
+want to add. keys. keys. keys. &gt;&gt; The repetitive what? &gt;&gt;
+The repetitive what? &gt;&gt; The repetitive what? &gt;&gt; Keys.
+&gt;&gt; Yeah, repetitive keys. Yeah, exactly. &gt;&gt; Yeah, repetitive
+keys. Yeah, exactly. &gt;&gt; Yeah, repetitive keys. Yeah, exactly. So,
+you could um you could start at So, you could um you could start at So,
+you could um you could start at state one, you could generate birth year
+state one, you could generate birth year state one, you could generate
+birth year and you could stay in state four, you and you could stay in
+state four, you and you could stay in state four, you could generate a
+year, you could go could generate a year, you could go could generate a
+year, you could go back, you could generate birth year, you back, you
+could generate birth year, you back, you could generate birth year, you
+could generate a year, you could go could generate a year, you could go
+could generate a year, you could go back. Um, so you could wind up with
+an back. Um, so you could wind up with an back. Um, so you could wind up
+with an output here that is technically valid output here that is
+technically valid output here that is technically valid JSON, but has
+like a thousand birth JSON, but has like a thousand birth JSON, but has
+like a thousand birth years in it, which is probably not true years in
+it, which is probably not true years in it, which is probably not true
+for a single person. for a single person. for a single person. Yeah.
+Yeah. Yeah. &gt;&gt; Possible that birth year is never outed &gt;&gt;
+Possible that birth year is never outed &gt;&gt; Possible that birth
+year is never outed because like in the first state if it because like
+in the first state if it because like in the first state if it goes and
+takes name goes and takes name goes and takes name after that the birth
+year come. after that the birth year come. after that the birth year
+come. &gt;&gt; Yeah. You could output name you could &gt;&gt; Yeah. You
+could output name you could &gt;&gt; Yeah. You could output name you
+could output a name go to state six and then output a name go to state
+six and then output a name go to state six and then end without ever
+outputting the birth end without ever outputting the birth end without
+ever outputting the birth year. So if you wanted to impose a year. So if
+you wanted to impose a year. So if you wanted to impose a criteria that
+they both need to be criteria that they both need to be criteria that
+they both need to be output then you need to Exactly. Yeah. output then
+you need to Exactly. Yeah. output then you need to Exactly. Yeah.
+&gt;&gt; What about nested JSON? Can you do that &gt;&gt; What about
+nested JSON? Can you do that &gt;&gt; What about nested JSON? Can you do
+that here? here? here? &gt;&gt; That's a great question. What about
+&gt;&gt; That's a great question. What about &gt;&gt; That's a great
+question. What about nested JSON? um we can't do that here. nested JSON?
+um we can't do that here. nested JSON? um we can't do that here. Um and
+in fact we cannot do that in this Um and in fact we cannot do that in
+this Um and in fact we cannot do that in this type of construction at
+all. Um and we type of construction at all. Um and we type of
+construction at all. Um and we will talk about that in just a few will
+talk about that in just a few will talk about that in just a few
+minutes. I think there's a we need like minutes. I think there's a we
+need like minutes. I think there's a we need like a slightly more um
+expressive a slightly more um expressive a slightly more um expressive
+construction to do nested JSON. construction to do nested JSON.
+construction to do nested JSON. Um so yeah so this is um kind of a Um so
+yeah so this is um kind of a Um so yeah so this is um kind of a couple
+of issues with this. Maybe one couple of issues with this. Maybe one
+couple of issues with this. Maybe one more is that there's no real
+constraint more is that there's no real constraint more is that there's
+no real constraint here. A birth year could be one number here. A birth
+year could be one number here. A birth year could be one number could be
+a thousand. a name could be it could be a thousand. a name could be it
+could be a thousand. a name could be it can't have any spaces in it. So
+these can't have any spaces in it. So these can't have any spaces in it.
+So these are sort of maybe non-trivial to write are sort of maybe non-
+trivial to write are sort of maybe non-trivial to write ourselves. Um
+the but also kind of fun ourselves. Um the but also kind of fun
+ourselves. Um the but also kind of fun puzzles if if this is the sort of
+thing puzzles if if this is the sort of thing puzzles if if this is the
+sort of thing that uh you enjoy. I think these are that uh you enjoy. I
+think these are that uh you enjoy. I think these are really neat. Um the
+good news is that really neat. Um the good news is that really neat. Um
+the good news is that for pretty much any kind of enforcing of for
+pretty much any kind of enforcing of for pretty much any kind of
+enforcing of a templatic constraint, you're actually a templatic
+constraint, you're actually a templatic constraint, you're actually not
+going to write these yourself. if not going to write these yourself. if
+not going to write these yourself. if you're going to provide some kind
+of set you're going to provide some kind of set you're going to provide
+some kind of set of rules or in the case of JSON in of rules or in the
+case of JSON in of rules or in the case of JSON in particular um actual
+like keys and types particular um actual like keys and types particular
+um actual like keys and types and uh some various libraries will and uh
+some various libraries will and uh some various libraries will enforce
+these for you. enforce these for you. enforce these for you. Um, but
+there's one more problem with Um, but there's one more problem with Um,
+but there's one more problem with these that wasn't really possible to
+see these that wasn't really possible to see these that wasn't really
+possible to see there. And before we talk about things there. And before
+we talk about things there. And before we talk about things like nested
+parenthesis, we're going to like nested parenthesis, we're going to like
+nested parenthesis, we're going to spend just a little bit of time here,
+spend just a little bit of time here, spend just a little bit of time
+here, which is that the when you do this kind which is that the when you
+do this kind which is that the when you do this kind of templated
+generation, um, you're of templated generation, um, you're of templated
+generation, um, you're putting these little like punctuation putting
+these little like punctuation putting these little like punctuation
+tokens kind of on their individual um, tokens kind of on their
+individual um, tokens kind of on their individual um, edges. And this
+can wind up with token edges. And this can wind up with token edges. And
+this can wind up with token boundaries that are quote unquote boundaries
+that are quote unquote boundaries that are quote unquote unnatural. And
+what I mean by that is unnatural. And what I mean by that is unnatural.
+And what I mean by that is that if you your model was generating in that
+if you your model was generating in that if you your model was
+generating in an unconstrained way, it might generate an unconstrained
+way, it might generate an unconstrained way, it might generate something
+like the URL is http something like the URL is http something like the
+URL is http slash. Um, but if you were following slash. Um, but if you
+were following slash. Um, but if you were following this like path along
+an auto uh along an this like path along an auto uh along an this like
+path along an auto uh along an automa to generate this, you might wind
+automa to generate this, you might wind automa to generate this, you
+might wind up with the URL is http you go along an up with the URL is
+http you go along an up with the URL is http you go along an edge and
+the edge gives you the colon edge and the edge gives you the colon edge
+and the edge gives you the colon and then you need to generate without a
+and then you need to generate without a and then you need to generate
+without a space in front two slashes. And this is space in front two
+slashes. And this is space in front two slashes. And this is certainly
+possible. This is probably a certainly possible. This is probably a
+certainly possible. This is probably a token in the vocabulary. But if
+the token in the vocabulary. But if the token in the vocabulary. But if
+the model in when the uh pre-training data model in when the uh pre-
+training data model in when the uh pre-training data was tokenized
+always tokenized this as was tokenized always tokenized this as was
+tokenized always tokenized this as this single token dot slash in uh
+URLs this single token dot slash in uh URLs this single token dot slash
+in uh URLs which is sort of a reasonable choice to which is sort of a
+reasonable choice to which is sort of a reasonable choice to make. Um
+this could be a relatively make. Um this could be a relatively make. Um
+this could be a relatively difficult token to predict. There could
+difficult token to predict. There could difficult token to predict.
+There could be like sort of not a lot of probability be like sort of not
+a lot of probability be like sort of not a lot of probability mass on
+it. Um we don't have to just mass on it. Um we don't have to just mass
+on it. Um we don't have to just sort of accept this as a consequence
+sort of accept this as a consequence sort of accept this as a
+consequence though. Um there's a way to correct this though. Um there's
+a way to correct this though. Um there's a way to correct this which is
+kind of inventively called which is kind of inventively called which is
+kind of inventively called token healing. So the idea here is we've
+token healing. So the idea here is we've token healing. So the idea here
+is we've already generated this colon. We know already generated this
+colon. We know already generated this colon. We know the colon has to be
+the start of the the colon has to be the start of the the colon has to
+be the start of the next token, but it doesn't necessarily next token,
+but it doesn't necessarily next token, but it doesn't necessarily have
+to be the full next token. So we'll have to be the full next token. So
+we'll have to be the full next token. So we'll roll back a token or very
+rarely to of roll back a token or very rarely to of roll back a token or
+very rarely to of generation and we'll just require that generation and
+we'll just require that generation and we'll just require that the next
+token starts with that token the next token starts with that token the
+next token starts with that token that we would have predicted before.
+So that we would have predicted before. So that we would have predicted
+before. So we know we want a token that at least we know we want a token
+that at least we know we want a token that at least begins with colon.
+So we'll look at all begins with colon. So we'll look at all begins with
+colon. So we'll look at all of our candidates for the next token and of
+our candidates for the next token and of our candidates for the next
+token and we'll eliminate everything that doesn't we'll eliminate
+everything that doesn't we'll eliminate everything that doesn't start
+with colon. So colon is still a start with colon. So colon is still a
+start with colon. So colon is still a valid next token, but so is colon
+slash, valid next token, but so is colon slash, valid next token, but so
+is colon slash, which has a lot higher probability um which has a lot
+higher probability um which has a lot higher probability um and so is
+more likely to be selected. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Yes.
+&gt;&gt; So what is the cue to actually? &gt;&gt; So what is the cue to
+actually? &gt;&gt; So what is the cue to actually? &gt;&gt; That's a
+great question. Um there's no &gt;&gt; That's a great question. Um
+there's no &gt;&gt; That's a great question. Um there's no like I think
+single accepted um like like I think single accepted um like like I
+think single accepted um like trigger to do this. Um, generally if
+trigger to do this. Um, generally if trigger to do this. Um, generally
+if you're doing some kind of templatic you're doing some kind of
+templatic you're doing some kind of templatic generation or if you're
+enforcing some generation or if you're enforcing some generation or if
+you're enforcing some kind of schema, it's a good idea to kind of
+schema, it's a good idea to kind of schema, it's a good idea to allow
+for the possibility of token allow for the possibility of token allow
+for the possibility of token healing and then to trigger it according
+healing and then to trigger it according healing and then to trigger it
+according to some like some heruristic rules. Um, to some like some
+heruristic rules. Um, to some like some heruristic rules. Um, does
+anyone actually have a sense of does anyone actually have a sense of
+does anyone actually have a sense of like what those what a heristic for
+that like what those what a heristic for that like what those what a
+heristic for that might be? It's kind of a couple that might be? It's
+kind of a couple that might be? It's kind of a couple that people use
+people use people use &gt;&gt; for when you should do token healing.
+Keep a list of bad characters. Keep a Keep a list of bad characters.
+Keep a Keep a list of bad characters. Keep a list of list of list of
+like for example like for example like for example colon space slash
+colon space slash colon space slash &gt;&gt; would be a bad character.
+&gt;&gt; would be a bad character. &gt;&gt; would be a bad character.
+&gt;&gt; Yeah, you can keep like a list of like &gt;&gt; Yeah, you can
+keep like a list of like &gt;&gt; Yeah, you can keep like a list of like
+common offenders like things like this common offenders like things like
+this common offenders like things like this um colon on its own that is
+likely to be um colon on its own that is likely to be um colon on its
+own that is likely to be something you might want to heal. Um you
+something you might want to heal. Um you something you might want to
+heal. Um you see you're preempting me just a little see you're
+preempting me just a little see you're preempting me just a little here.
+Um, so you could also do this when here. Um, so you could also do this
+when here. Um, so you could also do this when the last token is very
+short. Um, so the last token is very short. Um, so the last token is
+very short. Um, so this would catch the colon case as well. this would
+catch the colon case as well. this would catch the colon case as well.
+But if you have a sense that most of the But if you have a sense that
+most of the But if you have a sense that most of the tokens in your
+vocabulary are more than tokens in your vocabulary are more than tokens
+in your vocabulary are more than one character long, maybe if you get
+one character long, maybe if you get one character long, maybe if you
+get generate a token that is a single generate a token that is a single
+generate a token that is a single character, you might want to um, apply
+character, you might want to um, apply character, you might want to um,
+apply token healing. Um, another heruristic is token healing. Um,
+another heruristic is token healing. Um, another heruristic is that when
+the last token doesn't start that when the last token doesn't start that
+when the last token doesn't start or end with whites space or
+punctuation. or end with whites space or punctuation. or end with whites
+space or punctuation. So a lot of tokens will start with So a lot of
+tokens will start with So a lot of tokens will start with whites spaced
+and that indicates they're whites spaced and that indicates they're
+whites spaced and that indicates they're generally the start of a word.
+Um, a lot generally the start of a word. Um, a lot generally the start
+of a word. Um, a lot of tokens will end with punctuation or of tokens
+will end with punctuation or of tokens will end with punctuation or will
+end with a whites space. Um, of will end with a whites space. Um, of
+will end with a whites space. Um, of course it's possible for a token to
+be course it's possible for a token to be course it's possible for a
+token to be like the end of a word and then there to like the end of a
+word and then there to like the end of a word and then there to be like
+a whites space start of a new be like a whites space start of a new be
+like a whites space start of a new token after. So that's not a perfect
+token after. So that's not a perfect token after. So that's not a
+perfect heristic, but for something like code, heristic, but for
+something like code, heristic, but for something like code, this is a
+reasonable choice to make. Um, this is a reasonable choice to make. Um,
+this is a reasonable choice to make. Um, and when the last token
+predicted was a and when the last token predicted was a and when the
+last token predicted was a exact prefix of another likely token. So
+exact prefix of another likely token. So exact prefix of another likely
+token. So if you looked at that like step where if you looked at that
+like step where if you looked at that like step where you were
+generating colon instead of you were generating colon instead of you
+were generating colon instead of colon slash and you saw that there were
+colon slash and you saw that there were colon slash and you saw that
+there were two tokens that had both had relatively two tokens that had
+both had relatively two tokens that had both had relatively high
+probability and both started with high probability and both started with
+high probability and both started with this prefix. Um that might be a
+sign this prefix. Um that might be a sign this prefix. Um that might be
+a sign that you might need to go back and do that you might need to go
+back and do that you might need to go back and do token healing or that
+you should sort of token healing or that you should sort of token
+healing or that you should sort of rewrite your automa rewrite your
+rewrite your automa rewrite your rewrite your automa rewrite your
+structure such that you don't have to structure such that you don't have
+to structure such that you don't have to make that choice. make that
+choice. make that choice. &gt;&gt; Yes. Can token be done outside of
+like &gt;&gt; Yes. Can token be done outside of like &gt;&gt; Yes. Can
+token be done outside of like these sort of structured these sort of
+structured these sort of structured state machine state machine state
+machine because like it seems to me as if you're because like it seems
+to me as if you're because like it seems to me as if you're discovering
+something in the future discovering something in the future discovering
+something in the future which indicates you went down the wrong which
+indicates you went down the wrong which indicates you went down the
+wrong path like why can't that be done path like why can't that be done
+path like why can't that be done generally for say reasoning or problem
+generally for say reasoning or problem generally for say reasoning or
+problem solving and other things when you solving and other things when
+you solving and other things when you discover that you're at dead end
+perhaps discover that you're at dead end perhaps discover that you're at
+dead end perhaps the last tokens need to be the last tokens need to be
+the last tokens need to be &gt;&gt; yeah um that was a great question so
+I'm &gt;&gt; yeah um that was a great question so I'm &gt;&gt; yeah um
+that was a great question so I'm going to repeat it was why can't you
+going to repeat it was why can't you going to repeat it was why can't
+you just token heal like all the time for just token heal like all the
+time for just token heal like all the time for things like making a long
+for and also things like making a long for and also things like making a
+long for and also for sort of longer sets of tokens like for sort of
+longer sets of tokens like for sort of longer sets of tokens like to go
+back and backtrack. Um, I think to go back and backtrack. Um, I think to
+go back and backtrack. Um, I think the the the the answer on the the
+longer paths is the answer on the the longer paths is the answer on the
+the longer paths is that this in particular won't work for a that this
+in particular won't work for a that this in particular won't work for a
+longer path because you won't have a longer path because you won't have
+a longer path because you won't have a token that's big enough to sort
+of token that's big enough to sort of token that's big enough to sort of
+capture like if you had a um like I capture like if you had a um like I
+capture like if you had a um like I don't know don't know don't know
+it's not working. uh the cat went south it's not working. uh the cat
+went south it's not working. uh the cat went south and you wanted to
+like you decided at and you wanted to like you decided at and you wanted
+to like you decided at this point this was maybe a mistake and this
+point this was maybe a mistake and this point this was maybe a mistake
+and you wanted the token healed cat went you wanted the token healed cat
+went you wanted the token healed cat went south. Cat went south is
+probably not south. Cat went south is probably not south. Cat went south
+is probably not the prefix to any token in your the prefix to any token
+in your the prefix to any token in your vocabulary. So you couldn't do
+this vocabulary. So you couldn't do this vocabulary. So you couldn't do
+this particular trick of looking for particular trick of looking for
+particular trick of looking for prefixes. You could at some point decide
+prefixes. You could at some point decide prefixes. You could at some
+point decide this is actually a bad completion and I this is actually a
+bad completion and I this is actually a bad completion and I want to
+like start over from the and want to like start over from the and want
+to like start over from the and reample again. Um, and there are reample
+again. Um, and there are reample again. Um, and there are inference
+algorithms that do that kind inference algorithms that do that kind
+inference algorithms that do that kind of thing to say like you've made
+a of thing to say like you've made a of thing to say like you've made a
+mistake, you need to go further back. mistake, you need to go further
+back. mistake, you need to go further back. Um, or I've hit like a dead
+end in my Um, or I've hit like a dead end in my Um, or I've hit like a
+dead end in my reasoning. I need to go through another reasoning. I need
+to go through another reasoning. I need to go through another path of
+reasoning. Um, and I think that path of reasoning. Um, and I think that
+path of reasoning. Um, and I think that we will talk in a week or two
+about tree we will talk in a week or two about tree we will talk in a
+week or two about tree of thoughts, which is you can think of of
+thoughts, which is you can think of of thoughts, which is you can think
+of as sort of like a branching of multiple as sort of like a branching
+of multiple as sort of like a branching of multiple sentences instead of
+a branching of sentences instead of a branching of sentences instead of
+a branching of individual tokens. individual tokens. individual tokens.
+&gt;&gt; In this case, aren't we just saying that &gt;&gt; In this case,
+aren't we just saying that &gt;&gt; In this case, aren't we just saying
+that defects of like the defects of like the defects of like the But the
+when we do token healing, we're But the when we do token healing, we're
+But the when we do token healing, we're assuming that what we've
+generated is assuming that what we've generated is assuming that what
+we've generated is not incorrect. It's just like not the not incorrect.
+It's just like not the not incorrect. It's just like not the most
+efficient way to express that in most efficient way to express that in
+most efficient way to express that in the tokenizer. So we're saying
+like we the tokenizer. So we're saying like we the tokenizer. So we're
+saying like we still want to maintain whatever um still want to maintain
+whatever um still want to maintain whatever um output representation we
+had. We just output representation we had. We just output representation
+we had. We just maybe need to tokenize it a different maybe need to
+tokenize it a different maybe need to tokenize it a different way. Um
+because you could have like uh way. Um because you could have like uh
+way. Um because you could have like uh something like like our HTTPS.
+You could tokenize this as two tokens or You could tokenize this as two
+tokens or You could tokenize this as two tokens or you could tokenize
+this as three tokens you could tokenize this as three tokens you could
+tokenize this as three tokens and you would get the same output and you
+would get the same output and you would get the same output
+representation. So we're not actually representation. So we're not
+actually representation. So we're not actually when we heal this back
+into this, we're when we heal this back into this, we're when we heal
+this back into this, we're not actually changing our output string. not
+actually changing our output string. not actually changing our output
+string. We're just changing the tokens of the We're just changing the
+tokens of the We're just changing the tokens of the output to get there.
+&gt;&gt; Yeah. [Music] some of which are not even white space some of
+which are not even white space some of which are not even white space
+separated. separated. separated. &gt;&gt; So does this work there?
+&gt;&gt; So does this work there? &gt;&gt; So does this work there?
+&gt;&gt; Yeah, does this work for other &gt;&gt; Yeah, does this work
+for other &gt;&gt; Yeah, does this work for other languages? Um the like
+particular languages? Um the like particular languages? Um the like
+particular heristic of starting or ending with heristic of starting or
+ending with heristic of starting or ending with whites space doesn't um
+for a lot of whites space doesn't um for a lot of whites space doesn't
+um for a lot of languages, but the notion of like languages, but the
+notion of like languages, but the notion of like healing a token by
+keeping the surface healing a token by keeping the surface healing a
+token by keeping the surface form the same but changing the token form
+the same but changing the token form the same but changing the token
+does. And I think in particular it can does. And I think in particular
+it can does. And I think in particular it can be useful if you have like
+kind of weird be useful if you have like kind of weird be useful if you
+have like kind of weird uh unic code characters where you have uh unic
+code characters where you have uh unic code characters where you have
+like a a diiocritic or something that's like a a diiocritic or something
+that's like a a diiocritic or something that's actually treated as a
+separate token um actually treated as a separate token um actually
+treated as a separate token um in some but is also like if you have in
+some but is also like if you have in some but is also like if you have
+like um this is a token but also like this plus this is a token but also
+like this plus this is a token but also like this plus the unic code to
+add that on top two the unic code to add that on top two the unic code
+to add that on top two separate tokens. You could heal this separate
+tokens. You could heal this separate tokens. You could heal this into
+this representation. And so especially if your tokenizer is And so
+especially if your tokenizer is And so especially if your tokenizer is
+like not too clever about unic code like not too clever about unic code
+like not too clever about unic code things that are actually multiple
+bytes things that are actually multiple bytes things that are actually
+multiple bytes then this is a reasonable thing to do. then this is a
+reasonable thing to do. then this is a reasonable thing to do. Um and
+yeah so I kind of I don't know if Um and yeah so I kind of I don't know
+if Um and yeah so I kind of I don't know if I ever quite answered the
+original part I ever quite answered the original part I ever quite
+answered the original part of your question which was can you do of your
+question which was can you do of your question which was can you do
+token healing if you're not generating token healing if you're not
+generating token healing if you're not generating like a templatic
+generation and you like a templatic generation and you like a templatic
+generation and you could turn this on at any time. Um, it's could turn
+this on at any time. Um, it's could turn this on at any time. Um, it's
+probably most helpful if you're doing probably most helpful if you're
+doing probably most helpful if you're doing something that will mess
+with like the something that will mess with like the something that will
+mess with like the natural output because absence of any natural output
+because absence of any natural output because absence of any other
+constraint, it's much more likely other constraint, it's much more
+likely other constraint, it's much more likely for it to generate the
+sort of heals for it to generate the sort of heals for it to generate
+the sort of heals token than the than the non-healed token than the than
+the non-healed token than the than the non-healed version. But you could
+do this otherwise version. But you could do this otherwise version. But
+you could do this otherwise and it would just if the if you try to and
+it would just if the if you try to and it would just if the if you try
+to heal and the the prefix you're trying to heal and the the prefix
+you're trying to heal and the the prefix you're trying to heal is just
+the most likely next token, heal is just the most likely next token,
+heal is just the most likely next token, then nothing has changed. then
+nothing has changed. then nothing has changed. Um, the reason we don't
+just like Um, the reason we don't just like Um, the reason we don't just
+like automatically do this at every step is automatically do this at
+every step is automatically do this at every step is it's it's just
+expensive. you have to go it's it's just expensive. you have to go it's
+it's just expensive. you have to go back and recomputee. &gt;&gt; Yeah,
+of course. &gt;&gt; Yeah, of course. &gt;&gt; Yeah, of course. Um, so
+what does this look like? Um, in Um, so what does this look like? Um, in
+Um, so what does this look like? Um, in hugging face, u, hugging face
+doesn't hugging face, u, hugging face doesn't hugging face, u, hugging
+face doesn't have a nice native way of doing the have a nice native way
+of doing the have a nice native way of doing the templatic constraints.
+Um, but luckily templatic constraints. Um, but luckily templatic
+constraints. Um, but luckily there are a lot of other good options there
+are a lot of other good options there are a lot of other good options
+out there that do. Um, hugging face does out there that do. Um, hugging
+face does out there that do. Um, hugging face does have a a token
+healing implementation have a a token healing implementation have a a
+token healing implementation and so you can just pass token healing and
+so you can just pass token healing and so you can just pass token
+healing equal true. Um, if you are interested in equal true. Um, if you
+are interested in equal true. Um, if you are interested in in generating
+valid JSON, this is in generating valid JSON, this is in generating
+valid JSON, this is available almost everywhere that you can available
+almost everywhere that you can available almost everywhere that you can
+generate text. Um, uh, in llama CPP, generate text. Um, uh, in llama
+CPP, generate text. Um, uh, in llama CPP, there's like a really nice,
+um, there's like a really nice, um, there's like a really nice, um,
+explanation of their, uh, explanation of their, uh, explanation of
+their, uh, conceptualization of grammarss to conceptualization of
+grammarss to conceptualization of grammarss to enforce, uh, JSON. Um,
+which I think is enforce, uh, JSON. Um, which I think is enforce, uh,
+JSON. Um, which I think is one of the things linked on the website one
+of the things linked on the website one of the things linked on the
+website is an optional reading for this if is an optional reading for
+this if is an optional reading for this if you're interested in sort of
+like what you're interested in sort of like what you're interested in
+sort of like what types of things can be expressed in this types of
+things can be expressed in this types of things can be expressed in this
+way. Um but they have just so you can way. Um but they have just so you
+can way. Um but they have just so you can pass a response format as a
+JSON object. pass a response format as a JSON object. pass a response
+format as a JSON object. And the way that this works under the And the
+way that this works under the And the way that this works under the hood
+is kind of exactly what we hood is kind of exactly what we hood is kind
+of exactly what we described before. Um like a lot of described before.
+Um like a lot of described before. Um like a lot of libraries they also
+allow you to impose libraries they also allow you to impose libraries
+they also allow you to impose a particular schema. So if you had um a
+particular schema. So if you had um a particular schema. So if you had
+um some properties like you wanted your some properties like you wanted
+your some properties like you wanted your output to have exactly one
+name and one output to have exactly one name and one output to have
+exactly one name and one birthday but maybe not a thousand birthday but
+maybe not a thousand birthday but maybe not a thousand birthdays. Um you
+could pass a schema birthdays. Um you could pass a schema birthdays. Um
+you could pass a schema and enforce that uh for your generation. and
+enforce that uh for your generation. and enforce that uh for your
+generation. Um this is sort of yes. Um this is sort of yes. Um this is
+sort of yes. Can we discuss the state implementation Can we discuss the
+state implementation Can we discuss the state implementation drawback?
+So what is like way to enforce drawback? So what is like way to enforce
+drawback? So what is like way to enforce a schema? a schema? a schema?
+&gt;&gt; Yeah. So what is the like way to enforce &gt;&gt; Yeah. So what
+is the like way to enforce &gt;&gt; Yeah. So what is the like way to
+enforce a schema? Um you could actually have a schema? Um you could
+actually have a schema? Um you could actually have great personal risk
+room all the way great personal risk room all the way great personal
+risk room all the way back. You could actually redraw this in back. You
+could actually redraw this in back. You could actually redraw this in
+such a way that fixes those issues. Um such a way that fixes those
+issues. Um such a way that fixes those issues. Um so you could say like
+you have a state so you could say like you have a state so you could say
+like you have a state where you have output the name but no where you
+have output the name but no where you have output the name but no
+birthday and you have a state where birthday and you have a state where
+birthday and you have a state where you've output the birthday but no
+name. you've output the birthday but no name. you've output the birthday
+but no name. And then if you've output the birthday And then if you've
+output the birthday And then if you've output the birthday but no name,
+you can only output a name but no name, you can only output a name but
+no name, you can only output a name and then you can end. If you've
+output and then you can end. If you've output and then you can end. If
+you've output the name but no birthday, you can only the name but no
+birthday, you can only the name but no birthday, you can only output a
+birthday and then end. &gt;&gt; Yeah, for a really bigger complex
+&gt;&gt; Yeah, for a really bigger complex &gt;&gt; Yeah, for a really
+bigger complex schema, wouldn't this become impossible schema, wouldn't
+this become impossible schema, wouldn't this become impossible to
+manage? If you were drawing it out by to manage? If you were drawing it
+out by to manage? If you were drawing it out by hand, definitely. Um but
+if you have hand, definitely. Um but if you have hand, definitely. Um
+but if you have just like a a set of states sort of just like a a set of
+states sort of just like a a set of states sort of programmatically
+somewhere where it's programmatically somewhere where it's
+programmatically somewhere where it's like the valid next tokens are all
+sort like the valid next tokens are all sort like the valid next tokens
+are all sort of outputs from that state um this can of outputs from that
+state um this can of outputs from that state um this can be kind of
+compiled down into a pretty be kind of compiled down into a pretty be
+kind of compiled down into a pretty like efficient just like check
+against a like efficient just like check against a like efficient just
+like check against a list and and mask out the logits. list and and mask
+out the logits. list and and mask out the logits. &gt;&gt; Yes. So does
+the production system use &gt;&gt; Yes. So does the production system
+use &gt;&gt; Yes. So does the production system use state mach for
+example still use state machines? for example still use state machines?
+for example still use state machines? &gt;&gt; They do models like yeah
+do models like &gt;&gt; They do models like yeah do models like &gt;&gt;
+They do models like yeah do models like llama or GBD4 still use state
+machines? llama or GBD4 still use state machines? llama or GBD4 still
+use state machines? Um I mean they don't tell us. I would be Um I mean
+they don't tell us. I would be Um I mean they don't tell us. I would be
+surprised if they were doing something surprised if they were doing
+something surprised if they were doing something different. Um because
+this is like an different. Um because this is like an different. Um
+because this is like an exact solution to the problem. exact solution to
+the problem. exact solution to the problem. Um the caveat here is that
+this I think Um the caveat here is that this I think Um the caveat here
+is that this I think as someone pointed out won't generate as someone
+pointed out won't generate as someone pointed out won't generate
+arbitrary JSON because it can't do arbitrary JSON because it can't do
+arbitrary JSON because it can't do nesting. Um but there's a way to
+design nesting. Um but there's a way to design nesting. Um but there's a
+way to design a variant of a of a state machine that a variant of a of a
+state machine that a variant of a of a state machine that will will will
+&gt;&gt; talk about open AI but we can talk about &gt;&gt; talk about
+open AI but we can talk about &gt;&gt; talk about open AI but we can
+talk about like BLM or SG link and it is supported. like BLM or SG link
+and it is supported. like BLM or SG link and it is supported. &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; Yes. Just to be sure to
+understand this &gt;&gt; Yes. Just to be sure to understand this
+&gt;&gt; Yes. Just to be sure to understand this like suppose I provide
+a like you like suppose I provide a like you like suppose I provide a
+like you provide your example a GP file three uh provide your example a
+GP file three uh provide your example a GP file three uh keys to it like
+suppose I do provide a keys to it like suppose I do provide a keys to it
+like suppose I do provide a very very very 500 key JSON like what is
+that how 500 key JSON like what is that how 500 key JSON like what is
+that how exactly is this graph generated do I exactly is this graph
+generated do I exactly is this graph generated do I specify it does come
+how does this graph come to be come how does this graph come to be come
+how does this graph come to be &gt;&gt; how does this graph come to be I
+think &gt;&gt; how does this graph come to be I think &gt;&gt; how does
+this graph come to be I think that's a great question um I will that's a
+great question um I will that's a great question um I will at great risk
+We're going to try to go at great risk We're going to try to go at great
+risk We're going to try to go to to to the schedule. I think the best
+reference the schedule. I think the best reference the schedule. I think
+the best reference that I have seen for how this works is that I have
+seen for how this works is that I have seen for how this works is the
+one in llama CPP the one in llama CPP the one in llama CPP which is um
+they have they use a variant which is um they have they use a variant
+which is um they have they use a variant like a particular type of
+formal like a particular type of formal like a particular type of formal
+grammar. Um so this like what can you grammar. Um so this like what can
+you grammar. Um so this like what can you produce given these rules? Um
+the way of produce given these rules? Um the way of produce given these
+rules? Um the way of specifying this in like theory of specifying this
+in like theory of specifying this in like theory of computation terms is
+writing a grammar computation terms is writing a grammar computation
+terms is writing a grammar for that language. Um where the language for
+that language. Um where the language for that language. Um where the
+language could be all JSON that meets the schema. could be all JSON that
+meets the schema. could be all JSON that meets the schema. And so this
+is a particular format for And so this is a particular format for And so
+this is a particular format for writing grammarss. Um and it will um so
+writing grammarss. Um and it will um so writing grammarss. Um and it
+will um so it will start from like a root. If it will start from like a
+root. If it will start from like a root. If you've done like um any kind
+of theory you've done like um any kind of theory you've done like um any
+kind of theory of computation class, this would look of computation
+class, this would look of computation class, this would look this would
+be more like a a letter to an this would be more like a a letter to an
+this would be more like a a letter to an arrow to to some output. Um but
+this is arrow to to some output. Um but this is arrow to to some output.
+Um but this is their version of specifying that. And their version of
+specifying that. And their version of specifying that. And then you
+define like terminals being then you define like terminals being then
+you define like terminals being like actual strings that can be output
+like actual strings that can be output like actual strings that can be
+output or character ranges like this like this or character ranges like
+this like this or character ranges like this like this could be text.
+Um, most of the I think could be text. Um, most of the I think could be
+text. Um, most of the I think pretty much all of these will have a
+pretty much all of these will have a pretty much all of these will have
+a helper for JSON because it's the most helper for JSON because it's the
+most helper for JSON because it's the most common version of this where
+if you just common version of this where if you just common version of
+this where if you just pass like a JSON schema or you pass like pass
+like a JSON schema or you pass like pass like a JSON schema or you pass
+like some Python like typed uh dictionaries, some Python like typed uh
+dictionaries, some Python like typed uh dictionaries, it will convert it
+into a format like it will convert it into a format like it will convert
+it into a format like this and then once it's in a format like this and
+then once it's in a format like this and then once it's in a format like
+this, these can be um sort of this, these can be um sort of this, these
+can be um sort of transpiled down into like a parser. This transpiled
+down into like a parser. This transpiled down into like a parser. This
+is adjacent to um how parsing works. So is adjacent to um how parsing
+works. So is adjacent to um how parsing works. So if I understand
+correctly, we're able to if I understand correctly, we're able to if I
+understand correctly, we're able to specify a grammar and that is used
+to specify a grammar and that is used to specify a grammar and that is
+used to construct this graph. In the event that construct this graph. In
+the event that construct this graph. In the event that I do not specify
+grammar and I arbitrary I do not specify grammar and I arbitrary I do
+not specify grammar and I arbitrary arbitrary log JSON arbitrary log
+JSON arbitrary log JSON task, then it will derive a grammar on task,
+then it will derive a grammar on task, then it will derive a grammar on
+its own. its own. its own. &gt;&gt; Yeah, if you've given a if you have
+a &gt;&gt; Yeah, if you've given a if you have a &gt;&gt; Yeah, if
+you've given a if you have a library that has like helpers like this,
+library that has like helpers like this, library that has like helpers
+like this, they will take the JSON you write and they will take the JSON
+you write and they will take the JSON you write and they will convert it
+into a they will convert it into a they will convert it into a
+representation like this grammar and representation like this grammar
+and representation like this grammar and then enforce it as a con a set
+of then enforce it as a con a set of then enforce it as a con a set of
+constraints. constraints. constraints. Yeah, I think uh this is a really
+nice Yeah, I think uh this is a really nice Yeah, I think uh this is a
+really nice little connection with uh theory of little connection with
+uh theory of little connection with uh theory of computation.
+computation. computation. So, So, So, as we're going to wait a sec for
+this to as we're going to wait a sec for this to as we're going to wait
+a sec for this to load. Um so, as Graeme mentioned, this load. Um so, as
+Graeme mentioned, this load. Um so, as Graeme mentioned, this is sort of
+available most places. So, is sort of available most places. So, is sort
+of available most places. So, this you can do this in Langchain. You
+this you can do this in Langchain. You this you can do this in
+Langchain. You can do this in OpenAI. This used to be can do this in
+OpenAI. This used to be can do this in OpenAI. This used to be called
+JSON mode and they've kind of called JSON mode and they've kind of
+called JSON mode and they've kind of changed the name recently to
+structured changed the name recently to structured changed the name
+recently to structured outputs. Um it's a little more general. outputs.
+Um it's a little more general. outputs. Um it's a little more general.
+You can do this in Gemini and here You can do this in Gemini and here
+You can do this in Gemini and here you're passing um a schema which is
+you're passing um a schema which is you're passing um a schema which is
+actually like of Python type. So you're actually like of Python type. So
+you're actually like of Python type. So you're saying it needs to be a
+recipe name and saying it needs to be a recipe name and saying it needs
+to be a recipe name and ingredients and it will look like this
+ingredients and it will look like this ingredients and it will look like
+this format. Um one of the possibly I think format. Um one of the
+possibly I think format. Um one of the possibly I think the original way
+of doing this was from the original way of doing this was from the
+original way of doing this was from this Willard and Lo paper and they
+wrote this Willard and Lo paper and they wrote this Willard and Lo paper
+and they wrote this library and I think founded a this library and I
+think founded a this library and I think founded a startup around this.
+Um, so this is uh startup around this. Um, so this is uh startup around
+this. Um, so this is uh specifying outputs using like Python specifying
+outputs using like Python specifying outputs using like Python typing
+syntax. Um, much in the same way typing syntax. Um, much in the same way
+typing syntax. Um, much in the same way that Gemini is doing here now.
+Um, and that Gemini is doing here now. Um, and that Gemini is doing here
+now. Um, and any one of these is kind of an option any one of these is
+kind of an option any one of these is kind of an option for doing that.
+I think I don't actually for doing that. I think I don't actually for
+doing that. I think I don't actually know if I have the VLM one in here,
+but know if I have the VLM one in here, but know if I have the VLM one
+in here, but VLM also you can pass like a JSON VLM also you can pass
+like a JSON VLM also you can pass like a JSON schema. &gt;&gt; Um,
+&gt;&gt; Um, &gt;&gt; Um, yeah. And I feel like a a valid question yeah.
+And I feel like a a valid question yeah. And I feel like a a valid
+question at this point is could you do this for at this point is could
+you do this for at this point is could you do this for like an arbitrary
+task? Like could you like an arbitrary task? Like could you like an
+arbitrary task? Like could you write ballots? Could you say I need to
+write ballots? Could you say I need to write ballots? Could you say I
+need to write valid C? Um, and this gets into a write valid C? Um, and
+this gets into a write valid C? Um, and this gets into a a kind of like
+tricky corner which I a kind of like tricky corner which I a kind of
+like tricky corner which I think we we hinted at earlier. We talked
+think we we hinted at earlier. We talked think we we hinted at earlier.
+We talked about things that can or cannot be about things that can or
+cannot be about things that can or cannot be expressed in a grammar. Um,
+so who here expressed in a grammar. Um, so who here expressed in a
+grammar. Um, so who here I think Graham asked this last class but I
+think Graham asked this last class but I think Graham asked this last
+class but ask it again just for my own sanity. Who ask it again just for
+my own sanity. Who ask it again just for my own sanity. Who here has
+taken like a theory of here has taken like a theory of here has taken
+like a theory of computation or an automa class? computation or an
+automa class? computation or an automa class? &gt;&gt; Okay. &gt;&gt;
+Okay. &gt;&gt; Okay. &gt;&gt; Or programming languages or compilers.
+&gt;&gt; Or programming languages or compilers. &gt;&gt; Or programming
+languages or compilers. Yes. Great. Okay. So, we've got like Yes. Great.
+Okay. So, we've got like Yes. Great. Okay. So, we've got like some
+subsection of the room. Um, and if some subsection of the room. Um, and
+if some subsection of the room. Um, and if you haven't taken a class in
+this area you haven't taken a class in this area you haven't taken a
+class in this area and this kind of all sounds like a and this kind of
+all sounds like a and this kind of all sounds like a little bit of um
+like insider baseball little bit of um like insider baseball little bit
+of um like insider baseball from a from a corner that you're not in,
+from a from a corner that you're not in, from a from a corner that
+you're not in, that's okay. Um, this is just sort of that's okay. Um,
+this is just sort of that's okay. Um, this is just sort of for a little
+bit of extra context. Um, for a little bit of extra context. Um, for a
+little bit of extra context. Um, so we asked earlier, can we write down
+so we asked earlier, can we write down so we asked earlier, can we write
+down all the rules that will produce JSON? all the rules that will
+produce JSON? all the rules that will produce JSON? Um, and this is kind
+of an interesting Um, and this is kind of an interesting Um, and this is
+kind of an interesting question from a computational question from a
+computational question from a computational perspective. Um the
+immediate thing that perspective. Um the immediate thing that
+perspective. Um the immediate thing that somebody noted is that we we
+have this somebody noted is that we we have this somebody noted is that
+we we have this like notion of nesting parenthesis. Um like notion of
+nesting parenthesis. Um like notion of nesting parenthesis. Um and so
+we'll we would need to if you and so we'll we would need to if you and
+so we'll we would need to if you were writing a schema to or a set of
+were writing a schema to or a set of were writing a schema to or a set
+of rules to produce all valid JSON be able rules to produce all valid
+JSON be able rules to produce all valid JSON be able to say you can
+start with an arbitrary to say you can start with an arbitrary to say
+you can start with an arbitrary number of parentheses as long as you end
+number of parentheses as long as you end number of parentheses as long
+as you end with exactly the same number. Um but with exactly the same
+number. Um but with exactly the same number. Um but this uh like
+automagraph we drew um or this uh like automagraph we drew um or this uh
+like automagraph we drew um or finite automa doesn't have any way of
+finite automa doesn't have any way of finite automa doesn't have any way
+of keeping track of how many times it's keeping track of how many times
+it's keeping track of how many times it's been in a state before, right?
+um it been in a state before, right? um it been in a state before,
+right? um it sort of it just kind of moves through um sort of it just
+kind of moves through um sort of it just kind of moves through um
+without any record of where it's been without any record of where it's
+been without any record of where it's been before. Um and so finance
+automa express before. Um and so finance automa express before. Um and
+so finance automa express a sort of class of languages that we a sort of
+class of languages that we a sort of class of languages that we call
+regular languages. Um if you're call regular languages. Um if you're
+call regular languages. Um if you're enforcing a very particular schema
+um enforcing a very particular schema um enforcing a very particular
+schema um unless that schema allows for some kind unless that schema
+allows for some kind unless that schema allows for some kind of
+arbitrary nesting, generally you can of arbitrary nesting, generally you
+can of arbitrary nesting, generally you can write it out in this format
+where you write it out in this format where you write it out in this
+format where you know exactly how deep your nesting will know exactly
+how deep your nesting will know exactly how deep your nesting will go.
+So you can define like a really long go. So you can define like a really
+long go. So you can define like a really long automa that captures like
+exactly every automa that captures like exactly every automa that
+captures like exactly every level of nesting by just defining a set
+level of nesting by just defining a set level of nesting by just
+defining a set of different states like this is the of different states
+like this is the of different states like this is the state for
+parenthes for brackets nested state for parenthes for brackets nested
+state for parenthes for brackets nested five times versus six versus
+seven. Um five times versus six versus seven. Um five times versus six
+versus seven. Um if you want to do an arbitrary number of if you want to
+do an arbitrary number of if you want to do an arbitrary number of
+course that's not possible. Um and so course that's not possible. Um and
+so course that's not possible. Um and so you need to use a slightly more
+you need to use a slightly more you need to use a slightly more
+expressive class of languages called expressive class of languages
+called expressive class of languages called contextf free um but not
+regular. And uh contextf free um but not regular. And uh contextf free
+um but not regular. And uh the variation here um or the re the way the
+variation here um or the re the way the variation here um or the re the
+way that you would see this represented on that you would see this
+represented on that you would see this represented on that graph is you
+get sort of one extra that graph is you get sort of one extra that graph
+is you get sort of one extra piece of information which is you can piece
+of information which is you can piece of information which is you can
+keep track of a stack of prior values or keep track of a stack of prior
+values or keep track of a stack of prior values or a stack of prior
+information you've a stack of prior information you've a stack of prior
+information you've seen. So you could track like the number seen. So you
+could track like the number seen. So you could track like the number of
+opening versus closing closing of opening versus closing closing of
+opening versus closing closing parenthesis. Um and this is a set of
+parenthesis. Um and this is a set of parenthesis. Um and this is a set
+of languages called contextf free. Um that languages called contextf
+free. Um that languages called contextf free. Um that is a what would be
+a push down automa. is a what would be a push down automa. is a what
+would be a push down automa. So you would write um something that So you
+would write um something that So you would write um something that looks
+very much like this uh uh diagram looks very much like this uh uh
+diagram looks very much like this uh uh diagram that we drew out before,
+but that tracks that we drew out before, but that tracks that we drew
+out before, but that tracks like a little bit of extra information like
+a little bit of extra information like a little bit of extra information
+that gives you a little more expressive that gives you a little more
+expressive that gives you a little more expressive power. Um and in
+general, anything that power. Um and in general, anything that power. Um
+and in general, anything that supports uh JSON schemas is actually
+supports uh JSON schemas is actually supports uh JSON schemas is
+actually writing push down automa to enforce its writing push down
+automa to enforce its writing push down automa to enforce its
+constraints, not FSAs. constraints, not FSAs. constraints, not FSAs. Um,
+if you wanted to impose any more Um, if you wanted to impose any more
+Um, if you wanted to impose any more complicated things than that, like
+if complicated things than that, like if complicated things than that,
+like if you wanted to say uh you can have any you wanted to say uh you
+can have any you wanted to say uh you can have any arbitrary set of keys
+as long as they're arbitrary set of keys as long as they're arbitrary
+set of keys as long as they're all unique or if you in C maybe you can
+all unique or if you in C maybe you can all unique or if you in C maybe
+you can use any variable name you want that use any variable name you
+want that use any variable name you want that meets like these criteria
+as long as meets like these criteria as long as meets like these
+criteria as long as it's been defined earlier up in the same it's been
+defined earlier up in the same it's been defined earlier up in the same
+function or you can use numpy as long as function or you can use numpy
+as long as function or you can use numpy as long as you imported numpy
+further up. um if you you imported numpy further up. um if you you
+imported numpy further up. um if you need to impose constraints that are
+more need to impose constraints that are more need to impose constraints
+that are more complicated than this, you need complicated than this, you
+need complicated than this, you need something a little bit more
+powerful something a little bit more powerful something a little bit
+more powerful than contextf free grammarss. And so than contextf free
+grammarss. And so than contextf free grammarss. And so that's sort of
+the the line where the that's sort of the the line where the that's sort
+of the the line where the ability to enforce this really ability to
+enforce this really ability to enforce this really efficiently in this
+really nice way for efficiently in this really nice way for efficiently
+in this really nice way for generation ends. So you can do this um
+generation ends. So you can do this um generation ends. So you can do
+this um you can enforce like a particular JSON you can enforce like a
+particular JSON you can enforce like a particular JSON schema. You can
+enforce that like it is schema. You can enforce that like it is schema.
+You can enforce that like it is generically valid JSON. But if you want
+generically valid JSON. But if you want generically valid JSON. But if
+you want to enforce other kind of more complex to enforce other kind of
+more complex to enforce other kind of more complex constraints like you
+want like constraints like you want like constraints like you want like
+particular keys to all have different um particular keys to all have
+different um particular keys to all have different um you want all of
+your keys to be unique you want all of your keys to be unique you want
+all of your keys to be unique but you don't want to define what all but
+you don't want to define what all but you don't want to define what all
+the keys could possibly be. Um that gets the keys could possibly be. Um
+that gets the keys could possibly be. Um that gets into a class of
+languages that is not into a class of languages that is not into a class
+of languages that is not contextf free. And so this is like not contextf
+free. And so this is like not contextf free. And so this is like not
+possible to represent in this format. possible to represent in this
+format. possible to represent in this format. Um, and maybe that was a
+little Um, and maybe that was a little Um, and maybe that was a little
+handwavy. Um, if you haven't taken a handwavy. Um, if you haven't taken
+a handwavy. Um, if you haven't taken a theory of computation class, I
+think theory of computation class, I think theory of computation class,
+I think there's like so many cool comput there's like so many cool
+comput there's like so many cool comput connections here. Um, this is
+also like connections here. Um, this is also like connections here. Um,
+this is also like deeply connected to parsing. Yeah. deeply connected to
+parsing. Yeah. deeply connected to parsing. Yeah. &gt;&gt; Have a
+oneline definition for each of &gt;&gt; Have a oneline definition for
+each of &gt;&gt; Have a oneline definition for each of these three
+terms. Context, these three terms. Context, these three terms. Context,
+&gt;&gt; yeah. Yeah. Uh, like a oneline &gt;&gt; yeah. Yeah. Uh, like a
+oneline &gt;&gt; yeah. Yeah. Uh, like a oneline definition for each of
+these. Um, definition for each of these. Um, definition for each of
+these. Um, &gt;&gt; that's a tall order, but uh, &gt;&gt; that's a tall
+order, but uh, &gt;&gt; that's a tall order, but uh, &gt;&gt; yeah.
+&gt;&gt; yeah. &gt;&gt; yeah. Is is church sharing in the room with us
+Is is church sharing in the room with us Is is church sharing in the
+room with us right now? Um I think the uh the big I right now? Um I
+think the uh the big I right now? Um I think the uh the big I think yeah
+think yeah think yeah &gt;&gt; it's not a line, it's a shape. That's
+&gt;&gt; it's not a line, it's a shape. That's &gt;&gt; it's not a line,
+it's a shape. That's okay. Uh so there's a class of things okay. Uh so
+there's a class of things okay. Uh so there's a class of things that you
+can express with um that you can express with um that you can express
+with um uh regular language which is sort of uh regular language which
+is sort of uh regular language which is sort of things that don't
+require any things that don't require any things that don't require any
+extra bookkeeping uh outside of like extra bookkeeping uh outside of
+like extra bookkeeping uh outside of like what you're currently
+standing. That's what you're currently standing. That's what you're
+currently standing. That's really handy. Um but this is things like
+really handy. Um but this is things like really handy. Um but this is
+things like any number any number any number where you can write this as
+a reax that where you can write this as a reax that where you can write
+this as a reax that is like you know 0 to 9 possibly is like you know 0
+to 9 possibly is like you know 0 to 9 possibly infinite amounts.
+infinite amounts. infinite amounts. Um things that are a little more Um
+things that are a little more Um things that are a little more
+complicated than that where you need to complicated than that where you
+need to complicated than that where you need to like you don't need like
+a broad set of like you don't need like a broad set of like you don't
+need like a broad set of information but you need to keep track
+information but you need to keep track information but you need to keep
+track of like some additional of like some additional of like some
+additional symmetry or connection between two parts symmetry or
+connection between two parts symmetry or connection between two parts of
+your input are kind of free. Um of your input are kind of free. Um of
+your input are kind of free. Um and so this is and so this is and so
+this is really regular languages. This is really regular languages. This
+is really regular languages. This is context free languages. Um things
+that context free languages. Um things that context free languages. Um
+things that are and so this could be things like a are and so this could
+be things like a are and so this could be things like a to the n b to
+the n is kind of like a to the n b to the n is kind of like a to the n b
+to the n is kind of like a classic example. This like match numbers
+classic example. This like match numbers classic example. This like
+match numbers of a's and b's or match numbers of of a's and b's or match
+numbers of of a's and b's or match numbers of parentheses parentheses
+parentheses um or json max numbers of curly braces. um or json max
+numbers of curly braces. um or json max numbers of curly braces. Um
+there's a whole broad world outside Um there's a whole broad world
+outside Um there's a whole broad world outside of these two things. Um
+the regular of these two things. Um the regular of these two things. Um
+the regular languages are what can be expressed by languages are what
+can be expressed by languages are what can be expressed by the kind of
+finite state automa we drew the kind of finite state automa we drew the
+kind of finite state automa we drew on the board. Um which is something
+like on the board. Um which is something like on the board. Um which is
+something like this is like our start state. We can do this is like our
+start state. We can do this is like our start state. We can do like 0 to
+9 infinitely on that start like 0 to 9 infinitely on that start like 0
+to 9 infinitely on that start state and this would be like any number.
+state and this would be like any number. state and this would be like
+any number. Um if you want to draw something that is Um if you want to
+draw something that is Um if you want to draw something that is a little
+more complicated that can keep a little more complicated that can keep a
+little more complicated that can keep track of some degree of state like
+this track of some degree of state like this track of some degree of
+state like this you would have something that would look you would have
+something that would look you would have something that would look a
+little more like uh not actually a little more like uh not actually a
+little more like uh not actually memory, but the you would keep track of
+memory, but the you would keep track of memory, but the you would keep
+track of some amount of state. And so you'll see something that has And
+so you'll see something that has And so you'll see something that has
+like these um like little arrows to like these um like little arrows to
+like these um like little arrows to indicate adding state is usually how
+indicate adding state is usually how indicate adding state is usually
+how they're represented and that's a push they're represented and that's
+a push they're represented and that's a push down. down. down. So
+regular languages small set of things So regular languages small set of
+things So regular languages small set of things that are really easy to
+specify. This is that are really easy to specify. This is that are
+really easy to specify. This is also the original meaning of the term
+also the original meaning of the term also the original meaning of the
+term regular expression. Although regular regular expression. Although
+regular regular expression. Although regular expression syntax in some
+languages, expression syntax in some languages, expression syntax in
+some languages, programming languages is actually more programming
+languages is actually more programming languages is actually more
+expressive than this. Um, so this is expressive than this. Um, so this
+is expressive than this. Um, so this is like easy to specify context
+free a like easy to specify context free a like easy to specify context
+free a little harder to specify but still little harder to specify but
+still little harder to specify but still possible. Um, and so this would
+be where possible. Um, and so this would be where possible. Um, and so
+this would be where you see Automa. This is where you'd see you see
+Automa. This is where you'd see you see Automa. This is where you'd see
+a push down. This is where you would see a push down. This is where you
+would see a push down. This is where you would see like um the world of
+compilers is like um the world of compilers is like um the world of
+compilers is usually a little like one step further usually a little
+like one step further usually a little like one step further up. up. up.
+&gt;&gt; Yeah. Um, I'll just add if the term like &gt;&gt; Yeah. Um,
+I'll just add if the term like &gt;&gt; Yeah. Um, I'll just add if the
+term like express is like new to you, um, it's express is like new to
+you, um, it's express is like new to you, um, it's helpful to think of
+it as just like um, helpful to think of it as just like um, helpful to
+think of it as just like um, uh, if you look back at like the figure uh,
+if you look back at like the figure uh, if you look back at like the
+figure from a few slides ago with like the from a few slides ago with
+like the from a few slides ago with like the states instant. states
+instant. states instant. um you just think about all of the um you just
+think about all of the um you just think about all of the possible
+things you could generate from possible things you could generate from
+possible things you could generate from that kind of diagram or like the
+sets of that kind of diagram or like the sets of that kind of diagram or
+like the sets of diagrams that are similar to that diagrams that are
+similar to that diagrams that are similar to that diagram um following
+certain rules as in diagram um following certain rules as in diagram um
+following certain rules as in like no state tracking right sorry no like
+no state tracking right sorry no like no state tracking right sorry no
+yes state tracking no additional yes state tracking no additional yes
+state tracking no additional information yes express is just like
+information yes express is just like information yes express is just
+like what can you possibly generate um with what can you possibly
+generate um with what can you possibly generate um with like the
+combination of like all of the like the combination of like all of the
+like the combination of like all of the possible little possible little
+possible little automa that you automa that you automa that you &gt;&gt;
+Yeah. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt; can make. &gt;&gt; can
+make. &gt;&gt; can make. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Yes.
+&gt;&gt; Yeah. Another way to think about it is a &gt;&gt; Yeah. Another
+way to think about it is a &gt;&gt; Yeah. Another way to think about it
+is a language model like a typical language language model like a
+typical language language model like a typical language model that we
+think about can uh model that we think about can uh model that we think
+about can uh generate anything with some probability generate anything
+with some probability generate anything with some probability like it
+never gives zero probability to like it never gives zero probability to
+like it never gives zero probability to anything. These give uniform
+probability anything. These give uniform probability anything. These
+give uniform probability to everything. So uh everything that's to
+everything. So uh everything that's to everything. So uh everything
+that's accepted by the thumb and give zero accepted by the thumb and
+give zero accepted by the thumb and give zero probability to everything
+else. Um and probability to everything else. Um and probability to
+everything else. Um and so because of this like these are not so because
+of this like these are not so because of this like these are not saying
+anything about whether that's a saying anything about whether that's a
+saying anything about whether that's a good string or not or a likely
+string or good string or not or a likely string or good string or not or
+a likely string or not. It's just telling you yes this is not. It's just
+telling you yes this is not. It's just telling you yes this is an okay
+string. No this is not an okay an okay string. No this is not an okay an
+okay string. No this is not an okay string. Another way you can think
+about string. Another way you can think about string. Another way you
+can think about it actually is you can multiply this it actually is you
+can multiply this it actually is you can multiply this language model by
+our other language language model by our other language language model
+by our other language model. So because this language model model. So
+because this language model model. So because this language model gives
+uniform probability to everything, gives uniform probability to
+everything, gives uniform probability to everything, if you multiply
+this probability by the if you multiply this probability by the if you
+multiply this probability by the other probability, it will give zero to
+other probability, it will give zero to other probability, it will give
+zero to anything that's not accepted and like anything that's not
+accepted and like anything that's not accepted and like uniform
+probability to everything else. uniform probability to everything else.
+uniform probability to everything else. So it won't change the
+probability of So it won't change the probability of So it won't change
+the probability of the things that are okay or it won't the things that
+are okay or it won't the things that are okay or it won't change the
+relative probability of the change the relative probability of the
+change the relative probability of the things that are are okay but it
+will set things that are are okay but it will set things that are are
+okay but it will set the probability of other people's the probability
+of other people's the probability of other people's &gt;&gt; and when
+Graham was drawing like &gt;&gt; and when Graham was drawing like
+&gt;&gt; and when Graham was drawing like weighted finite state automa
+um last weighted finite state automa um last weighted finite state
+automa um last lecture that's kind of exactly what you lecture that's
+kind of exactly what you lecture that's kind of exactly what you could
+think about as happening is it's could think about as happening is it's
+could think about as happening is it's the same level of expressivity
+that you the same level of expressivity that you the same level of
+expressivity that you can you can get the same set of things can you can
+get the same set of things can you can get the same set of things out of
+it but now you've like attached out of it but now you've like attached
+out of it but now you've like attached probabilities to going like to
+two probabilities to going like to two probabilities to going like to
+two versus four and those you generally got versus four and those you
+generally got versus four and those you generally got from your language
+model. &gt;&gt; You don't need a theory of class. &gt;&gt; You don't
+need a theory of class. &gt;&gt; You don't need a theory of class.
+&gt;&gt; Yeah. No, no, take theory of comp. But uh but my question is uh
+like I how But uh but my question is uh like I how But uh but my
+question is uh like I how is this like putside in Netherland? So is this
+like putside in Netherland? So is this like putside in Netherland? So
+like after soft max we have a token. Yeah. Like how do you map from like
+the Yeah. Like how do you map from like the Yeah. Like how do you map
+from like the the softmax over your whole vocabulary the softmax over
+your whole vocabulary the softmax over your whole vocabulary into like
+enforcing constraints like into like enforcing constraints like into
+like enforcing constraints like this? Um you do a kind of like silly
+this? Um you do a kind of like silly this? Um you do a kind of like
+silly simple thing u which I think I didn't simple thing u which I think
+I didn't simple thing u which I think I didn't say too clearly which is
+that you just say too clearly which is that you just say too clearly
+which is that you just sort of set the probabilities to sort of set the
+probabilities to sort of set the probabilities to everything that isn't
+a valid transition everything that isn't a valid transition everything
+that isn't a valid transition in this graph to be like arbitrarily in
+this graph to be like arbitrarily in this graph to be like arbitrarily
+low. Um, and you do that by adding like low. Um, and you do that by
+adding like low. Um, and you do that by adding like a large negative
+right before softmax. a large negative right before softmax. a large
+negative right before softmax. &gt;&gt; So that's the kind of notion of
+like &gt;&gt; So that's the kind of notion of like &gt;&gt; So that's
+the kind of notion of like crossing things out in here is you've
+crossing things out in here is you've crossing things out in here is
+you've just like you've zeroed out the just like you've zeroed out the
+just like you've zeroed out the probability of everything that's not in
+probability of everything that's not in probability of everything that's
+not in this graph. this graph. this graph. &gt;&gt; Yeah. In another way
+to think about it &gt;&gt; Yeah. In another way to think about it
+&gt;&gt; Yeah. In another way to think about it actually um since we
+were talking about actually um since we were talking about actually um
+since we were talking about multiplying the probabilities together.
+multiplying the probabilities together. multiplying the probabilities
+together. Let's say we have the probability of the Let's say we have the
+probability of the Let's say we have the probability of the ln ln ln and
+then we have the probability of the and then we have the probability of
+the and then we have the probability of the auto automaton. Mhm. auto
+automaton. Mhm. auto automaton. Mhm. &gt;&gt; And we always express
+these in um in one &gt;&gt; And we always express these in um in one
+&gt;&gt; And we always express these in um in one probabilities when we
+do or like probabilities when we do or like probabilities when we do or
+like negative one probabilities, right? And negative one probabilities,
+right? And negative one probabilities, right? And so what's a negative
+what's the log so what's a negative what's the log so what's a negative
+what's the log probability of zero probability of zero probability of
+zero &gt;&gt; minus infinity, right? So what you &gt;&gt; minus
+infinity, right? So what you &gt;&gt; minus infinity, right? So what you
+actually do when you calculate these um actually do when you calculate
+these um actually do when you calculate these um in your in pietorch or
+something like in your in pietorch or something like in your in pietorch
+or something like that is you set the probab and you know that is you
+set the probab and you know that is you set the probab and you know if
+it's uniform we can just like set it if it's uniform we can just like
+set it if it's uniform we can just like set it to one um uh and so that
+means all the to one um uh and so that means all the to one um uh and so
+that means all the things that are allowed is the next things that are
+allowed is the next things that are allowed is the next token are zero
+all the things that are token are zero all the things that are token are
+zero all the things that are not allowed to the next token we add not
+allowed to the next token we add not allowed to the next token we add
+minus infinity and then we take the soft minus infinity and then we take
+the soft minus infinity and then we take the soft backs again to
+reormalize into our backs again to reormalize into our backs again to
+reormalize into our probability probability probability &gt;&gt; and so
+that's how we mask out the next &gt;&gt; and so that's how we mask out
+the next &gt;&gt; and so that's how we mask out the next mechanistically
+but also like it mechanistically but also like it mechanistically but
+also like it directly, &gt;&gt; right? So, all this to say um you should
+&gt;&gt; right? So, all this to say um you should &gt;&gt; right? So,
+all this to say um you should take theory of computation and we've take
+theory of computation and we've take theory of computation and we've
+kind of gotten to a set of things that kind of gotten to a set of things
+that kind of gotten to a set of things that are like there's a number of
+things that are like there's a number of things that are like there's a
+number of things that are possible to do with this kind of are possible
+to do with this kind of are possible to do with this kind of like um
+automa inspired setup, but like um automa inspired setup, but like um
+automa inspired setup, but there's also a number of things that are
+there's also a number of things that are there's also a number of things
+that are not possible to do. So something like not possible to do. So
+something like not possible to do. So something like enforcing that it
+generates valid C for enforcing that it generates valid C for enforcing
+that it generates valid C for instance is not um contextf free because
+instance is not um contextf free because instance is not um contextf
+free because you have these requirements like you have these
+requirements like you have these requirements like variables must be
+defined before they variables must be defined before they variables must
+be defined before they are used and so you could not do that are used
+and so you could not do that are used and so you could not do that with
+this type of um method. So yes, go with this type of um method. So yes,
+go with this type of um method. So yes, go ahead or sorry I thought you
+were ahead or sorry I thought you were ahead or sorry I thought you were
+raising your hand like the reason it's context the reason like the
+reason it's context the reason like the reason it's context the reason
+context is a voice because they have a context is a voice because they
+have a context is a voice because they have a notion of some sort of
+memory adjacent notion of some sort of memory adjacent notion of some
+sort of memory adjacent concepts are like the number of concepts are
+like the number of concepts are like the number of connections to the
+nodes. connections to the nodes. connections to the nodes. &gt;&gt;
+Yeah, you can think of them as they have &gt;&gt; Yeah, you can think of
+them as they have &gt;&gt; Yeah, you can think of them as they have a
+stack um like a a stack memory you can a stack um like a a stack memory
+you can a stack um like a a stack memory you can write and read from.
+write and read from. write and read from. &gt;&gt; Why can't that be
+added? &gt;&gt; Why can't that be added? &gt;&gt; Why can't that be
+added? Uh why can't that be added to the like Uh why can't that be added
+to the like Uh why can't that be added to the like regular? So that can
+so you can do regular? So that can so you can do regular? So that can so
+you can do anything kind of up to a contextfree anything kind of up to a
+contextfree anything kind of up to a contextfree parameter um with this
+type of uh like parameter um with this type of uh like parameter um with
+this type of uh like schema enforcing. Um what you can't do schema
+enforcing. Um what you can't do schema enforcing. Um what you can't do
+is add things like keep a list of all of is add things like keep a list
+of all of is add things like keep a list of all of the variables that
+have been defined the variables that have been defined the variables
+that have been defined before and check if the thing I'm before and
+check if the thing I'm before and check if the thing I'm generating is
+from that list because you generating is from that list because you
+generating is from that list because you couldn't do that with just
+reading couldn't do that with just reading couldn't do that with just
+reading writing from a single stack. If you have if you can write to
+multiple If you have if you can write to multiple If you have if you can
+write to multiple stacks or if you have sort of like a stacks or if you
+have sort of like a stacks or if you have sort of like a long line of um
+long line of um long line of um I in these terms tape like a long line I
+in these terms tape like a long line I in these terms tape like a long
+line of places you can read and write then of places you can read and
+write then of places you can read and write then you could do that but
+that would be a you could do that but that would be a you could do that
+but that would be a more a strictly more expressive thing more a
+strictly more expressive thing more a strictly more expressive thing
+than a contextfree language that would than a contextfree language that
+would than a contextfree language that would be a touring machine. Um,
+and so then we be a touring machine. Um, and so then we be a touring
+machine. Um, and so then we get into a whole another can of words, get
+into a whole another can of words, get into a whole another can of
+words, but that's not possible to enforce in but that's not possible to
+enforce in but that's not possible to enforce in this kind of like token
+by token um, this kind of like token by token um, this kind of like
+token by token um, checking way that we did here. checking way that we
+did here. checking way that we did here. &gt;&gt; So we'll move now into
+a &gt;&gt; So we'll move now into a &gt;&gt; So we'll move now into a
+&gt;&gt; Yeah. Yeah. totally &gt;&gt; Yeah. Yeah. totally &gt;&gt; Yeah.
+Yeah. totally &gt;&gt; sorry. Can you alter right now all &gt;&gt;
+sorry. Can you alter right now all &gt;&gt; sorry. Can you alter right
+now all you've done is that you things you've done is that you things
+you've done is that you things distribution and let everything that's
+distribution and let everything that's distribution and let everything
+that's unchanged except by normal unchanged except by normal unchanged
+except by normal &gt;&gt; now to introduce any notions of like you
+&gt;&gt; now to introduce any notions of like you &gt;&gt; now to
+introduce any notions of like you know know know can you augment the
+probability can you augment the probability can you augment the
+probability distribution after you've done this sort distribution after
+you've done this sort distribution after you've done this sort of
+filteration of filteration of filteration &gt;&gt; yeah could you like
+augment the &gt;&gt; yeah could you like augment the &gt;&gt; yeah could
+you like augment the probability distribution after you've probability
+distribution after you've probability distribution after you've done
+this sort of cut off um you can and done this sort of cut off um you can
+and done this sort of cut off um you can and you could not do so in such
+a way that you could not do so in such a way that you could not do so in
+such a way that would give you like the ability ility to would give you
+like the ability ility to would give you like the ability ility to to
+simulate like an arbitrary language to simulate like an arbitrary
+language to simulate like an arbitrary language like C. Um you what you
+could do is you like C. Um you what you could do is you like C. Um you
+what you could do is you could set aside the idea of automa could set
+aside the idea of automa could set aside the idea of automa entirely and
+apply some constraints to entirely and apply some constraints to
+entirely and apply some constraints to your probability distribution to
+reshape your probability distribution to reshape your probability
+distribution to reshape it to make it more likely that you'd it to make
+it more likely that you'd it to make it more likely that you'd wind up
+with valid C and that's what wind up with valid C and that's what wind
+up with valid C and that's what we're going to do next. we're going to
+do next. we're going to do next. &gt;&gt; I think &gt;&gt; I think
+&gt;&gt; I think &gt;&gt; yeah &gt;&gt; yeah &gt;&gt; yeah um I I think
+this stuff is really cool. um I I think this stuff is really cool. um I
+I think this stuff is really cool. I used to if you ever want to talk
+about I used to if you ever want to talk about I used to if you ever
+want to talk about it more I'm happy to it more I'm happy to it more I'm
+happy to &gt;&gt; Yeah. Um so now we have these kind of &gt;&gt; Yeah.
+Um so now we have these kind of &gt;&gt; Yeah. Um so now we have these
+kind of constraints um for JSON that are they constraints um for JSON
+that are they constraints um for JSON that are they have this nice
+property that token by have this nice property that token by have this
+nice property that token by token we know whether we're are token we
+know whether we're are token we know whether we're are satisfying our
+constraint or not. Um if satisfying our constraint or not. Um if
+satisfying our constraint or not. Um if our constraint isn't doesn't
+have this our constraint isn't doesn't have this our constraint isn't
+doesn't have this sort of nice property we need to do some sort of nice
+property we need to do some sort of nice property we need to do some
+sort of estimation of whether we're sort of estimation of whether we're
+sort of estimation of whether we're going to satisfy the constraint
+instead. going to satisfy the constraint instead. going to satisfy the
+constraint instead. Um and here this is sort of a much Um and here this
+is sort of a much Um and here this is sort of a much broader class of
+constraints that broader class of constraints that broader class of
+constraints that includes things that can be a little includes things
+that can be a little includes things that can be a little more handwavy
+maybe than than the sort more handwavy maybe than than the sort more
+handwavy maybe than than the sort of strict format checking. So for of
+strict format checking. So for of strict format checking. So for
+instance, if I say this semantic instance, if I say this semantic
+instance, if I say this semantic constraint, I want to describe like a
+constraint, I want to describe like a constraint, I want to describe
+like a hobby I could try to stay in shape, but hobby I could try to stay
+in shape, but hobby I could try to stay in shape, but I do not want the
+model to tell me to go I do not want the model to tell me to go I do not
+want the model to tell me to go climbing. Like I've decided I don't want
+climbing. Like I've decided I don't want climbing. Like I've decided I
+don't want to go climbing. I'm looking at Clara to go climbing. I'm
+looking at Clara to go climbing. I'm looking at Clara directly in the
+eyes. Please don't take directly in the eyes. Please don't take directly
+in the eyes. Please don't take me climbing. Um this is not like me
+climbing. Um this is not like me climbing. Um this is not like possible
+to enforce through like a possible to enforce through like a possible to
+enforce through like a nitro, right? How do we prevent the nitro, right?
+How do we prevent the nitro, right? How do we prevent the model from
+suggesting this? Um and a model from suggesting this? Um and a model
+from suggesting this? Um and a year ago when I when I first made this
+year ago when I when I first made this year ago when I when I first made
+this slide, I asked I think this is Gemini slide, I asked I think this
+is Gemini slide, I asked I think this is Gemini 1.5 at the time. Um, and
+true to form, 1.5 at the time. Um, and true to form, 1.5 at the time.
+Um, and true to form, it got it got sort of a couple a couple it got it
+got sort of a couple a couple it got it got sort of a couple a couple
+lines into this generation. It suggested lines into this generation. It
+suggested lines into this generation. It suggested some great ideas and
+then it cycled back some great ideas and then it cycled back some great
+ideas and then it cycled back around to climbing. Um, this has changed
+around to climbing. Um, this has changed around to climbing. Um, this
+has changed in the last uh like 10 months or so. So, in the last uh like
+10 months or so. So, in the last uh like 10 months or so. So, GPD5 no
+longer suggests climbing too if GPD5 no longer suggests climbing too if
+GPD5 no longer suggests climbing too if you say you don't want to um go
+you say you don't want to um go you say you don't want to um go
+climbing, which officially means climbing, which officially means
+climbing, which officially means language models have beat my friends on
+language models have beat my friends on language models have beat my
+friends on the Amanda Hobby benchmark. Um, but even the Amanda Hobby
+benchmark. Um, but even the Amanda Hobby benchmark. Um, but even so, say
+say you have a model that's so, say say you have a model that's so, say
+say you have a model that's maybe slightly less performant than maybe
+slightly less performant than maybe slightly less performant than that.
+Is there is there something you that. Is there is there something you
+that. Is there is there something you can do to get it from to no longer
+can do to get it from to no longer can do to get it from to no longer
+suggest this to you? Um maybe if we were suggest this to you? Um maybe
+if we were suggest this to you? Um maybe if we were just talking about
+templates, the just talking about templates, the just talking about
+templates, the reasonable thing to do is just set the reasonable thing
+to do is just set the reasonable thing to do is just set the probability
+of the token climbing to be probability of the token climbing to be
+probability of the token climbing to be zero. Um this is like a a kind
+of zero. Um this is like a a kind of zero. Um this is like a a kind of
+hardline approach. It's very easy to hardline approach. It's very easy
+to hardline approach. It's very easy to implement. We know how to do
+this, implement. We know how to do this, implement. We know how to do
+this, right? We just add a giant negative to right? We just add a giant
+negative to right? We just add a giant negative to the logit and softmax
+again. Um but it's the logit and softmax again. Um but it's the logit
+and softmax again. Um but it's bad if there are sort of synonyms. Maybe
+bad if there are sort of synonyms. Maybe bad if there are sort of
+synonyms. Maybe if I don't want to go climbing, I also if I don't want
+to go climbing, I also if I don't want to go climbing, I also don't want
+to go bouldering. Um, and don't want to go bouldering. Um, and don't
+want to go bouldering. Um, and it's bad if the tokens we restrict could
+it's bad if the tokens we restrict could it's bad if the tokens we
+restrict could be used in sort of allowed ways. Like be used in sort of
+allowed ways. Like be used in sort of allowed ways. Like maybe I want to
+um talk about like maybe I want to um talk about like maybe I want to um
+talk about like hiking where you have to sort of go hiking where you
+have to sort of go hiking where you have to sort of go climbing up this
+mountain to see a good climbing up this mountain to see a good climbing
+up this mountain to see a good view. That's a valid way of talking view.
+That's a valid way of talking view. That's a valid way of talking about
+hiking. Um, but it doesn't about hiking. Um, but it doesn't about
+hiking. Um, but it doesn't actually sort of convey this meaning actually
+sort of convey this meaning actually sort of convey this meaning we're
+trying to restrict. Um, and it's we're trying to restrict. Um, and it's
+we're trying to restrict. Um, and it's also bad if we generate other
+related also bad if we generate other related also bad if we generate
+other related terms before the term we're trying to terms before the
+term we're trying to terms before the term we're trying to restrict. So
+if the model says a great restrict. So if the model says a great
+restrict. So if the model says a great activity you could do with your
+friends activity you could do with your friends activity you could do
+with your friends is rock and then we are not allowed to is rock and
+then we are not allowed to is rock and then we are not allowed to
+produce the term climbing, you could produce the term climbing, you
+could produce the term climbing, you could wind up with some like really
+wind up with some like really wind up with some like really non-
+naturalistic or nonfluent non-naturalistic or nonfluent non-naturalistic
+or nonfluent generation. Um so this we're not going generation. Um so
+this we're not going generation. Um so this we're not going to get out
+of this problem by just sort to get out of this problem by just sort to
+get out of this problem by just sort of hitting it with a big softmax
+like of hitting it with a big softmax like of hitting it with a big
+softmax like hammer. Um we always sort of have this hammer. Um we always
+sort of have this hammer. Um we always sort of have this option that we
+talked about um in option that we talked about um in option that we
+talked about um in diverse beam search as well where we diverse beam
+search as well where we diverse beam search as well where we could just
+generate a set and filter. could just generate a set and filter. could
+just generate a set and filter. Um, this could be extremely Um, this
+could be extremely Um, this could be extremely computationally expensive
+if the thing computationally expensive if the thing computationally
+expensive if the thing we're trying to restrict is a relatively we're
+trying to restrict is a relatively we're trying to restrict is a
+relatively common output. Um, but it's has this common output. Um, but
+it's has this common output. Um, but it's has this advantage that it's
+easier for us to advantage that it's easier for us to advantage that
+it's easier for us to check that full sequences violate the check that
+full sequences violate the check that full sequences violate the
+constraint than subsequences because we constraint than subsequences
+because we constraint than subsequences because we no longer have this
+like token-wise no longer have this like token-wise no longer have this
+like token-wise verifiability. verifiability. verifiability. Um, we
+could do something like Um, we could do something like Um, we could do
+something like neurologic a which we talked about neurologic a which we
+talked about neurologic a which we talked about before. Um, it does
+allow us to look before. Um, it does allow us to look before. Um, it
+does allow us to look ahead which is nice, but this is a ahead which is
+nice, but this is a ahead which is nice, but this is a constraint that's
+a little harder to constraint that's a little harder to constraint
+that's a little harder to verify. um where I couldn't just sort of
+verify. um where I couldn't just sort of verify. um where I couldn't
+just sort of write a list of unallowable terms. You write a list of
+unallowable terms. You write a list of unallowable terms. You know, if I
+tried to write like a rule know, if I tried to write like a rule know,
+if I tried to write like a rule that indicates whether an output is that
+indicates whether an output is that indicates whether an output is about
+timing or not, I could maybe write about timing or not, I could maybe
+write about timing or not, I could maybe write like a very long set of
+huristics, you like a very long set of huristics, you like a very long
+set of huristics, you could check. Um but this isn't really could check.
+Um but this isn't really could check. Um but this isn't really something
+I could specify with a reax, something I could specify with a reax,
+something I could specify with a reax, right? So, we need to think about
+how we right? So, we need to think about how we right? So, we need to
+think about how we calculate this huristic a little bit calculate this
+huristic a little bit calculate this huristic a little bit differently.
+differently. differently. Uh we'll talk about sort of one uh Uh we'll
+talk about sort of one uh Uh we'll talk about sort of one uh method in
+this category, which is a method in this category, which is a method in
+this category, which is a method called fudge. Um the idea here is
+method called fudge. Um the idea here is method called fudge. Um the
+idea here is that we started with this probability that we started with
+this probability that we started with this probability distribution
+which is sort of our distribution which is sort of our distribution
+which is sort of our standard distribution over the next standard
+distribution over the next standard distribution over the next token
+given our our inputs and our token given our our inputs and our token
+given our our inputs and our outputs so far. We want to impose this
+outputs so far. We want to impose this outputs so far. We want to impose
+this additional constraint or condition on additional constraint or
+condition on additional constraint or condition on this additional
+factor a and this could this additional factor a and this could this
+additional factor a and this could be we want the topic to be not
+climbing be we want the topic to be not climbing be we want the topic to
+be not climbing which could be we want the in in sort of which could be
+we want the in in sort of which could be we want the in in sort of the
+example we'll do here is could be we the example we'll do here is could
+be we the example we'll do here is could be we want the text to be
+formal or informal. want the text to be formal or informal. want the
+text to be formal or informal. Um it could be we want the text to it Um
+it could be we want the text to it Um it could be we want the text to it
+could even be we want the text to be could even be we want the text to
+be could even be we want the text to be valid JSON just some kind of
+constraint valid JSON just some kind of constraint valid JSON just some
+kind of constraint that we want to modify the probability that we want
+to modify the probability that we want to modify the probability
+distribution according to the insight of distribution according to the
+insight of distribution according to the insight of fudge and of methods
+like fudge is that fudge and of methods like fudge is that fudge and of
+methods like fudge is that this is a relatively hard um thing to do this
+is a relatively hard um thing to do this is a relatively hard um thing
+to do this middle equation if we we sort of this middle equation if we
+we sort of this middle equation if we we sort of need to train a model
+maybe that need to train a model maybe that need to train a model maybe
+that conditions on a separate thing and this conditions on a separate
+thing and this conditions on a separate thing and this is certainly
+something you can do this a is certainly something you can do this a is
+certainly something you can do this a class conditioned language model
+so you class conditioned language model so you class conditioned
+language model so you could say like I trained a model that could say
+like I trained a model that could say like I trained a model that takes
+an input that is the style of text takes an input that is the style of
+text takes an input that is the style of text as well as the text that I
+just trained as well as the text that I just trained as well as the text
+that I just trained on and it will always if you give it the on and it
+will always if you give it the on and it will always if you give it the
+input formal it will give you formal if input formal it will give you
+formal if input formal it will give you formal if you give it the input
+informal it will you give it the input informal it will you give it the
+input informal it will give you informal but if you want to give you
+informal but if you want to give you informal but if you want to take a
+model that wasn't trained in this take a model that wasn't trained in
+this take a model that wasn't trained in this manner this is a
+relatively hard thing manner this is a relatively hard thing manner this
+is a relatively hard thing to solve but by base rule you can just to
+solve but by base rule you can just to solve but by base rule you can
+just rewrite this um or with to within a rewrite this um or with to
+within a rewrite this um or with to within a constant you can write this
+as constant you can write this as constant you can write this as
+proportional to um p of the constraint proportional to um p of the
+constraint proportional to um p of the constraint being satisfied given
+where we are so being satisfied given where we are so being satisfied
+given where we are so far plus the probability of predicting far plus
+the probability of predicting far plus the probability of predicting
+that thing. Um, and here this is P of that thing. Um, and here this is P
+of that thing. Um, and here this is P of the constraint being satisfied
+given the the constraint being satisfied given the the constraint being
+satisfied given the substring up to the token we're about to substring
+up to the token we're about to substring up to the token we're about to
+produce. Um, and the probability of produce. Um, and the probability of
+produce. Um, and the probability of producing that token. And this is a
+producing that token. And this is a producing that token. And this is a
+proportional, which is okay because proportional, which is okay because
+proportional, which is okay because we're going to softmax everything
+we're going to softmax everything we're going to softmax everything
+anyway. So, we don't care about sort of anyway. So, we don't care about
+sort of anyway. So, we don't care about sort of exact value. So, how do
+we compute the exact value. So, how do we compute the exact value. So,
+how do we compute the probability that we're going to satisfy
+probability that we're going to satisfy probability that we're going to
+satisfy a constraint given just like sort of the a constraint given just
+like sort of the a constraint given just like sort of the string up to
+the decision we're about to string up to the decision we're about to
+string up to the decision we're about to make? Um make? Um make? Um the
+idea here is that this is a much the idea here is that this is a much
+the idea here is that this is a much easier task than actually
+predicting the easier task than actually predicting the easier task than
+actually predicting the whole string. And so we can take a bunch whole
+string. And so we can take a bunch whole string. And so we can take a
+bunch of data we already have if we have any of data we already have if
+we have any of data we already have if we have any kind of labeled data
+for this task and kind of labeled data for this task and kind of labeled
+data for this task and turn it into data for this. So if we turn it into
+data for this. So if we turn it into data for this. So if we have this
+formal and informal data and have this formal and informal data and have
+this formal and informal data and we want to um predict how likely it is
+we want to um predict how likely it is we want to um predict how likely
+it is that an output will meet the constraint that an output will meet
+the constraint that an output will meet the constraint of formality by
+the end, we could of formality by the end, we could of formality by the
+end, we could tokenize each of our things in formal tokenize each of our
+things in formal tokenize each of our things in formal and tokenize each
+of our things in and tokenize each of our things in and tokenize each of
+our things in informal and take every substring informal and take every
+substring informal and take every substring starting from the the start
+as an input starting from the the start as an input starting from the
+the start as an input example. So I um would get the label example. So I
+um would get the label example. So I um would get the label formal. I
+would would get the label formal. I would would get the label formal. I
+would would get the label formal. I would appreciate we get the formal.
+I would appreciate we get the formal. I would appreciate we get the
+label formal in this data. And if you do label formal in this data. And
+if you do label formal in this data. And if you do this over a really
+large corpus, you'll this over a really large corpus, you'll this over a
+really large corpus, you'll wind up with a bunch of examples and wind up
+with a bunch of examples and wind up with a bunch of examples and you'll
+get some kind of notion like you'll get some kind of notion like you'll
+get some kind of notion like maybe starting with I has relatively maybe
+starting with I has relatively maybe starting with I has relatively
+equal probability of coming from formal equal probability of coming from
+formal equal probability of coming from formal or informal. But starting
+with I would or informal. But starting with I would or informal. But
+starting with I would appreciate is almost always only seen in
+appreciate is almost always only seen in appreciate is almost always
+only seen in the formal data and not the informal the formal data and
+not the informal the formal data and not the informal data. And so you
+could train a data. And so you could train a data. And so you could
+train a classifier given some one of these classifier given some one of
+these classifier given some one of these substrings to predict whether
+the whole substrings to predict whether the whole substrings to predict
+whether the whole output that was sampled from is formal output that was
+sampled from is formal output that was sampled from is formal or
+informal. Um and this data is or informal. Um and this data is or
+informal. Um and this data is relatively easy to get. relatively easy to
+get. relatively easy to get. Once you have that data, you can take Once
+you have that data, you can take Once you have that data, you can take
+your language model maybe with some your language model maybe with some
+your language model maybe with some input do you and you you can pass
+things input do you and you you can pass things input do you and you you
+can pass things through the model as you would have through the model as
+you would have through the model as you would have before. So here you
+pass through the before. So here you pass through the before. So here
+you pass through the model itself and you get some sort of model itself
+and you get some sort of model itself and you get some sort of
+distribution over some candidate output distribution over some candidate
+output distribution over some candidate output tokens. But then you can
+also pass each tokens. But then you can also pass each tokens. But then
+you can also pass each of the input plus each of those of the input plus
+each of those of the input plus each of those candidate tokens through
+this scoring candidate tokens through this scoring candidate tokens
+through this scoring thing you've just trained. So you say thing you've
+just trained. So you say thing you've just trained. So you say what's
+the probability that my output what's the probability that my output
+what's the probability that my output will be formal given do you want
+or do will be formal given do you want or do will be formal given do you
+want or do you prefer or do you thus and it will you prefer or do you
+thus and it will you prefer or do you thus and it will give you an out
+sort of formality give you an out sort of formality give you an out sort
+of formality prediction a prediction that you're prediction a prediction
+that you're prediction a prediction that you're going to wind up with a
+formal text. Um going to wind up with a formal text. Um going to wind up
+with a formal text. Um so you can see here thus is a really low so you
+can see here thus is a really low so you can see here thus is a really
+low probability output in general because probability output in general
+because probability output in general because it's not maybe like the
+most uh standard it's not maybe like the most uh standard it's not maybe
+like the most uh standard way of saying this but thus is a do thus way
+of saying this but thus is a do thus way of saying this but thus is a do
+thus is a very formal like phrase and so it is a very formal like phrase
+and so it is a very formal like phrase and so it gets a high formality
+score but a low gets a high formality score but a low gets a high
+formality score but a low overall score. Then you simply uh overall
+score. Then you simply uh overall score. Then you simply uh multiply
+these together or in log space multiply these together or in log space
+multiply these together or in log space add and you wind up with scores
+that add and you wind up with scores that add and you wind up with
+scores that factor in both the overall probability factor in both the
+overall probability factor in both the overall probability and this sort
+of formality probability. and this sort of formality probability. and
+this sort of formality probability. So the thing that sort of we'd like
+to So the thing that sort of we'd like to So the thing that sort of we'd
+like to happen happens which is want and prefer happen happens which is
+want and prefer happen happens which is want and prefer were relatively
+even probability but were relatively even probability but were
+relatively even probability but prefer is more formal so it gets prefer
+is more formal so it gets prefer is more formal so it gets updated. Um,
+and so you wind up with the updated. Um, and so you wind up with the
+updated. Um, and so you wind up with the output, do you prefer? And this
+idea of output, do you prefer? And this idea of output, do you prefer?
+And this idea of sort of looking one token into the sort of looking one
+token into the sort of looking one token into the future and trying to
+make a a binary future and trying to make a a binary future and trying
+to make a a binary decision is where the name fudge comes decision is
+where the name fudge comes decision is where the name fudge comes from.
+This is future discriminators. from. This is future discriminators.
+from. This is future discriminators. So you're discriminating formal or
+So you're discriminating formal or So you're discriminating formal or
+informal based on this next token. informal based on this next token.
+informal based on this next token. Um, and there's a kind of a few Um,
+and there's a kind of a few Um, and there's a kind of a few limitations
+to this. So this is limitations to this. So this is limitations to this.
+So this is generally a really nice idea. The first generally a really
+nice idea. The first generally a really nice idea. The first is that you
+have to pass the future is that you have to pass the future is that you
+have to pass the future discriminator over sort of all of the
+discriminator over sort of all of the discriminator over sort of all of
+the tokens you're going to decide between at tokens you're going to
+decide between at tokens you're going to decide between at the next
+step, right? You the future the next step, right? You the future the
+next step, right? You the future discriminator takes one more token than
+discriminator takes one more token than discriminator takes one more
+token than you've actually predicted. Um so you you've actually
+predicted. Um so you you've actually predicted. Um so you need to pass
+do you want, do you prefer, need to pass do you want, do you prefer,
+need to pass do you want, do you prefer, do you thus each of these
+through your do you thus each of these through your do you thus each of
+these through your your decision your discriminator. Um the your
+decision your discriminator. Um the your decision your discriminator. Um
+the solution to this that they propose is solution to this that they
+propose is solution to this that they propose is sort of twofold. They
+only run the sort of twofold. They only run the sort of twofold. They
+only run the future discriminator on a small subset. future
+discriminator on a small subset. future discriminator on a small subset.
+So if you take for instance in their So if you take for instance in
+their So if you take for instance in their case they take the top 200
+most likely case they take the top 200 most likely case they take the
+top 200 most likely next tokens um and you run on just those next tokens
+um and you run on just those next tokens um and you run on just those
+200 instead of all 100,000 and some um 200 instead of all 100,000 and
+some um 200 instead of all 100,000 and some um because you know that
+even if something because you know that even if something because you
+know that even if something is really formal if it's the you know is
+really formal if it's the you know is really formal if it's the you know
+100,000 most likely token it's not going 100,000 most likely token it's
+not going 100,000 most likely token it's not going to get predicted
+anyway. Um and then the to get predicted anyway. Um and then the to get
+predicted anyway. Um and then the other thing they do is they use a very
+other thing they do is they use a very other thing they do is they use a
+very small model and because this sort of small model and because this
+sort of small model and because this sort of zero one choice is a
+relatively easy zero one choice is a relatively easy zero one choice is
+a relatively easy thing to learn. This is this is possible thing to
+learn. This is this is possible thing to learn. This is this is possible
+to do. to do. to do. Um the other limitation is that this is Um the
+other limitation is that this is Um the other limitation is that this is
+not guaranteed to satisfy the not guaranteed to satisfy the not
+guaranteed to satisfy the constraint. Um this is true sort of in
+constraint. Um this is true sort of in constraint. Um this is true sort
+of in general of any method that's trying to general of any method
+that's trying to general of any method that's trying to predict the
+future. Um so you could you predict the future. Um so you could you
+predict the future. Um so you could you could sort of in practice if
+you're could sort of in practice if you're could sort of in practice if
+you're doing something like formality you could doing something like
+formality you could doing something like formality you could say this is
+probably good enough. It's say this is probably good enough. It's say
+this is probably good enough. It's okay if it occasionally sounds a
+little okay if it occasionally sounds a little okay if it occasionally
+sounds a little informal. If you have a constraint that informal. If you
+have a constraint that informal. If you have a constraint that it's
+really important to you, you could it's really important to you, you
+could it's really important to you, you could couple this with something
+like couple this with something like couple this with something like
+rejection sampling over a set of outputs rejection sampling over a set
+of outputs rejection sampling over a set of outputs where you can then
+once you've seen the where you can then once you've seen the where you
+can then once you've seen the full output rescore and reject anything
+full output rescore and reject anything full output rescore and reject
+anything that doesn't seem um like appropriate. that doesn't seem um
+like appropriate. that doesn't seem um like appropriate. Um and this
+requires access to logits Um and this requires access to logits Um and
+this requires access to logits which is sort of a fundamental which is
+sort of a fundamental which is sort of a fundamental requirement of of
+this method and of a requirement of of this method and of a requirement
+of of this method and of a number of methods like it. number of methods
+like it. number of methods like it. Um there's a kind of interesting Um
+there's a kind of interesting Um there's a kind of interesting
+connection here which um I think we're connection here which um I think
+we're connection here which um I think we're not going to spend too much
+time on but not going to spend too much time on but not going to spend
+too much time on but that is explored in detail in a paper a that is
+explored in detail in a paper a that is explored in detail in a paper a
+very good paper called control decoding very good paper called control
+decoding very good paper called control decoding and also a very good
+paper called I and also a very good paper called I and also a very good
+paper called I think RHF as Beijian inference think RHF as Beijian
+inference think RHF as Beijian inference um which is the corbecol that
+this these um which is the corbecol that this these um which is the
+corbecol that this these figures are from and the connection here
+figures are from and the connection here figures are from and the
+connection here is that you can frame RLHF and they is that you can
+frame RLHF and they is that you can frame RLHF and they actually prove
+you can frame RHF as this actually prove you can frame RHF as this
+actually prove you can frame RHF as this sort of manipulation in like a
+a Beijian sort of manipulation in like a a Beijian sort of manipulation
+in like a a Beijian inference sense where your prior is the inference
+sense where your prior is the inference sense where your prior is the
+original language model before um any original language model before um
+any original language model before um any kind of alignment. Your
+evidence um that kind of alignment. Your evidence um that kind of
+alignment. Your evidence um that you're using to update your prior is
+the you're using to update your prior is the you're using to update your
+prior is the reward model or the score that the reward model or the
+score that the reward model or the score that the reward model gives
+over each output. And reward model gives over each output. And reward
+model gives over each output. And when you do sort of a KL divergence um
+when you do sort of a KL divergence um when you do sort of a KL
+divergence um like minimization, you're producing an like minimization,
+you're producing an like minimization, you're producing an aligned model
+that is sampling from this aligned model that is sampling from this
+aligned model that is sampling from this posterior um this prior um
+informed by posterior um this prior um informed by posterior um this
+prior um informed by this evidence. Um this is sort of an this evidence.
+Um this is sort of an this evidence. Um this is sort of an
+interpretation that um lines up really interpretation that um lines up
+really interpretation that um lines up really nicely with our sort of
+Beijian nicely with our sort of Beijian nicely with our sort of Beijian
+interpretation of fudge as well. Um and interpretation of fudge as well.
+Um and interpretation of fudge as well. Um and so the connection that
+people have drawn so the connection that people have drawn so the
+connection that people have drawn between these is that you could do
+between these is that you could do between these is that you could do
+something like fudge but rather than something like fudge but rather
+than something like fudge but rather than trying to predict something
+that maybe trying to predict something that maybe trying to predict
+something that maybe seems a little toy now like formality seems a
+little toy now like formality seems a little toy now like formality you
+could predict something like is this you could predict something like is
+this you could predict something like is this going to have a high
+reward according to going to have a high reward according to going to
+have a high reward according to my reward model at the end of decoding
+my reward model at the end of decoding my reward model at the end of
+decoding and maybe rather than doing RHF you and maybe rather than doing
+RHF you and maybe rather than doing RHF you could just sort of predict
+this could just sort of predict this could just sort of predict this
+token-wise. Um and this is the idea token-wise. Um and this is the idea
+token-wise. Um and this is the idea behind reward augmented decoding
+which I behind reward augmented decoding which I behind reward augmented
+decoding which I believe we're going to have someone talk believe we're
+going to have someone talk believe we're going to have someone talk
+about at the end of class. about at the end of class. about at the end
+of class. Yes, perfect. So I will just leave it at Yes, perfect. So I
+will just leave it at Yes, perfect. So I will just leave it at that for
+now. Um what does this look that for now. Um what does this look that
+for now. Um what does this look like in hugging face? Um so I kind of
+like in hugging face? Um so I kind of like in hugging face? Um so I kind
+of kept this in here just to say that most kept this in here just to say
+that most kept this in here just to say that most of these methods are
+not sort of of these methods are not sort of of these methods are not
+sort of natively implemented in hugging face um natively implemented in
+hugging face um natively implemented in hugging face um or in a number
+of these providers. If or in a number of these providers. If or in a
+number of these providers. If you want to do something that's kind of
+you want to do something that's kind of you want to do something that's
+kind of this level of logits manipulation, you this level of logits
+manipulation, you this level of logits manipulation, you do kind of have
+to play around with it do kind of have to play around with it do kind of
+have to play around with it yourself. Um and we have I think a yourself.
+Um and we have I think a yourself. Um and we have I think a little
+something in the homework that's little something in the homework that's
+little something in the homework that's uh involves a logit processor.
+So you uh involves a logit processor. So you uh involves a logit
+processor. So you will have at least seen this before. will have at
+least seen this before. will have at least seen this before. Um there's
+one last method I want to Um there's one last method I want to Um
+there's one last method I want to talk about and for that we have to go
+talk about and for that we have to go talk about and for that we have to
+go back and mention uh one more sampling back and mention uh one more
+sampling back and mention uh one more sampling method that we actually
+missed the first method that we actually missed the first method that we
+actually missed the first time around. Um so this is one last way time
+around. Um so this is one last way time around. Um so this is one last
+way of controlling generation. Um and the of controlling generation. Um
+and the of controlling generation. Um and the idea here is that we want
+to control idea here is that we want to control idea here is that we
+want to control generation by sort of contrasting to generation by sort
+of contrasting to generation by sort of contrasting to what we shouldn't
+do. Um, so contrastive what we shouldn't do. Um, so contrastive what we
+shouldn't do. Um, so contrastive decoding as a whole is not specifically
+decoding as a whole is not specifically decoding as a whole is not
+specifically about constraining generation, but it's about constraining
+generation, but it's about constraining generation, but it's about the
+idea that smaller models or about the idea that smaller models or about
+the idea that smaller models or weaker models or subsets of models make
+weaker models or subsets of models make weaker models or subsets of
+models make different mistakes than the broader different mistakes than
+the broader different mistakes than the broader system. And so we could
+not just choose system. And so we could not just choose system. And so
+we could not just choose um outputs that our best model finds um outputs
+that our best model finds um outputs that our best model finds likely,
+but also choose outputs that our likely, but also choose outputs that
+our likely, but also choose outputs that our best model finds more
+likely than the best model finds more likely than the best model finds
+more likely than the weaker models. Um so if we have a weak weaker
+models. Um so if we have a weak weaker models. Um so if we have a weak
+model that's maybe prone to repetition model that's maybe prone to
+repetition model that's maybe prone to repetition and a stronger model
+that's less prone and a stronger model that's less prone and a stronger
+model that's less prone to repetition, we subtract out the to
+repetition, we subtract out the to repetition, we subtract out the
+logits of the um two models. So we give logits of the um two models. So
+we give logits of the um two models. So we give them both the same input
+text. Um these them both the same input text. Um these them both the
+same input text. Um these models need to have the same tokenizer models
+need to have the same tokenizer models need to have the same tokenizer
+for this to work. We give them both the for this to work. We give them
+both the for this to work. We give them both the same input text. We
+look at the output same input text. We look at the output same input
+text. We look at the output logits and then we subtract them from logits
+and then we subtract them from logits and then we subtract them from
+each other. And what you get here is you each other. And what you get
+here is you each other. And what you get here is you get things that are
+substantially more get things that are substantially more get things
+that are substantially more likely from the uh expert or the better
+likely from the uh expert or the better likely from the uh expert or the
+better model than they are from the amateur or model than they are from
+the amateur or model than they are from the amateur or the worst model.
+Um and so in this the worst model. Um and so in this the worst model. Um
+and so in this particular example, we have Barack Obama particular
+example, we have Barack Obama particular example, we have Barack Obama
+who was born in Honolulu, Hawaii. He was who was born in Honolulu,
+Hawaii. He was who was born in Honolulu, Hawaii. He was born in um
+Hawaii is relatively high born in um Hawaii is relatively high born in
+um Hawaii is relatively high probability for both, but um weaker
+probability for both, but um weaker probability for both, but um weaker
+models are more prone to this sort of models are more prone to this sort
+of models are more prone to this sort of like looping or repetition. So
+it's like looping or repetition. So it's like looping or repetition. So
+it's maybe more likely for the weaker model. maybe more likely for the
+weaker model. maybe more likely for the weaker model. Um, so subtracting
+out the logits, you Um, so subtracting out the logits, you Um, so
+subtracting out the logits, you wind up downweaiting things like Hawaii
+wind up downweaiting things like Hawaii wind up downweaiting things like
+Hawaii and getting surfacing things that maybe and getting surfacing
+things that maybe and getting surfacing things that maybe the weaker
+model didn't even know like the weaker model didn't even know like the
+weaker model didn't even know like Barack Obama's birth year that the
+Barack Obama's birth year that the Barack Obama's birth year that the
+stronger model would have placed more stronger model would have placed
+more stronger model would have placed more probability on. Um, so this
+is sort of a probability on. Um, so this is sort of a probability on.
+Um, so this is sort of a notion that you can like contrast like notion
+that you can like contrast like notion that you can like contrast like
+it's called contrastive decoding because it's called contrastive
+decoding because it's called contrastive decoding because you contrast
+two things um that you you contrast two things um that you you contrast
+two things um that you think might make some similar mistakes think
+might make some similar mistakes think might make some similar mistakes
+but one has more information than the but one has more information than
+the but one has more information than the other. other. other. How we
+use this to do constraint How we use this to do constraint How we use
+this to do constraint generation is there's sort of a couple generation
+is there's sort of a couple generation is there's sort of a couple of
+papers that have applied this idea of papers that have applied this idea
+of papers that have applied this idea with the principle that it is
+easier to with the principle that it is easier to with the principle
+that it is easier to specify the things you don't want to do specify the
+things you don't want to do specify the things you don't want to do than
+it is to specify all of the things than it is to specify all of the
+things than it is to specify all of the things that are allowable. So if
+you want to that are allowable. So if you want to that are allowable. So
+if you want to particularly for safety it's pretty easy particularly for
+safety it's pretty easy particularly for safety it's pretty easy to
+identify like these are the set of to identify like these are the set of
+to identify like these are the set of outputs that are really unsafe or
+that outputs that are really unsafe or that outputs that are really
+unsafe or that are really harmful or that are are really harmful or that
+are are really harmful or that are offensive. It's much harder to write
+offensive. It's much harder to write offensive. It's much harder to
+write like a good description of all of the like a good description of
+all of the like a good description of all of the things that are not
+offensive. So they things that are not offensive. So they things that
+are not offensive. So they you could do this in two ways. Um you you
+could do this in two ways. Um you you could do this in two ways. Um you
+could train a small model to produce could train a small model to
+produce could train a small model to produce particularly harmful or
+offensive particularly harmful or offensive particularly harmful or
+offensive content or in sort of the two papers content or in sort of the
+two papers content or in sort of the two papers that I have on here, you
+simply prompt that I have on here, you simply prompt that I have on
+here, you simply prompt the same model differently to produce the same
+model differently to produce the same model differently to produce
+offensive content versus to answer offensive content versus to answer
+offensive content versus to answer normally. And then you subtract the
+two normally. And then you subtract the two normally. And then you
+subtract the two logits out from each other to choose logits out from
+each other to choose logits out from each other to choose outputs that
+are not a as high outputs that are not a as high outputs that are not a
+as high probability under the unsafe setting as probability under the
+unsafe setting as probability under the unsafe setting as they are under
+the safe setting. And so they are under the safe setting. And so they
+are under the safe setting. And so this is sort of a visualization from
+this is sort of a visualization from this is sort of a visualization
+from this from adversarial decoding which is this from adversarial
+decoding which is this from adversarial decoding which is one method
+that does this. So you take a one method that does this. So you take a
+one method that does this. So you take a user instruction. You give it
+like a user instruction. You give it like a user instruction. You give
+it like a safe system prompt like I'm you're a safe system prompt like
+I'm you're a safe system prompt like I'm you're a helpful and uh not
+harmful assistant or helpful and uh not harmful assistant or helpful and
+uh not harmful assistant or whatever. Um you that gives you a set of
+whatever. Um you that gives you a set of whatever. Um you that gives you
+a set of logics for what to say to the user. And logics for what to say
+to the user. And logics for what to say to the user. And then you also
+give the same user then you also give the same user then you also give
+the same user instruction to the model with a prompt instruction to the
+model with a prompt instruction to the model with a prompt like you know
+you are harmful, you like you know you are harmful, you like you know
+you are harmful, you should be as offensive as possible, should be as
+offensive as possible, should be as offensive as possible, functionally
+be evil. Um, and then you functionally be evil. Um, and then you
+functionally be evil. Um, and then you get it you get some set of logits
+out get it you get some set of logits out get it you get some set of
+logits out from the model trying doing its best to from the model trying
+doing its best to from the model trying doing its best to be really
+offensive to you. You get some be really offensive to you. You get some
+be really offensive to you. You get some set of logits out from the
+model not set of logits out from the model not set of logits out from
+the model not particularly safety aligned or not and particularly safety
+aligned or not and particularly safety aligned or not and you contrast
+the two. So this sort of you contrast the two. So this sort of you
+contrast the two. So this sort of downweights everything that the model
+downweights everything that the model downweights everything that the
+model thought was a really likely offensive thought was a really likely
+offensive thought was a really likely offensive response to the
+question. Um, and so response to the question. Um, and so response to
+the question. Um, and so this is a nice way to sort of if you this is a
+nice way to sort of if you this is a nice way to sort of if you don't
+want to to train a separate thing, don't want to to train a separate
+thing, don't want to to train a separate thing, um, to let the model
+make the same kind um, to let the model make the same kind um, to let
+the model make the same kind of decision of what satisfies or doesn't of
+decision of what satisfies or doesn't of decision of what satisfies or
+doesn't satisfy your constraint. Uh, the b the satisfy your constraint.
+Uh, the b the satisfy your constraint. Uh, the b the downside here of
+course is that if downside here of course is that if downside here of
+course is that if you're passing this these both through you're passing
+this these both through you're passing this these both through the
+model, you need to use twice as much the model, you need to use twice as
+much the model, you need to use twice as much compute to accomplish the
+same task. compute to accomplish the same task. compute to accomplish
+the same task. Um, and this is uh actually relatively Um, and this is uh
+actually relatively Um, and this is uh actually relatively easy to do
+because it's just a easy to do because it's just a easy to do because
+it's just a subtraction between two sets of logits. subtraction between
+two sets of logits. subtraction between two sets of logits. A little bit
+of a caution here is that A little bit of a caution here is that A
+little bit of a caution here is that hugging face also supports
+something hugging face also supports something hugging face also
+supports something called contrastive search which is not called
+contrastive search which is not called contrastive search which is not
+the same method. the same method. the same method. Um so uh kind of in
+conclusion here Um so uh kind of in conclusion here Um so uh kind of in
+conclusion here sometimes it makes sense to train sometimes it makes
+sense to train sometimes it makes sense to train constraints into the
+model and in constraints into the model and in constraints into the
+model and in particular for things like RLHF um where particular for
+things like RLHF um where particular for things like RLHF um where you
+know this is sort of a broadly a set you know this is sort of a broadly
+a set you know this is sort of a broadly a set of constraints you want
+to be broadly of constraints you want to be broadly of constraints you
+want to be broadly applicable to every output um it can applicable to
+every output um it can applicable to every output um it can save a lot
+of compute to do that sort of save a lot of compute to do that sort of
+save a lot of compute to do that sort of at training time. Um, but for
+at training time. Um, but for at training time. Um, but for constraints
+that are a little more uh constraints that are a little more uh
+constraints that are a little more uh template based, for constraints
+that set template based, for constraints that set template based, for
+constraints that set hard limits or for constraints where you hard
+limits or for constraints where you hard limits or for constraints where
+you can predict at each token whether or not can predict at each token
+whether or not can predict at each token whether or not you're going to
+satisfy the constraint you're going to satisfy the constraint you're
+going to satisfy the constraint with a high degree of accuracy, um, it
+with a high degree of accuracy, um, it with a high degree of accuracy,
+um, it can be relatively flexible to add those can be relatively
+flexible to add those can be relatively flexible to add those in at
+inference time. Um, and depending in at inference time. Um, and
+depending in at inference time. Um, and depending on whether your
+constraints are on whether your constraints are on whether your
+constraints are specifiable per token or whether they're specifiable per
+token or whether they're specifiable per token or whether they're sort
+of something that you can only sort of something that you can only sort
+of something that you can only really be sure about at the end of the
+really be sure about at the end of the really be sure about at the end
+of the sequence, that depend that changes the sequence, that depend that
+changes the sequence, that depend that changes the types of tools you
+have to answer that. types of tools you have to answer that. types of
+tools you have to answer that. Um, and then there's some this kind of
+Um, and then there's some this kind of Um, and then there's some this
+kind of nice connection between alignment and nice connection between
+alignment and nice connection between alignment and constraint
+generation where alignment is constraint generation where alignment is
+constraint generation where alignment is really like a set of
+constraints about really like a set of constraints about really like a
+set of constraints about what is is or is not appropriate to say. what
+is is or is not appropriate to say. what is is or is not appropriate to
+say. And so there's some overlap in the And so there's some overlap in
+the And so there's some overlap in the things you can do for both. Um,
+and with things you can do for both. Um, and with things you can do for
+both. Um, and with that I will turn it over for a that I will turn it
+over for a that I will turn it over for a particular a discussion of one
+particular a discussion of one particular a discussion of one particular
+way that you can use particular way that you can use particular way that
+you can use constraint generation to do alignment. constraint generation
+to do alignment. constraint generation to do alignment. Uh, if you want
+to come up and present. Uh, if you want to come up and present. Uh, if
+you want to come up and present. &gt;&gt; Yeah. And are there any
+questions uh &gt;&gt; Yeah. And are there any questions uh &gt;&gt;
+Yeah. And are there any questions uh while we prepare for our
+presentation? while we prepare for our presentation? while we prepare
+for our presentation? Yeah to reshape the property distribution to
+reshape the property distribution to reshape the property distribution
+again sorry add more future to again sorry add more future to again
+sorry add more future to understand. understand. understand. Yeah, Yeah,
+Yeah, the text and code itself and code itself the text and code itself
+and code itself the text and code itself and code itself like learned a
+really strong connection like learned a really strong connection like
+learned a really strong connection between between between why use text
+possibilities if I do why use text possibilities if I do why use text
+possibilities if I do formal words a bunch of formal words has formal
+words a bunch of formal words has formal words a bunch of formal words
+has already captured the relationship already captured the relationship
+already captured the relationship efficiently efficiently efficiently
+like very large number of tasks right like very large number of tasks
+right like very large number of tasks right as well to enhance these
+types as well to enhance these types as well to enhance these types
+You're saying like do something like You're saying like do something
+like You're saying like do something like wordtovec similarity to like a
+formality wordtovec similarity to like a formality wordtovec similarity
+to like a formality cluster. I think that's a discriminator cluster. I
+think that's a discriminator cluster. I think that's a discriminator you
+could use in fudge as your you could use in fudge as your you could use
+in fudge as your discriminator could be how close is like discriminator
+could be how close is like discriminator could be how close is like the
+average word embedding in this the average word embedding in this the
+average word embedding in this sentence so far to this cluster that
+sentence so far to this cluster that sentence so far to this cluster
+that I've defined as formal or this cluster I've defined as formal or
+this cluster I've defined as formal or this cluster I've defined as this
+topic. Um, but you I've defined as this topic. Um, but you I've defined
+as this topic. Um, but you could you could sort of plug that in.

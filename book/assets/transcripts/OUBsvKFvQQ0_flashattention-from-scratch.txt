@@ -1,0 +1,472 @@
+# flashattention-from-scratch
+# video: https://www.youtube.com/watch?v=OUBsvKFvQQ0
+
+Let's break down flash attention. Fast
+and memory efficient exact attention
+with IO awareness from Tri Dao and
+collaborators at Stanford. Same math as
+ordinary attention. Radically less
+memory and a lot faster.
+Here is the attention matrix. Every
+token scoring every other token. For a
+thousand token sequence, that's a
+million numbers. Standard attention
+writes that whole grid out to memory,
+reads it back, writes it again. Flash
+attention computes the exact same answer
+and never builds the grid at all. Same
+outputs to the last bit, but linear
+memory and up to seven and a half times
+faster. The trick isn't a cleverer
+approximation. It's being careful about
+where the numbers live.
+Let's ground ourselves in exactly what
+attention computes because every symbol
+here comes back. You have three
+matrices, queries, keys, and values.
+Each n tokens tall by d dimensions wide,
+where d is the head dimension, usually
+64 or 128. Multiply q by k transpose and
+you get the score matrix s, an n by n
+grid where entry ij is how strongly
+query i attends to key j. In practice,
+you also scale it by 1 over root d to
+keep the numbers tame. Softmax each row
+of s, turning those scores into a
+probability distribution, the weights p.
+Then multiply p by v to blend the values
+into the output o, again n by d. Two
+matrix multiplies with a softmax in the
+middle. That is all attention is. And
+the entire performance story lives in
+that one object in the center, the n by
+n grid. One more thing worth holding on
+to. This whole computation happens per
+attention head and per sequence in the
+batch independently. So in practice,
+you're running many of these little n by
+n problems at once, which is exactly why
+the memory cost piles up so fast.
+Here's the part most courses skip. A GPU
+is not one uniform pool of memory. It's
+a hierarchy. At the bottom, HBM,
+high-bandwidth memory, 40 GB on an A100.
+Fast by everyday standards, but slow by
+the GPU's zone, about 1 and 1/2 TB a
+second. Above it, SRAM, on-chip memory
+sitting right next to the compute units.
+Screaming fast at 19 TB a second, but
+tiny, megabytes, not gigabytes. Now,
+watch what standard attention does. It
+computes the scores and writes the whole
+n by n matrix out to HBM. Reads it back
+to run softmax. Writes the result. Reads
+it again to multiply by V. The floating
+point work is trivial. The time is spent
+shuttling that giant matrix in and out
+of slow memory. That is the wall.
+And that is the paper's central claim.
+To see why that matters, you have to
+know operations come in two flavors.
+Compute-bound, the clock is set by the
+arithmetic. A big matrix multiply with a
+fat inner dimension is the classic case.
+There's so much math that the memory
+reads barely register. And memory-bound,
+the arithmetic is trivial, and you're
+purely limited by how fast bytes move.
+The telltale is arithmetic intensity,
+flops per byte. Softmax, dropout,
+masking, every element-wise pass over
+that n by n grid has almost no math per
+byte, so they're deeply memory-bound.
+Put real numbers on it. Standard
+attention on GPT-2
+does about 67 gigaflops of arithmetic,
+but moves 40 GB through HBM and takes 42
+milliseconds. Almost all of it just
+waiting on memory. The matmuls aren't
+the problem. The grid is.
+So, the obvious question, why write the
+grid out at all? Why not compute the
+output directly and skip it? Here's the
+obstacle that stops the naive approach.
+Softmax over a row needs the entire row
+to normalize even a single entry. You
+need the maximum across all in scores
+for numerical stability and the sum of
+all in exponentials for the denominator.
+Both are reductions. They couple every
+column in the row together. You can't
+finalize any one weight until you've
+seen all of them. That coupling is
+exactly why the standard implementation
+materializes the full row of scores
+first and why everyone assumed you had
+to. Break that coupling, compute the
+row's softmax without ever holding the
+whole row, and the entire algorithm
+falls out.
+So, let's look at softmax carefully
+because the fix hides inside it. You
+never exponentiate raw scores. A score
+of a few hundred overflows the instant
+you hit e to the x. So, the numerically
+stable softmax first finds the row's
+maximum, m, and subtracts it. Then it
+exponentiates each shifted score, fi
+equals e to the xi minus m. It sums
+those into l and finally divides f by l.
+Subtracting the max changes nothing in
+the answer. It cancels in the ratio, but
+it keeps every exponential between zero
+and one. Now, notice what actually
+carries the information. A whole row
+softmax is summarized by just two
+running numbers, the max m and the sum
+l. Track those two as data streams in
+and you have everything.
+Here's the key idea and it's genuinely
+elegant. You don't need the row all at
+once. You can process it in chunks and
+keep the two statistics running. Say the
+row arrives in two blocks. Process the
+first, local max m1, local sum l1. Now
+the second block arrives and it contains
+a larger value, a new maximum. Problem.
+L1 was computed by subtracting the old,
+smaller max, so it's on the wrong scale.
+The fix is a single multiplication. You
+rescale the old sum by e to the m1 minus
+the new max, a factor below one that
+shrinks it to exactly the scale it would
+have had if you'd known the true maximum
+from the start. Then add the second
+block sum, update the max, and you're
+ready for the next block. Column by
+column, block by block, you reconstruct
+the exact softmax denominator, never
+holding more than one block at a time.
+The authors put it in a single line.
+Let's make that exactness because it's
+the part people distrust. Take a full
+row, six scores, and stream it in three
+blocks. After block one, the running max
+is three, the running sum is 1.135.
+Block two brings a four, a bigger max,
+so we rescale and add. The sum becomes
+1.467.
+Block three brings a five, rescale
+again, and we land at 1.590.
+Now compute the softmax the ordinary
+way, all six scores at once. The
+denominator is 1.590
+to the digit, identical. And here's the
+storage detail you'll want when you
+implement it. Instead of keeping the max
+and the sum separately, fold them into
+one number, l equals m plus log l, the
+log sum exp. That single value per row
+is everything the backward pass will
+ever need.
+But the softmax denominator was never
+the real goal, the output o is. So push
+the exact same trick one level up onto
+the output itself. Alongside the running
+max and running sum, keep a running
+output vector. When a new block arrives
+with a new maximum, rescale that running
+output by the very same correction
+factor. Then add this block's
+contribution, its local softmax weights
+p tilde times its values v. You divide
+by the running sum only once at the very
+end. This is the line that makes the
+whole paper work, so sit with it. The
+output is assembled block by block, and
+every time a bigger score appears,
+everything accumulated so far gets
+rescaled in place. You never hold the
+full row of attention weights, never
+build a piece of that n by n matrix,
+just a single d-dimensional vector
+corrected as you go. And why is
+deferring that final division safe?
+Because the unnormalized output and the
+running sum scale together. The
+correction factor multiplies both, so
+one division at the very end recovers
+exactly the right weighted average.
+Keeping everything measured against the
+running max also means no intermediate
+value ever overflows.
+Now, translate that onto real hardware
+where the blocks aren't abstract.
+They're chosen to fit SRAM. You can't
+load the n by n grid, but you can load
+small tiles. Cut the queries into row
+blocks and the keys and values into
+column blocks. Each pairing of a Q block
+with a K block carves out one small tile
+of the score grid, BR rows by BC
+columns. The block sizes are picked so
+that a K and V block, a Q block, and the
+running accumulators all fit on chip at
+the same time. So, the enormous n by n
+grid becomes a checkerboard of little
+tiles, and at any instant the hardware
+holds exactly one of them in fast
+memory.
+Where do those block sizes actually come
+from? Count what has to live on chip at
+once. A block of Q, a block of K, a
+block of V, and the output block O. Four
+things, each about BC by D. They all
+have to fit in SRAM of size M. So, 4 *
+BC * D has to stay under M, which pins
+the block size to M over 4D. And within
+that ceiling, bigger is better. The
+larger each block, the fewer times you
+sweep over all of Q, and the fewer trips
+you make to HBM. So, run time drops as
+the block grows, then flattens once your
+bandwidth free, or you simply run out of
+SRAM. That's the whole tuning knob, one
+number set by the hardware.
+Now assemble the full forward pass.
+There are two nested loops. The outer
+loop walks across the column blocks of K
+and V, loading each pair from HBM into
+SRAM one time. The inner loop walks down
+the row blocks of Q. For each tile,
+entirely on chip, compute the scores, Q
+block times K block transpose. Take the
+tiles row max, exponentiate, row sum,
+its local statistics. Merge those into
+that query blocks running max and
+running sum using the correction factor
+from before. Then update the query
+blocks output in place. Rescale what's
+there, add this tiles weighted values.
+Write back just the output block and its
+two little statistics and move to the
+next tile. Because K and V are the outer
+loop, each query blocks output gets
+revisited and refined as new key blocks
+arrive. And that loop order is
+deliberate. K and V are what you reload
+into SRAM. So keeping a pair fixed while
+you stream all the query blocks past
+them minimizes how often the large
+matrices have to cross the memory bus.
+When both loops finish, O is exact, bit
+for bit what standard attention would
+give, and the N by N matrix never once
+touched HBM.
+If you want to actually write this, here
+is the entire forward kernel. Initialize
+the output and the two statistics in
+memory. Outer loop over the K and V
+blocks. Load one pair into SRAM. Inner
+loop over the Q blocks. Load the query
+block along with its running output and
+stats. On chip, the tile scores, its
+local max, the exponentials, the local
+sum. Update the running max and then
+this line in green, apply the correction
+factor to rescale the old sum and the
+old output before adding the new blocks
+contribution. Divide by the running sum,
+store the block and its two statistics
+and continue. That's it. No in buying
+array is ever allocated. 13 lines and it
+produces the exact same attention as the
+textbook version.
+One implementation detail ties it
+together. In standard attention each
+step is its own GPU kernel. Matmul,
+write to HBM, softmax, write to HBM,
+matmul, write to HBM. Three separate
+round trips through slow memory. Flash
+attention fuses all of it into a single
+kernel. Load the blocks once, do the
+first matmul, the softmax, and the
+second matmul entirely on chip and write
+the result out one time. That fusion is
+only possible because tiling shrank the
+whole computation down to fit in SRAM in
+the first place.
+Now let's actually count the memory
+traffic because this is where the payoff
+becomes a theorem. Standard attention
+touches HBM on the order of n squared.
+It writes and reads that whole grid
+several times over. Flash attention,
+each K&V block is about the size of
+SRAM. M For every one of those blocks,
+you sweep over all of Q. That's roughly
+ND over M passes over the queries and
+each pass moves about ND numbers.
+Multiply it out and you get n squared d
+squared over M total HBM accesses. Since
+d squared is much smaller than M, d is
+around 100, M is around 100 kilobytes,
+that's many times fewer accesses than n
+squared. And here's the part that breaks
+people's intuition. Flash attention does
+more floating point work, 75 gigaflops
+versus 67, because it recomputes in the
+backward pass. But its memory traffic
+collapses from 40 GB to 4. Attention is
+memory bound, so traffic is what counts.
+More math, a fraction of the shuttling,
+and it runs nearly six times faster. It
+also uses linear memory instead of
+quadratic because the grid is never
+stored. And the authors go one step
+further and prove a matching lower bound
+across the relevant range of SRAM sizes.
+No exact attention algorithm can beat
+this HBM count asymptotically. So, Flash
+Attention isn't merely faster on memory
+traffic, it's essentially optimal.
+And this is proven, not just measured.
+One more thing you'll need for real
+language models, causal masking. A token
+can only attend to the past. So, in the
+tiled picture, every block above the
+diagonal is pure future and you simply
+never compute it. That's roughly half
+the tiles gone for free. The blocks
+sitting right on the diagonal are the
+only subtle case. Part of each is past,
+part is future, so you mask the future
+entries to minus infinity inside the
+tile on chip before the softmax. Sliding
+windows, block-sparse patterns, they all
+slot into this exact same loop.
+If watching a memory access argument
+turn into a six-time speed-up is your
+idea of a good time, like, subscribe,
+and send this to the friend who still
+thinks fewer flops automatically means
+faster. Because the backward pass is
+where it gets even better.
+Training needs gradients and the
+textbook backward pass needs S and P,
+the exact N by N matrices we so proudly
+refused to store. Awkward. The answer is
+re-computation. Remember, in the forward
+pass we did save two things per row, the
+output O and that single log sum exp
+number L. It turns out that's enough to
+rebuild any tile of the scores and
+probabilities on the fly in SRAM during
+the backward pass. Recompute the tile,
+use it, throw it away. This looks like
+gradient checkpointing, trade compute to
+save memory, but there's a twist.
+Recomputing a tile in fast SRAM is so
+much cheaper than a round trip to slow
+HBM that you don't actually trade. You
+save the memory and you come out faster,
+both at once.
+And the gradients themselves are cleaner
+than you'd fear, just the chain rule
+done by hand. The gradient of V is P
+transpose times DO. The gradient of the
+weights, DP, is DO times V transpose.
+For the scores, softmax has a known
+Jacobian, diagonal of P minus PP
+transpose, which gives DS equals P
+element-wise times the quantity DP minus
+D. And D is the trick that keeps
+everything linear. Instead of forming a
+full N by N product for each row, it
+collapses to a single scalar, the row
+sum of DO element-wise O, which is just
+DOI dotted with OI. One number per row.
+With DS in hand, the input gradients
+drop right out. DQ is DS times K and DK
+is DS transpose times Q. Every one of
+these is a matmul over tiles, no N by N
+array anywhere.
+And here's the backward pass as a loop,
+the same shape as the forward run in
+reverse. Outer loop over the K and V
+blocks, inner loop over Q. First,
+recompute this tile's probabilities, the
+scores from Q and K, then P as the
+exponential of the scores minus the
+stored L. That one line stands in for
+the entire N by N matrix we chose not to
+save. Then accumulate. The value
+gradient gets P transpose times DO,
+compute DP, and that cheap little D, the
+row sum of DO times O, form DS. And push
+out the input gradients. DQ gets DS
+times K, DK gets DS transpose times Q.
+Each block's gradients accumulate across
+the loop, everything stays linear in
+memory, and you get exact gradients
+without ever materializing the attention
+matrix.
+In their words,
+"And once attention is tiled into
+blocks, sparsity comes almost for free.
+Hand the algorithm a block mask, which
+tiles are even allowed to matter, and
+simply skip the zero blocks. No wasted
+compute, no wasted memory traffic on
+them. The IO cost drops by exactly the
+fraction of blocks you keep. That's
+BlockSparce Flash Attention. Two to four
+times faster again on top of everything,
+and it scales attention out to 64,000
+tokens."
+So, does the whole contraption earn its
+keep? BERT Large trains 15% faster than
+the standing MLPerf speed record. GPT-2
+trains up to three times faster than the
+common implementation, and crucially,
+the perplexity matches to the decimal
+because the computation is genuinely
+identical, not an approximation. The
+Long-Range Arena benchmark speeds up 2.4
+times. Memory that used to grow with the
+square of the sequence length now grows
+only linearly. So, context windows can
+finally stretch, and that unlocks new
+capability. For the first time, a
+transformer clears better than chance on
+Path-X at 16,000 tokens, and BlockSparce
+pushes that to 64,000 on Path-256.
+Not by approximating attention, by
+respecting the memory hierarchy.
+For the record,
+so here's the whole recipe. The N by N
+attention matrix is the cost, so never
+build it. Stream the softmax using two
+running statistics, the max and the sum.
+Tile Q, K, and V so a block fits in fast
+SRAM, and fuse everything into one
+kernel. Rescale the running output every
+time a bigger score shows up, and in the
+backward pass, recompute the tiles
+instead of storing them. The result is
+bit-for-bit the same attention in linear
+memory running far faster because the
+bottleneck was never the math. It was
+the memory.
+The one-line version, attention was
+memory bound, not compute bound. So,
+Flash Attention keeps the whole
+computation in on-chip SRAM, streams the
+softmax with two running numbers, and
+never writes the N by N matrix to slow
+memory at all.
+And it leaves you with a thought, how
+many other slow algorithms aren't
+compute bound at all, just badly
+acquainted with their own memory? That's
+my read. Tell me yours. Until next time.

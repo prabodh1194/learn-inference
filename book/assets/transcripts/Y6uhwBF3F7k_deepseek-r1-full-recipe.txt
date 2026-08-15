@@ -1,0 +1,416 @@
+# deepseek-r1-full-recipe
+# video: https://www.youtube.com/watch?v=Y6uhwBF3F7k
+
+Let's break down the core idea behind
+this paper in depth. DeepSeek R1,
+incentivizing reasoning in large
+language models via reinforcement
+learning from DeepSeek.
+Here's something that should not work.
+You take a raw language model, no work
+solutions, no human written reasoning,
+nobody showing it how to think, and you
+do exactly one thing. Every time it gets
+a hard math problem right, you pay it.
+That's the entire training signal. Get
+the answer correct, get rewarded. And
+over thousands of steps, with no one
+teaching it, the model starts thinking.
+It writes longer. It checks its own
+work. It backtracks, tries another
+route, catches its own mistakes. On the
+hardest competition math in the room,
+its score climbs from barely one in six
+to beating the average human competitor,
+landing in the same league as OpenAI's
+O1. Reasoning wasn't installed. It grew
+out of a reward. Over the next 20
+minutes, we're going to rebuild this
+whole thing twice. First, R1-0,
+pure reinforcement learning straight
+onto the base model, and the emergent
+reasoning that stunned everyone. Then
+the four-stage pipeline that took that
+feral genius and turned it into
+something you'd actually ship. And
+finally, how they bottled it into models
+small enough to run at home. Let's go.
+First, what even is a reasoning model?
+An ordinary model blurts the answer
+straight out, one forward pass, done. A
+reasoning model does something more
+human. Before it commits, it thinks out
+loud. It writes a long chain of thought,
+scratch work, dead ends, sanity checks,
+and only then gives its final answer.
+And here's the useful part. The longer
+it thinks, the more of these hard
+problems it gets right. Thinking is just
+compute spent at answer time instead of
+training time. So, the question this
+whole paper asks is simple. Where does
+that thinking come from? Do you have to
+teach it? Or can it grow on its own from
+nothing but a nudge in the right
+direction?
+So, how do you reward being right
+without a human grading every single
+answer? Two pieces. First, the
+optimizer, GRPO, the same trick
+introduced in the DeepSeek Math paper.
+Quick refresher. For one question, you
+don't grade a single answer. You sample
+a whole group of them, say 16. You score
+each, and then each answer's advantage
+is dead simple. How far above or below
+the group's own average did it land?
+Beat your peers, get pushed up. Drag
+behind, get pushed down. The group
+grades itself. No separate critic
+network, no value model to train
+alongside, which is exactly what makes
+it cheap enough to run at this scale.
+Second, the grader itself, and it's
+almost insultingly simple. Two rules.
+Accuracy, is the final answer actually
+correct? For math, check it against the
+known solution. For code, run it against
+the test cases. And format, did you wrap
+your thinking inside the think tags?
+That's the whole reward. No neural
+network judging quality, because the
+moment you let a learned model hand out
+the rewards, the policy learns to fool
+it. Reward hacking. Dumb, rigid rules
+can't be gamed.
+Now, the bit that made this paper
+famous. Everyone else builds a reasoning
+model like this. First, supervised
+fine-tuning. Feed it a mountain of
+human-written, step-by-step solutions,
+and make it copy them. Then, maybe some
+reinforcement learning to polish.
+DeepSeek's move with our 1-0 was to
+delete the entire first stage. No
+supervised fine-tuning. No human
+reasoning examples. Nothing. You take
+DeepSeek V3 base, raw off the
+pre-training line, and you point GRPO
+straight at it. Here's the loop, and it
+never changes. Hand the model a hard
+problem. Let it generate a group of full
+attempts, thinking tags and all. Grade
+each with those two rigid rules, right
+answer, correct format. Compute the
+group relative advantage. Nudge the
+weights toward whatever the winners did
+and away from the losers. Repeat 10,000
+times. Notice what is never in that
+loop, a single example of good
+reasoning. Nobody ever shows it a
+well-reasoned solution. The only
+pressure on the entire system is land
+the answer more often. The bet is that
+good reasoning is simply whatever gets
+you there. And that if you reward the
+destination hard enough, the model will
+discover the road entirely on its own.
+Insane bet. It worked.
+So, what actually happens as you run
+that loop? Two curves start climbing
+together, and they are the heart of the
+paper. The first is accuracy. On AIME,
+the brutal American high school
+Olympiad, the model starts at 15.6%
+barely one problem in six. As training
+grinds on, it climbs and climbs and
+lands at 77.9%
+pass at one. And if you let it vote
+across several tries, 86.7. That's from
+mostly failing to comfortably beating
+the average human competitor with not
+one line of reasoning ever handed to it.
+The second curve is the tell for why.
+It's the average response length. How
+many tokens the model spends thinking
+before it answers. And nobody told it to
+think longer. But that curve rises right
+alongside accuracy, hundreds of tokens,
+then thousands. The model discovers
+entirely on its own that spending more
+thought gets the answer right more
+often. So, the reward quietly pushes it
+to think more. That's the
+self-evolution. Two curves, accuracy and
+thinking time, dragging each other
+upward, driven by nothing but a reward
+for being correct.
+And then there's the moment that gave
+this paper its legend. Somewhere in the
+middle of training, on a gnarly algebra
+problem, our 1-0 is grinding through the
+usual way. Square both sides, rearrange,
+push the symbols around, and then
+mid-solution, it does this. It stops. It
+writes, "Wait, wait, wait." That's an
+aha moment I can flag here. And it goes
+back, reevaluates its own steps,
+realizes it was heading somewhere wrong,
+and restarts down a better path. Read
+that again because of what it isn't.
+Nobody wrote a check-your-work
+instruction. There is no rule in the
+reward for self- correction. No example
+of back-tracking in the training data.
+There is no training data. The model
+discovered, purely because catching
+mistakes leads to right answers more
+often, that it pays to stop and doubt
+itself. An emergent metacognitive move
+in a strangely human little voice that
+fell out of a reward signal. The authors
+basically stopped and stared. They call
+it an aha moment for them, too. This is
+the beat to sit with. Reflection wasn't
+programmed. It was incentivized into
+existence.
+And the authors flag it, too. The moment
+their model learned, on its own, to
+rethink.
+So, our 1-0 is a phenomenal reasoner. It
+is also, bluntly, a terrible product.
+Here's the catch with rewarding only the
+final answer. You constrain the
+destination, but you left the road
+completely unconstrained. And the model
+took that freedom and got weird. Its
+chains of thought are a mess to read,
+sprawling, disorganized, optimized for
+landing the answer, not for a human
+following along. Worse, because the base
+model was trained heavily on both
+English and Chinese, our 1-0 starts
+language mixing. It'll reason halfway
+through a problem in English, slide into
+Chinese for a few lines, then slide
+back. To the reward function, that's
+totally fine. The answer's still right,
+so it never gets penalized. To a human
+trying to actually use it, it's
+unreadable. This is the fundamental
+tension of pure RL. The reward measured
+whether it was correct and nothing else.
+So, everything the reward didn't
+measure, like being readable, quietly
+rotted. Great brain, bad manners.
+So, how do you keep the emergent
+brilliance but fix the manners? You
+don't patch our 1-0. You rebuild in four
+stages, and this pipeline is the real
+deep seek R1. Stage one, cold start.
+Before any RL, you gently warm the base
+model on a few thousand hand-curated
+examples of long, readable,
+human-friendly reasoning. Not enough to
+teach it how to think, just enough to
+fix the voice and give it a clean format
+to speak in. Stage two, reasoning RL.
+Now, you run the same GRPO loop we just
+watched, rediscovering deep reasoning.
+But you bolt on one new reward, a
+language consistency bonus that pays the
+model for keeping its whole chain of
+thought in a single language. That kills
+the language mixing directly. Stage
+three, rejection sampling then
+supervised fine-tuning. Take that
+polished RL model, sample from it a lot,
+keep only the outputs that are actually
+correct. That harvest becomes roughly
+600,000 clean reasoning examples, plus
+around 200,000 general ones, writing,
+facts, everyday questions. And you
+fine-tune a fresh base on all of it.
+Stage four, a final RL pass across every
+kind of prompt, tuning for helpfulness
+and harmlessness. Four stages, each
+feeding the next. Same emergent
+reasoning, finally presentable.
+Let's make sure each stage earns its
+place because the ordering is the clever
+part. Why cold start first instead of
+just running RL like zero did? Because
+our 1-0 proved RL can find a reasoning,
+but also that RL alone finds it in an
+ugly, unreadable form. Cold start plants
+a small, clean seed of readable format.
+So, when RL explores, it explores from a
+well-behaved starting point instead of a
+feral one. Why rejection sampling in the
+middle? This is the sneaky smart move.
+The stage two RL model reasons
+beautifully, but is hard to steer. So,
+instead of shipping it, you use it as a
+data factory. Generate mountains of
+solutions, keep only the correct ones,
+and you've quietly converted a hard to
+control RL policy into clean supervised
+data you fully own. And you fold in
+general skills, writing, facts, that
+reasoning RL never touched. And why RL
+yet again at the very end? Because after
+all that fine-tuning, you want the final
+alignment. Helpful, harmless, coherent
+across every kind of question, not just
+math. Each stage exists to repair
+exactly what the stage before it
+couldn't.
+Here's that recipe in their own words.
+It begins with a pinch of cold start
+data.
+If watching reasoning bootstrap itself
+out of a reward is your kind of magic,
+like, subscribe, and send this to the
+friend who still insists you need a
+million labeled examples for everything.
+Because the next part is the sneaky
+clever bit. Can we take this giant brain
+and shrink it down to something you can
+actually run?
+Here's the problem. The full R1 is a 670
+billion parameter mixture of experts
+monster. Almost nobody can run it. So,
+DeepSeek did the generous, obvious in
+hindsight thing. Remember, R1 now
+produces gorgeous, long, self-checked
+reasoning traces. So, treat those traces
+as a textbook. You take a small,
+ordinary dense model, a Quinn or a
+Llama, anywhere from 1 and 1/2 billion
+parameters up to 70, and you simply
+fine-tune it. Plain supervised learning
+on 800,000 of R1's own outputs. No
+reinforcement learning on the small
+model at all. Just, here is how the big
+model thought, copy it. And the small
+models drink it in. They inherit the
+reasoning, the long chains, the
+backtracking, the self-checks from
+watching the giant. The numbers are
+startling. The distilled 14 billion
+model out-reasons baselines several
+times its size. And the distilled 32
+billion hits 72.6 on AIME, out-thinking
+models many times bigger and clearing
+OpenAI's 01 mini. A tiny open model
+reasoning like a giant because a giant
+taught it.
+Now, the finding that flips the whole
+story, and it's the one worth
+remembering. Obvious next question, why
+distill? Why not just do to the small
+model exactly what we did to the big
+one? Point pure reinforcement learning
+straight at it and let it discover
+reasoning itself, our 1-0 style. So,
+they tried it. They took a 32 billion
+base model and ran the full, expensive,
+large-scale RL on it directly. And it
+mostly stalled. It crawled up to roughly
+the level of existing 32B reasoning
+models and no further. Then they took
+that same 32B and just distilled our
+ones traces into it instead. It blew the
+RL version away across every single
+benchmark. Two bars, one lesson. For a
+small model, discovering reasoning from
+scratch with RL is brutally expensive
+and caps out low. But copying the
+reasoning a bigger model already
+discovered is cheap and lands far
+higher. Discovery is expensive. Copying
+discovery is nearly free. So, if you
+want a small reasoner, don't grow one,
+inherit one.
+So, where does it all land? The full
+Deep Seek R1 goes toe-to-toe with
+OpenAI's 01217,
+the frontier closed reasoning model at
+the time, on the hard math, on math 500,
+on competition coding, on graduate level
+science. Roughly 79.8 on AIME, 97 plus
+on math, 500, and it outranks 96% of
+humans on Codeforces. And the distilled
+models are state-of-the-art for their
+size, top to bottom. But the kicker, the
+thing that made this a genuine moment in
+the field, is that all of it shipped
+open. The weights, the recipe, the whole
+distilled family, out for anyone to
+download. Frontier reasoning, no longer
+behind a wall.
+And on the math, the paper says it flat
+out, on par with OpenAI's a 11217.
+Let's isolate what every piece actually
+bought, because that's where the real
+lessons hide. R1-0 versus full R1. The
+pure RL0 model is the stronger raw
+discoverer. It's the one that grew
+reasoning from literally nothing. But
+it's unreadable, and it mixes languages.
+The four-stage pipeline barely trades
+away any reasoning power, and in
+exchange it buys readability, single
+language consistency, and general
+helpfulness. That's the deal the entire
+paper is built on. A hair of raw
+reasoning for a model humans can
+actually use. Then the small model axis,
+distillation versus direct RL.
+Distilling R1's traces into a small
+model wins decisively. Running RL
+directly on that same small model stalls
+out. So the two knobs pull in opposite
+directions depending on scale. At the
+frontier, with a huge base and huge
+compute, RL is how brand new reasoning
+gets discovered in the first place. Down
+at small scale, you don't rediscover it,
+you inherit it. Each result quietly
+tells you which tool fits which size.
+So here's the whole thing, start to
+finish. One, the reward is dumb on
+purpose. Just check the final answer and
+the format, no neural greater to hack.
+Two, optimize it with GRPO, a group of
+tries, each graded against its own
+average, no critic. Three, point that
+straight at the raw base model, no
+supervised warm-up, and reasoning
+emerges on its own. Longer thinking,
+self-checking, the aha moment and all.
+Four, wrap that feral brain in a
+four-stage pipeline. Cold start for a
+readable voice, reasoning RL to sharpen
+it, and fix the language mixing.
+Rejection sampling into clean data, then
+a final RL pass to align it. And five,
+distill those hard-won reasoning traces
+down into small models anyone can run.
+Reasoning grown from a reward, then
+bottled and handed out.
+The one-line version, don't teach a
+model to reason. Pay it to be right.
+Reward the correct answer, optimize with
+group relative reinforcement learning,
+and the chain of thought grows itself.
+Then copy that thinking into something
+small enough to run anywhere.
+And it leaves a genuinely strange
+thought. If reasoning, reflection,
+self-doubt, the aha moment was just
+sitting in there, waiting for the right
+reward to coax it out. What else is in
+these models right now, dormant, waiting
+for the right reward to show up? That's
+my read. Tell me yours. Until next time.

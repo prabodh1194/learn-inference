@@ -1,0 +1,154 @@
+# attention-never-replaced-bite
+# video: https://www.youtube.com/watch?v=d1FrlDzGEB4
+
+Let's break down the core idea behind
+this paper. Attention is all you need.
+Google Brain, 2017.
+9 years old and still what almost
+everything you use is running on.
+9 years. Hundreds of papers built to
+replace it. Linear attention, state
+space models, every attention is not all
+you need rebuttal on archive. And the
+model you talked to this morning is
+still underneath this. So this isn't a
+tutorial on what attention is. It's an
+autopsy of the choices that made it
+survive. Punchline up front, it didn't
+win by being smarter. It won because it
+fit the hardware.
+Here's what they were actually fighting
+in 2017.
+A recurrent net computes position five
+from position four, which came from
+three, which came from two. It's a
+chain. A 40 token sentence is 40 steps
+you cannot skip. Not with a bigger GPU,
+not with a hundred of them. Meanwhile,
+the GPU, built to do 10,000
+multiplications at once, sits idle
+waiting its turn. Attention already
+existed bolted onto that chain. The move
+was deleting the chain.
+Replace it with this. Every position
+looks at every other position directly.
+And here's the load-bearing part. None
+of those lookups depend on each other.
+So the sentence isn't 40 steps. It's one
+matrix multiply. Queries against keys,
+softmax times values, and all 40
+positions resolve in the same instant.
+Recurrence needs in sequential
+operations. Self-attention needs one,
+however long the input. And token one
+reaches token 40 in a single hop, so
+gradients never run a 40 step relay.
+Now a detail that looks like nothing. A
+score is a dot product over 64
+dimensions, and a sum like that spreads
+out as dimensions pile up. Its spread
+grows like the square root of DK. So
+scores don't swing plus or minus one.
+They swing plus or minus eight. Push
+that into a soft max and you get a
+spike, not a distribution. One position
+at basically one, the rest at zero. And
+soft max at a spike has no gradient
+left. The layer stops learning where to
+look. Divide by root DK and it trains.
+The justification for the most copied
+symbol in deep learning is,
+delightfully, a hedge.
+One head produces one way to average,
+and an average is a blur. If a token
+needs to track its subject, its verb
+tense, and the bracket it has to close,
+one soft max smears across all three and
+you get mush. So, project into eight
+subspaces of 64 dimensions, run eight
+attentions side by side, concatenate.
+Each head gets to be sharp about one
+relationship, and the sly part is the
+accounting. 64 * 8 is 512, so eight
+heads cost what one did.
+But deleting the chain deleted order
+along with it. Attention is permutation
+invariant. Shuffle the tokens and every
+score is identical. The outputs just
+shuffle along. The cat ate the fish and
+the fish ate the cat are the same bag.
+So, order gets injected by hand. Signs
+and cosines whose wavelength stretch
+from a few radians to 60,000. A clock
+where every dimension ticks at its own
+rate. Shift by a fixed offset and it's a
+linear transform. That's the thread a
+decade of position papers went on to
+pull.
+If, why does this thing refuse to die is
+your kind of question, like, subscribe,
+and send it to whoever told you
+attention got replaced last week.
+Then the boring glue that makes six
+layers trainable at all. A sublayer
+never replaces its input, it adds to it.
+Layer norm of X plus whatever the
+sublayer computed, which leaves a
+straight wire from the loss down to
+layer one. Instead of a gradient
+fighting through six transformations to
+get there, every block writes an edit
+onto a running stream instead of
+overriding it. That's why we call it the
+residual stream, a shared bus every head
+reads from and writes back to.
+Now the table they were honest about.
+Per layer, self-attention costs n
+squared times d, recurrence costs n
+times d squared. So when the sequence is
+shorter than the model is wide, 40
+tokens, 512 dimensions, every sentence
+in 2017,
+attention is genuinely cheaper. And in
+the column that mattered, one sequential
+step versus n, a quadratic in length
+traded for a constant in depth. Back
+then that quadratic was free. It stopped
+being free the day context hit 64,000.
+The design didn't age badly. The input
+got a thousand times longer.
+And the numbers that bought it the
+benefit of the doubt, 28.4 BLEU on
+English-German, beating every prior
+model, ensembles included, by over two
+points. 41.8 on English-French, a new
+single model record after three and a
+half days on eight GPUs. Their base
+model beat everything published before
+it on roughly a hundredth of the
+training compute. Not just better,
+absurdly cheaper.
+Straight from the abstract.
+So the whole recipe, cut the recurrence
+and the sequence resolves in one shot
+instead of n steps. Divide by root dk
+and the softmax keeps a gradient. Split
+the width into eight heads and one blur
+becomes eight sharp relations. Add a
+sinusoidal clock because order stopped
+being free. Wrap it in a residual stream
+so depth trains. Nine years of
+challengers have attacked exactly one of
+those, the n squared, and everyone that
+stuck kept the skeleton.
+One line. Every choice in here was
+bought with parallelism. The whole
+sequence computes at once, and
+everything else exists to keep that
+shape trainable.
+Which leaves the question the whole
+attention war turns on. Is the N squared
+a bug we eventually delete, or is
+looking at everything the thing that
+actually makes it work? That's my read.
+Tell me yours. Until next time.

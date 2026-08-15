@@ -1,0 +1,143 @@
+# grouped-query-attention
+# video: https://www.youtube.com/watch?v=_hvdcVitU0Y
+
+Let's break down the core idea behind
+this paper, GQA from Google Research,
+the one-line change to attention that
+made serving these models affordable.
+Eight times less memory during
+generation and almost no quality lost.
+That's the entire paper and it's why
+nearly every model you've run this year
+quietly uses it. Here's what nobody
+tells you about serving a large model.
+The weights aren't the problem. The
+thing eating your GPU is a giant,
+ever-growing scratch pad called the KV
+cache. GQA shrinks it with a change
+small enough to fit in one sentence.
+Start with generation. Every time the
+model writes a token, it attends to
+every token before it. Recomputing all
+those keys and values each step would be
+madness, so we cache them. Write once,
+reuse forever. Except the cache grows
+with every new token and each step the
+GPU reads the whole thing back just to
+produce one word. So decoding isn't
+compute bound, it's bandwidth bound.
+Your very expensive matrix multipliers
+sit idle waiting on memory.
+How big does it get? For every past
+token you store a key and a value for
+every head in every layer for every
+sequence in the batch. So it scales with
+context length, with batch size and with
+head count. At long context and real
+batch sizes the cache stops being a
+rounding error. It dwarfs the weights
+and it's fat for one reason. Every head
+insists on its own private keys and
+values.
+Noam Shazeer's fix for years earlier was
+gloriously blunt. What if all the query
+heads shared one set of keys and values?
+Keep the query heads, they still ask
+different questions, but hand them all
+the same key and value. That's
+multi-query attention and it shrinks the
+cache by the number of heads. 64 heads,
+64 times smaller. Except you've just
+deleted a big chunk of the model's
+capacity. Quality slips and training
+gets twitchy, loss spikes, and models
+that diverge when you fine-tune on long
+inputs.
+So, GQA asked the question everybody
+skipped. Why is this a light switch?
+Sort the query heads into groups. Every
+head inside a group shares one key head
+and one value head, but each group gets
+its own. Eight groups instead of 64
+heads. The cache shrinks eightfold and
+every group still keeps its own view of
+the past. Now, the ends of that dial.
+One group per head is exactly multi-head
+attention. One group total is exactly
+multi-query. GQA isn't a new mechanism.
+It's the slider that was always sitting
+between them.
+Here's the part that made this actually
+happen. A new attention layout normally
+means training from scratch. Nobody's
+doing that for a checkpoint they already
+shipped. So, instead, inside each group,
+average the key projections together and
+average the value projections. Mean
+pooling literally. The shared head
+starts life as the consensus of the
+heads it replaces. Already roughly right
+and better than keeping one head and
+binning the rest or starting from noise.
+Then, keep pre-training on the same data
+for 5% of the original steps.
+5% and they checked exactly where the
+returns run out.
+If average a few weights and have your
+serving bill is your kind of trick, like
+subscribe and send this to whoever pays
+for your GPUs.
+So, where do you set the dial? The trade
+is beautifully lopsided. Going from one
+group to eight costs almost no speed.
+The cache is already small enough that
+bandwidth stops being what you wait on.
+Keep climbing toward one group per head
+and the cost bites hard. Quality moves
+the other way. Most of what multi-query
+gave up comes back in the first few
+groups. So, the sweet spot isn't a
+compromise. It's a corner. Eight groups
+and you're done.
+The receipts on T5 XXL full multi-head
+scores 47.2
+at 1.51% sample. Multi-query is six
+times faster, but slips to 46.6.
+GQA with eight groups, 0.28 multi-query
+speed and 47.1 shoulder to shoulder with
+full multi-head, which is why GQA became
+the default. Llama 2, Llama 3, Mistral,
+most of what you serve. It's also the
+ancestor of DeepSeek's multi-head latent
+attention, which we covered in the
+DeepSeek series. Same target, different
+move. Compress the cache instead of
+sharing it.
+And here's the row that made everyone
+switch.
+So, the whole thing in one pass.
+Generation is bottlenecked by rereading
+the KV cache and the cache is fat
+because every head hoards its own keys
+and values. Multi-query shares one set
+across all of them. Fast, but it costs
+quality and stability. GQA splits the
+difference. Group the heads, one
+key-value pair per group. A clean dial
+from multi-head to multi-query. Convert
+an existing checkpoint by mean pooling
+inside each group, up-train 5% and you
+land at multi-query speed with
+multi-head quality.
+One line. Don't give every attention
+head its own keys and values and don't
+force them all to share one. Group them
+and the cache shrinks by the size of the
+group while the model barely notices.
+Which leaves a question I keep chewing
+on. GQA works because attention heads
+are redundant enough to share and nobody
+really knows how much sharing is too
+much. Every architecture since has been
+quietly probing that edge. That's my
+read. Tell me yours. Until next time.

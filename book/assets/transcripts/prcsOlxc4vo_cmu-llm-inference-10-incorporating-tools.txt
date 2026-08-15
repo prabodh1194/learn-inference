@@ -1,0 +1,1859 @@
+# cmu-llm-inference-10-incorporating-tools
+# video: https://www.youtube.com/watch?v=prcsOlxc4vo
+# captions: manual
+
+Hello everyone. Um so we had a few Hello everyone. Um so we had a few
+Hello everyone. Um so we had a few questions about the assignment. Um
+the questions about the assignment. Um the questions about the
+assignment. Um the first question about the assignment was first
+question about the assignment was first question about the assignment
+was um were people having trouble with the um were people having trouble
+with the um were people having trouble with the inference on the like
+graph problem uh inference on the like graph problem uh inference on the
+like graph problem uh where it was taking a really long time where it
+was taking a really long time where it was taking a really long time
+with your models? with your models? with your models? Yes. Yes. Yes. Um
+did I see some people nodding Um did I see some people nodding Um did I
+see some people nodding that? Um yes. Okay. Um, did you have uh that? Um
+yes. Okay. Um, did you have uh that? Um yes. Okay. Um, did you have uh
+like the thinking token on for Gwen 3? like the thinking token on for
+Gwen 3? like the thinking token on for Gwen 3? No, No, No, &gt;&gt; you
+explicitly turned it off. Okay. Um, &gt;&gt; you explicitly turned it
+off. Okay. Um, &gt;&gt; you explicitly turned it off. Okay. Um, we will
+uh need to look into that we will uh need to look into that we will uh
+need to look into that because I didn't uh I didn't see that because I
+didn't uh I didn't see that because I didn't uh I didn't see that when
+we ran it ourselves, but um we'll when we ran it ourselves, but um we'll
+when we ran it ourselves, but um we'll uh we'll see. Um and then uh the
+other uh we'll see. Um and then uh the other uh we'll see. Um and then
+uh the other thing is I had a question about when the thing is I had a
+question about when the thing is I had a question about when the
+homework the next homework's going to be homework the next homework's
+going to be homework the next homework's going to be out. Um, I'll let
+the TAs answer that out. Um, I'll let the TAs answer that out. Um, I'll
+let the TAs answer that when they get here. They are running a when they
+get here. They are running a when they get here. They are running a
+little bit late. I don't know if they little bit late. I don't know if
+they little bit late. I don't know if they stayed up late for the
+deadline. Uh, I stayed up late for the deadline. Uh, I stayed up late
+for the deadline. Uh, I cleared a line last night or something, cleared
+a line last night or something, cleared a line last night or something,
+but but but &gt;&gt; yeah, I I know at least uh at least some &gt;&gt;
+yeah, I I know at least uh at least some &gt;&gt; yeah, I I know at
+least uh at least some of them did. of them did. of them did. Um, Um,
+Um, cool. But um yeah, I I don't want to cool. But um yeah, I I don't
+want to cool. But um yeah, I I don't want to waste time. How many people
+do we have waste time. How many people do we have waste time. How many
+people do we have presenting today? One, two, three. Okay, presenting
+today? One, two, three. Okay, presenting today? One, two, three. Okay, I
+have a lot of content today. So I will I have a lot of content today. So
+I will I have a lot of content today. So I will get started and try to
+go quickly. Um get started and try to go quickly. Um get started and try
+to go quickly. Um cool. Okay. Um so this time I'm going to talk Okay. Um
+so this time I'm going to talk Okay. Um so this time I'm going to talk
+about tool use. Um and about tool use. Um and about tool use. Um and the
+basic idea is that um we we want to the basic idea is that um we we want
+to the basic idea is that um we we want to provide the agent with tools
+that it can provide the agent with tools that it can provide the agent
+with tools that it can use. And in terms of the definition of use. And
+in terms of the definition of use. And in terms of the definition of
+tools, uh, we're talking about things tools, uh, we're talking about
+things tools, uh, we're talking about things that are external to the
+LM. Um, and that are external to the LM. Um, and that are external to
+the LM. Um, and they're part of an environment that the they're part of
+an environment that the they're part of an environment that the LM is
+kind of placed in. And they have a LM is kind of placed in. And they
+have a LM is kind of placed in. And they have a functional interface.
+And so we we think functional interface. And so we we think functional
+interface. And so we we think of them as uh functions in a programming
+of them as uh functions in a programming of them as uh functions in a
+programming language uh callable with input, language uh callable with
+input, language uh callable with input, parameters, and output uh that
+you get parameters, and output uh that you get parameters, and output uh
+that you get from them. uh and they're generally you from them. uh and
+they're generally you from them. uh and they're generally you know
+executable as uh programs and uh there's a survey paper that I did and
+uh there's a survey paper that I did and uh there's a survey paper that
+I did uh together with one of the um one of my uh together with one of
+the um one of my uh together with one of the um one of my students Sora
+called what are tools students Sora called what are tools students Sora
+called what are tools anyway it's on the the site uh and you anyway it's
+on the the site uh and you anyway it's on the the site uh and you can go
+in and read a lot of the slides can go in and read a lot of the slides
+can go in and read a lot of the slides here are kind of based on that to
+some here are kind of based on that to some here are kind of based on
+that to some extent but in coming up with that survey extent but in
+coming up with that survey extent but in coming up with that survey we
+tried to think of like the categories we tried to think of like the
+categories we tried to think of like the categories of tools that you
+use um and there's of tools that you use um and there's of tools that
+you use um and there's basically three different categories of basically
+three different categories of basically three different categories of
+tools that you might use. So the first tools that you might use. So the
+first tools that you might use. So the first one is um perception and
+what we mean by one is um perception and what we mean by one is um
+perception and what we mean by perception is basically giving the
+perception is basically giving the perception is basically giving the
+language model the ability to access language model the ability to
+access language model the ability to access information that is not
+included in its information that is not included in its information that
+is not included in its parameters. So um they can collect parameters. So
+um they can collect parameters. So um they can collect information from
+the web or they can information from the web or they can information
+from the web or they can read a file system or uh you know read a file
+system or uh you know read a file system or uh you know interact with
+the user uh in some way or interact with the user uh in some way or
+interact with the user uh in some way or something like that. something
+like that. something like that. Uh the second thing is uh taking actions
+Uh the second thing is uh taking actions Uh the second thing is uh
+taking actions and so actions are things that can and so actions are
+things that can and so actions are things that can directly affect
+change on the directly affect change on the directly affect change on
+the environment. So perception is basically environment. So perception
+is basically environment. So perception is basically you know just
+gathering information from you know just gathering information from you
+know just gathering information from the environment where action is
+actually the environment where action is actually the environment where
+action is actually you know making some sort of change to you know
+making some sort of change to you know making some sort of change to the
+environment. And then the final one the environment. And then the final
+one the environment. And then the final one is computation and what this
+is is this is computation and what this is is this is computation and
+what this is is this is not necessarily interacting with an is not
+necessarily interacting with an is not necessarily interacting with an
+external environment. So you're not external environment. So you're not
+external environment. So you're not providing the agent with or the the
+LM providing the agent with or the the LM providing the agent with or
+the the LM with any more information than it has with any more
+information than it has with any more information than it has
+originally. Um but it can do sorts of originally. Um but it can do sorts
+of originally. Um but it can do sorts of computations that like aren't
+easy to do computations that like aren't easy to do computations that
+like aren't easy to do uh within a language model. Here are some
+examples of them. Um and Here are some examples of them. Um and Here are
+some examples of them. Um and so uh you can have things that provide so
+uh you can have things that provide so uh you can have things that
+provide additional knowledge. So you can like additional knowledge. So
+you can like additional knowledge. So you can like call a search engine
+uh make database call a search engine uh make database call a search
+engine uh make database queries. uh you can do computation queries. uh
+you can do computation queries. uh you can do computation either using
+like just a calculator or a either using like just a calculator or a
+either using like just a calculator or a Python interpreter. Um you can
+get Python interpreter. Um you can get Python interpreter. Um you can
+get information about the world like getting information about the world
+like getting information about the world like getting the weather or
+fetching events from a the weather or fetching events from a the weather
+or fetching events from a calendar. And you can also do other calendar.
+And you can also do other calendar. And you can also do other things
+like calling uh you know tools things like calling uh you know tools
+things like calling uh you know tools that allow you to interact with
+other that allow you to interact with other that allow you to interact
+with other modalities that the LM can't interact modalities that the LM
+can't interact modalities that the LM can't interact with immediately.
+So um like doing with immediately. So um like doing with immediately. So
+um like doing visual QA over an image uh converting a visual QA over an
+image uh converting a visual QA over an image uh converting a video to
+its transcript uh playing music video to its transcript uh playing music
+video to its transcript uh playing music on Spotify uh you know other
+stuff like on Spotify uh you know other stuff like on Spotify uh you
+know other stuff like that. Uh any questions about that? Uh any
+questions about that? Uh any questions about that? Okay cool. So Okay
+cool. So Okay cool. So the basic uh tool use paradigm uh this the basic
+uh tool use paradigm uh this the basic uh tool use paradigm uh this is
+not the only way to call tools but is not the only way to call tools but
+is not the only way to call tools but this is one of the common ways to
+call this is one of the common ways to call this is one of the common
+ways to call tools in language models is uh you have tools in language
+models is uh you have tools in language models is uh you have a user
+query and then before um you a user query and then before um you a user
+query and then before um you actually actually actually generate the
+output you have some way of generate the output you have some way of
+generate the output you have some way of calling a function and
+typically what calling a function and typically what calling a function
+and typically what this means is you have a tag that's like this means
+is you have a tag that's like this means is you have a tag that's like
+something like start tool call or uh something like start tool call or
+uh something like start tool call or uh something like this which
+indicates that something like this which indicates that something like
+this which indicates that you're starting to call a tool. You you're
+starting to call a tool. You you're starting to call a tool. You write
+the tool call and then you uh you write the tool call and then you uh
+you write the tool call and then you uh you finish. And so uh here this
+actually finish. And so uh here this actually finish. And so uh here
+this actually this figure might this figure might this figure might not
+be the best. It should be like tool not be the best. It should be like
+tool not be the best. It should be like tool uh you should have a tool
+tag and then uh you should have a tool tag and then uh you should have a
+tool tag and then check weather and then like a closed check weather and
+then like a closed check weather and then like a closed tool tag um or
+or something like that. tool tag um or or something like that. tool tag
+um or or something like that. But this is uh you know the example of But
+this is uh you know the example of But this is uh you know the example
+of how it it works. And so then you get the how it it works. And so then
+you get the how it it works. And so then you get the tool call, you call
+the remote server tool call, you call the remote server tool call, you
+call the remote server and you return the API output. And you and you
+return the API output. And you and you return the API output. And you
+can either like concatenate it directly can either like concatenate it
+directly can either like concatenate it directly into the stream that
+the agent is into the stream that the agent is into the stream that the
+agent is generating or you can give it to the generating or you can give
+it to the generating or you can give it to the agent as an observation.
+And then based agent as an observation. And then based agent as an
+observation. And then based on that observation uh it can go back on
+that observation uh it can go back on that observation uh it can go back
+and uh like and uh like and uh like you know generate the response to
+you. Cool. Everything good? Um so the first Cool. Everything good? Um so
+the first Cool. Everything good? Um so the first uh example of this kind
+of in the large uh example of this kind of in the large uh example of
+this kind of in the large uh modern large language model era uh modern
+large language model era uh modern large language model era actually one
+thing I I should mention is actually one thing I I should mention is
+actually one thing I I should mention is um before the modern large
+language um before the modern large language um before the modern large
+language model era this existed in lots and lots model era this existed
+in lots and lots model era this existed in lots and lots of cases like
+Siri and uh you know Alexa of cases like Siri and uh you know Alexa of
+cases like Siri and uh you know Alexa and all of your personal
+assistants. Um and all of your personal assistants. Um and all of your
+personal assistants. Um but they did it in a different way. The but they
+did it in a different way. The but they did it in a different way. The
+way they did it is they had classifiers way they did it is they had
+classifiers way they did it is they had classifiers and they would have
+a classifier that and they would have a classifier that and they would
+have a classifier that says I need this API call. So like the says I
+need this API call. So like the says I need this API call. So like the
+user says something you classify into user says something you classify
+into user says something you classify into over all of the APIs that you
+are over all of the APIs that you are over all of the APIs that you are
+calling and then after that for each API calling and then after that for
+each API calling and then after that for each API you would then fill in
+the arguments. So you would then fill in the arguments. So you would
+then fill in the arguments. So you would have like an argument filling
+you would have like an argument filling you would have like an argument
+filling model. So that's the way you would do it model. So that's the
+way you would do it model. So that's the way you would do it now. Um
+previously now you usually do it now. Um previously now you usually do
+it now. Um previously now you usually do it by just having the language
+model by just having the language model by just having the language
+model directly generate the code uh to call directly generate the code
+uh to call directly generate the code uh to call the tool. the tool. the
+tool. So the first example of this that I'm So the first example of this
+that I'm So the first example of this that I'm aware of in the modern LM
+era is web GPT aware of in the modern LM era is web GPT aware of in the
+modern LM era is web GPT and this was uh basically uh taking the and
+this was uh basically uh taking the and this was uh basically uh taking
+the GPT models and giving them a tool to uh GPT models and giving them a
+tool to uh GPT models and giving them a tool to uh do web search. Uh so
+if it sounds do web search. Uh so if it sounds do web search. Uh so if
+it sounds familiar because every large language familiar because every
+large language familiar because every large language model provider
+chatbot does this model provider chatbot does this model provider
+chatbot does this nowadays uh it actually was a research nowadays uh it
+actually was a research nowadays uh it actually was a research paper
+four years ago. So um it came from paper four years ago. So um it came
+from paper four years ago. So um it came from this and uh so the the
+issue is uh this and uh so the the issue is uh this and uh so the the
+issue is uh language models lack access to current language models lack
+access to current language models lack access to current information. So
+they do text based web information. So they do text based web
+information. So they do text based web browsing as a tool. browsing as a
+tool. browsing as a tool. Um, they had a textbased interface that Um,
+they had a textbased interface that Um, they had a textbased interface
+that allowed the GPT model at the time, which allowed the GPT model at
+the time, which allowed the GPT model at the time, which I think was uh
+maybe GPT2, to uh search, I think was uh maybe GPT2, to uh search, I
+think was uh maybe GPT2, to uh search, click, uh, scroll and quote. And
+so, you click, uh, scroll and quote. And so, you click, uh, scroll and
+quote. And so, you know, they could search for a web page, know, they
+could search for a web page, know, they could search for a web page,
+click on, uh, click on links, scroll, click on, uh, click on links,
+scroll, click on, uh, click on links, scroll, and then extract quotes
+from them. And, and then extract quotes from them. And, and then extract
+quotes from them. And, um, they actually trained it uh, using um, they
+actually trained it uh, using um, they actually trained it uh, using
+reinforcement learning from human reinforcement learning from human
+reinforcement learning from human feedback. So not from verifiable
+rewards feedback. So not from verifiable rewards feedback. So not from
+verifiable rewards but directly uh from a feedback model. but directly
+uh from a feedback model. but directly uh from a feedback model. And I'm
+not going to cover RLHF a whole And I'm not going to cover RLHF a whole
+And I'm not going to cover RLHF a whole lot in this uh class. Hopefully
+most of lot in this uh class. Hopefully most of lot in this uh class.
+Hopefully most of you have seen it somewhere before. But you have seen
+it somewhere before. But you have seen it somewhere before. But the
+basic idea behind it is they started the basic idea behind it is they
+started the basic idea behind it is they started out with behavior
+cloning. So they out with behavior cloning. So they out with behavior
+cloning. So they created a web interface where humans created a web
+interface where humans created a web interface where humans could
+actually like search for things could actually like search for things
+could actually like search for things and uh and click on links and
+scroll and and uh and click on links and scroll and and uh and click on
+links and scroll and gather information and information gather
+information and information gather information and information gathering
+tasks. They instrumented it so gathering tasks. They instrumented it so
+gathering tasks. They instrumented it so they could gather all the data
+of how they could gather all the data of how they could gather all the
+data of how humans were doing it and then train GPT humans were doing it
+and then train GPT humans were doing it and then train GPT with the that
+data. Uh they then did with the that data. Uh they then did with the
+that data. Uh they then did reward modeling. So they um had uh the
+reward modeling. So they um had uh the reward modeling. So they um had
+uh the behavior clone model uh you know behavior clone model uh you know
+behavior clone model uh you know generate two outputs and then humans
+generate two outputs and then humans generate two outputs and then
+humans would pick which one they like the best would pick which one they
+like the best would pick which one they like the best and so that would
+give you preference and so that would give you preference and so that
+would give you preference data and then based on that they would data
+and then based on that they would data and then based on that they would
+train the reward model and then the train the reward model and then the
+train the reward model and then the reward model would be used to grade
+uh reward model would be used to grade uh reward model would be used to
+grade uh like essentially web GPT generations. like essentially web GPT
+generations. like essentially web GPT generations. So, um, you know,
+every time you're in So, um, you know, every time you're in So, um, you
+know, every time you're in chat GPT and you get the two things side chat
+GPT and you get the two things side chat GPT and you get the two things
+side by side and you press, uh, you know, I by side and you press, uh,
+you know, I by side and you press, uh, you know, I like this one better
+or I like this one like this one better or I like this one like this one
+better or I like this one better, you're basically, uh, doing better,
+you're basically, uh, doing better, you're basically, uh, doing number
+two for them. So, thank you for number two for them. So, thank you for
+number two for them. So, thank you for your service. your service. your
+service. Um, Um, Um, so so so here here were the results. Uh and one
+here here were the results. Uh and one here here were the results. Uh
+and one interesting thing that they showed was interesting thing that
+they showed was interesting thing that they showed was they compared the
+small models with each they compared the small models with each they
+compared the small models with each other and then they also compared uh
+other and then they also compared uh other and then they also compared
+uh small models with medium models with small models with medium models
+with small models with medium models with with big models and then they
+also with big models and then they also with big models and then they
+also compared uh models without search and compared uh models without
+search and compared uh models without search and with search. But they
+finally compared with search. But they finally compared with search. But
+they finally compared with uh like human demonstrations uh with uh like
+human demonstrations uh with uh like human demonstrations uh that they
+got from their annotators and that they got from their annotators and
+that they got from their annotators and the best answer on Reddit. So
+here their the best answer on Reddit. So here their the best answer on
+Reddit. So here their baseline was a random Redditor who got baseline
+was a random Redditor who got baseline was a random Redditor who got
+upvoted. So which in 2021 was pretty upvoted. So which in 2021 was
+pretty upvoted. So which in 2021 was pretty impressive that they could
+uh they could impressive that they could uh they could impressive that
+they could uh they could beat the random Redditor that got beat the
+random Redditor that got beat the random Redditor that got upvoted. But
+they uh evaluated it I upvoted. But they uh evaluated it I upvoted. But
+they uh evaluated it I think manually evaluated it based on think
+manually evaluated it based on think manually evaluated it based on
+overall usefulness uh coherence and overall usefulness uh coherence and
+overall usefulness uh coherence and factual accuracy and demonstrated
+that factual accuracy and demonstrated that factual accuracy and
+demonstrated that their uh 175B model so maybe this was their uh 175B
+model so maybe this was their uh 175B model so maybe this was GPD3
+actually sorry GPD3 um it was able GPD3 actually sorry GPD3 um it was
+able GPD3 actually sorry GPD3 um it was able to do better than these to
+do better than these to do better than these Um, another important thing
+of using a Um, another important thing of using a Um, another important
+thing of using a tool for this is that you can get tool for this is that
+you can get tool for this is that you can get citations. So you can look
+up uh um you citations. So you can look up uh um you citations. So you
+can look up uh um you can look up uh outputs can look up uh outputs can
+look up uh outputs and uh provide links so people can look and uh
+provide links so people can look and uh provide links so people can look
+and of course you know you see this all and of course you know you see
+this all and of course you know you see this all the time in your uh
+interfaces nowadays. the time in your uh interfaces nowadays. the time
+in your uh interfaces nowadays. Um so any any questions about this? I Um
+so any any questions about this? I Um so any any questions about this? I
+have one question which is um have one question which is um have one
+question which is um does this sound like retrieval augmented does this
+sound like retrieval augmented does this sound like retrieval augmented
+generation to anybody? generation to anybody? generation to anybody?
+Like have have you built a rag system or Like have have you built a rag
+system or Like have have you built a rag system or done something like
+this? Does it seem done something like this? Does it seem done something
+like this? Does it seem like that? Yeah. Uh so like yes people like
+that? Yeah. Uh so like yes people like that? Yeah. Uh so like yes people
+were nodding. Um any any idea what makes were nodding. Um any any idea
+what makes were nodding. Um any any idea what makes this a little bit
+different than many this a little bit different than many this a little
+bit different than many rag systems? rag systems? rag systems? &gt;&gt;
+Yes. Uh the index is not static. Um yeah, Uh the index is not static. Um
+yeah, Uh the index is not static. Um yeah, good good point. The web is
+constantly good good point. The web is constantly good good point. The
+web is constantly evolving. Uh that's not what I was evolving. Uh that's
+not what I was evolving. Uh that's not what I was thinking about, but
+it's it's pretty thinking about, but it's it's pretty thinking about,
+but it's it's pretty close. Yeah. close. Yeah. close. Yeah. &gt;&gt;
+Yeah, exactly. Retrieval is a tool call. &gt;&gt; Yeah, exactly.
+Retrieval is a tool call. &gt;&gt; Yeah, exactly. Retrieval is a tool
+call. So typically when you build a rag So typically when you build a
+rag So typically when you build a rag system, the most typical way to do
+it is system, the most typical way to do it is system, the most typical
+way to do it is to take in the query, do a lookup, get to take in the
+query, do a lookup, get to take in the query, do a lookup, get all the
+relevant documents, and all the relevant documents, and all the relevant
+documents, and generate. But here they gave the LM the generate. But
+here they gave the LM the generate. But here they gave the LM the
+ability to do tools. So So that was kind ability to do tools. So So that
+was kind ability to do tools. So So that was kind of the innovation in
+this of the innovation in this of the innovation in this Um Um Um so mo
+moving a little bit ahead in time so mo moving a little bit ahead in
+time so mo moving a little bit ahead in time uh we have tool formers. So
+this was uh we have tool formers. So this was uh we have tool formers.
+So this was like the the paper that really uh kicked like the the paper
+that really uh kicked like the the paper that really uh kicked off the
+interest in tools and I think off the interest in tools and I think off
+the interest in tools and I think the reason why was um because for a
+the reason why was um because for a the reason why was um because for a
+couple reasons. Number one, previous couple reasons. Number one,
+previous couple reasons. Number one, previous approaches required manual
+annotation approaches required manual annotation approaches required
+manual annotation like behavior cloning. Um the second uh like behavior
+cloning. Um the second uh like behavior cloning. Um the second uh reason
+was that this was actually done reason was that this was actually done
+reason was that this was actually done on like a decently sized model
+that on like a decently sized model that on like a decently sized model
+that other people would be able to train other people would be able to
+train other people would be able to train GPTJ. GPTJ. GPTJ. And so uh
+the idea was that they want to And so uh the idea was that they want to
+And so uh the idea was that they want to generate um uh they wanted to
+teach the generate um uh they wanted to teach the generate um uh they
+wanted to teach the model to learn when how to use tools. Um model to
+learn when how to use tools. Um model to learn when how to use tools. Um
+and the way they did this was through and the way they did this was
+through and the way they did this was through self-supervised learning
+from unlabelled self-supervised learning from unlabelled self-supervised
+learning from unlabelled text. And I think this is a really text. And I
+think this is a really text. And I think this is a really clever method.
+I I like it a lot. Um, clever method. I I like it a lot. Um, clever
+method. I I like it a lot. Um, and part of the reason why it's clever
+and part of the reason why it's clever and part of the reason why it's
+clever is that it worked really well with the is that it worked really
+well with the is that it worked really well with the weaker models that
+we had then. So, it weaker models that we had then. So, it weaker models
+that we had then. So, it would certainly work with the smaller would
+certainly work with the smaller would certainly work with the smaller
+models that we have now. Um, now you models that we have now. Um, now
+you models that we have now. Um, now you might be able to do something
+that's a might be able to do something that's a might be able to do
+something that's a little bit less uh, you know, complex little bit less
+uh, you know, complex little bit less uh, you know, complex than this
+and still get good results. than this and still get good results. than
+this and still get good results. But, uh, let's take a look at what they
+But, uh, let's take a look at what they But, uh, let's take a look at
+what they did first. So, the basic way it works is did first. So, the
+basic way it works is did first. So, the basic way it works is they
+would have a language model data they would have a language model data
+they would have a language model data set. Um, surprisingly this is not
+a CMU set. Um, surprisingly this is not a CMU set. Um, surprisingly this
+is not a CMU paper, but their example is still about paper, but their
+example is still about paper, but their example is still about
+Pittsburgh. Uh, it's actually from Meta Pittsburgh. Uh, it's actually
+from Meta Pittsburgh. Uh, it's actually from Meta in in uh in London,
+but uh you know uh in in uh in London, but uh you know uh in in uh in
+London, but uh you know uh thank you thank you for that. And then thank
+you thank you for that. And then thank you thank you for that. And then
+um so they have the LM data set and the um so they have the LM data set
+and the um so they have the LM data set and the query was like
+Pittsburgh is known as uh query was like Pittsburgh is known as uh query
+was like Pittsburgh is known as uh they they turned it into like what uh
+they they turned it into like what uh they they turned it into like what
+uh what other name is Pittsburgh known by? what other name is Pittsburgh
+known by? what other name is Pittsburgh known by? Uh and things like
+this. They sampled Uh and things like this. They sampled Uh and things
+like this. They sampled API calls. In this case, this was an API API
+calls. In this case, this was an API API calls. In this case, this was
+an API call to an external question answering call to an external
+question answering call to an external question answering system. And
+then uh they would execute system. And then uh they would execute
+system. And then uh they would execute the API calls and they would
+check if the API calls and they would check if the API calls and they
+would check if the API call um generated an output the API call um
+generated an output the API call um generated an output where uh
+conditioning on this output where uh conditioning on this output where
+uh conditioning on this output from the API call increased the from the
+API call increased the from the API call increased the probability of
+the correct answer being probability of the correct answer being
+probability of the correct answer being output compared to if you had no
+uh no output compared to if you had no uh no output compared to if you
+had no uh no API call. So, um API call. So, um API call. So, um the uh
+the way they added this is they the uh the way they added this is they
+the uh the way they added this is they basically had um Pittsburgh is
+known as basically had um Pittsburgh is known as basically had um
+Pittsburgh is known as they had an open bracket where the open they had
+an open bracket where the open they had an open bracket where the open
+bracket and the tool name was an bracket and the tool name was an
+bracket and the tool name was an indicator that they should be starting
+a indicator that they should be starting a indicator that they should be
+starting a tool call. They would add like what tool call. They would add
+like what tool call. They would add like what other names is Pittsburgh
+known by. Um other names is Pittsburgh known by. Um other names is
+Pittsburgh known by. Um and then they would generate the uh the and then
+they would generate the uh the and then they would generate the uh the
+arrow arrow arrow and after they generated the arrow it and after they
+generated the arrow it and after they generated the arrow it would
+actually make the tool call return would actually make the tool call
+return would actually make the tool call return the tool call answer um
+close the the tool call answer um close the the tool call answer um
+close the bracket and close uh sorry close the bracket and close uh
+sorry close the bracket and close uh sorry close the parenthesis and
+close the bracket and parenthesis and close the bracket and parenthesis
+and close the bracket and you would append this to the context and you
+would append this to the context and you would append this to the
+context and then calculate the probability of the then calculate the
+probability of the then calculate the probability of the steel city
+after um after appending this steel city after um after appending this
+steel city after um after appending this and uh after not appending this
+and make and uh after not appending this and make and uh after not
+appending this and make sure that the probability after you sure that
+the probability after you sure that the probability after you appended
+it is higher. So that would appended it is higher. So that would
+appended it is higher. So that would mean that the tool call was useful.
+Um mean that the tool call was useful. Um mean that the tool call was
+useful. Um yeah, this is an existing question answering this is an
+existing question answering this is an existing question answering tool
+and the reason why they did this tool and the reason why they did this
+tool and the reason why they did this was back then GPGA could not
+answer was back then GPGA could not answer was back then GPGA could not
+answer questions very well. Um so this would be questions very well. Um
+so this would be questions very well. Um so this would be like a kind of
+out of the box QA system. like a kind of out of the box QA system. like
+a kind of out of the box QA system. Um I can actually talk a little bit
+more Um I can actually talk a little bit more Um I can actually talk a
+little bit more about like which tools you should be about like which
+tools you should be about like which tools you should be using uh now
+but yeah &gt;&gt; the question &gt;&gt; the question &gt;&gt; the
+question oh what was the question oh what was the question oh what was
+the question other other other &gt;&gt; oh yeah so we we have some other
+tools &gt;&gt; oh yeah so we we have some other tools &gt;&gt; oh yeah
+so we we have some other tools in this paper and then I'm going to talk
+in this paper and then I'm going to talk in this paper and then I'm
+going to talk a little bit more about tools in general a little bit more
+about tools in general a little bit more about tools in general yeah
+yeah yeah &gt;&gt; it can be wrong even if the probability &gt;&gt; it
+can be wrong even if the probability &gt;&gt; it can be wrong even if
+the probability &gt;&gt; even if the prob probability improves &gt;&gt;
+even if the prob probability improves &gt;&gt; even if the prob
+probability improves doesn't necessarily mean that the answer doesn't
+necessarily mean that the answer doesn't necessarily mean that the
+answer is correct. Uh but their their only is correct. Uh but their
+their only is correct. Uh but their their only criterion for choosing
+tools is whether criterion for choosing tools is whether criterion for
+choosing tools is whether the output was useful. Um the output of the
+output was useful. Um the output of the output was useful. Um the output
+of the tool call was useful. the tool call was useful. the tool call was
+useful. Cool. Cool. Cool. &gt;&gt; Wow. &gt;&gt; Wow. &gt;&gt; Wow.
+&gt;&gt; Any others? Yeah, &gt;&gt; Any others? Yeah, &gt;&gt; Any
+others? Yeah, that's great. I'm glad you like it. Um that's great. I'm
+glad you like it. Um that's great. I'm glad you like it. Um it's not my
+not my paper, but I'll it's not my not my paper, but I'll it's not my
+not my paper, but I'll convey it to the paper author if you if convey it
+to the paper author if you if convey it to the paper author if you if
+you'd like. Um so uh basically the um you'd like. Um so uh basically the
+um you'd like. Um so uh basically the um they learned tool use without
+human they learned tool use without human they learned tool use without
+human supervision uh through a process of self supervision uh through a
+process of self supervision uh through a process of self annotation uh
+generating potential tool annotation uh generating potential tool
+annotation uh generating potential tool calls automatically filtering
+and calls automatically filtering and calls automatically filtering and
+keeping only the ones that improve keeping only the ones that improve
+keeping only the ones that improve prediction and fine-tuning on the
+prediction and fine-tuning on the prediction and fine-tuning on the
+successful ones. So this is kind of like successful ones. So this is
+kind of like successful ones. So this is kind of like um quasi RL it's
+just like filtered uh um quasi RL it's just like filtered uh um quasi RL
+it's just like filtered uh filtered behavior coding basically. Um,
+filtered behavior coding basically. Um, filtered behavior coding
+basically. Um, one other thing I forgot to mention is one other thing I
+forgot to mention is one other thing I forgot to mention is they had a
+prompt uh that just said they had a prompt uh that just said they had a
+prompt uh that just said these are all of the tools that you have these
+are all of the tools that you have these are all of the tools that you
+have access to and train the model uh started access to and train the
+model uh started access to and train the model uh started the model
+using that prompt. Now the model using that prompt. Now the model using
+that prompt. Now language models would probably just language models
+would probably just language models would probably just follow that
+prompt. Uh back when they follow that prompt. Uh back when they follow
+that prompt. Uh back when they started this uh language models would
+started this uh language models would started this uh language models
+would not necessarily follow this prompt. So not necessarily follow this
+prompt. So not necessarily follow this prompt. So they really need this
+process of like they really need this process of like they really need
+this process of like bootstrapping and gradual improvement to
+bootstrapping and gradual improvement to bootstrapping and gradual
+improvement to make this work. make this work. make this work. Um and
+they demonstrated that uh they Um and they demonstrated that uh they Um
+and they demonstrated that uh they got better and better as the model uh
+got better and better as the model uh got better and better as the model
+uh model parameters increased all the way model parameters increased all
+the way model parameters increased all the way up to a uh 6.5 billion
+which was a large up to a uh 6.5 billion which was a large up to a uh
+6.5 billion which was a large model for them training uh two years ago
+model for them training uh two years ago model for them training uh two
+years ago and um interestingly the improvement and um interestingly the
+improvement and um interestingly the improvement from using tools
+actually increased as from using tools actually increased as from using
+tools actually increased as uh the model size got better got larger uh
+the model size got better got larger uh the model size got better got
+larger and I think the reason why is just and I think the reason why is
+just and I think the reason why is just because the models were was too
+poor at because the models were was too poor at because the models were
+was too poor at generating good tool calls when they generating good
+tool calls when they generating good tool calls when they were smaller.
+Uh that you needed a were smaller. Uh that you needed a were smaller. Uh
+that you needed a certain level of accuracy before um certain level of
+accuracy before um certain level of accuracy before um before it got
+better. But actually like before it got better. But actually like before
+it got better. But actually like probably if you got bigger bigger and
+probably if you got bigger bigger and probably if you got bigger bigger
+and bigger, you know, the benefit of having bigger, you know, the
+benefit of having bigger, you know, the benefit of having a tool would
+decrease because the base a tool would decrease because the base a tool
+would decrease because the base model was able to do things well. So I
+model was able to do things well. So I model was able to do things well.
+So I don't think this would continue forever. don't think this would
+continue forever. don't think this would continue forever. Um so one one
+limitation of this is they Um so one one limitation of this is they Um
+so one one limitation of this is they really only added four tools. Um I
+I really only added four tools. Um I I really only added four tools. Um
+I I thought I added the four tools on the thought I added the four tools
+on the thought I added the four tools on the slides but um maybe uh
+condensed them slides but um maybe uh condensed them slides but um maybe
+uh condensed them for uh for space. But um this was things for uh for
+space. But um this was things for uh for space. But um this was things
+like um actually maybe I can just open like um actually maybe I can just
+open like um actually maybe I can just open the paper uh to make sure I
+get all the paper uh to make sure I get all the paper uh to make sure I
+get all these right. Yeah, it was these ones. A question Yeah, it was
+these ones. A question Yeah, it was these ones. A question answering
+tool, a calculator tool, a answering tool, a calculator tool, a
+answering tool, a calculator tool, a machine translation tool, and a
+wiki machine translation tool, and a wiki machine translation tool, and
+a wiki search tool were the the tools that search tool were the the
+tools that search tool were the the tools that they're used to. Cool.
+&gt;&gt; One question. &gt;&gt; One question. &gt;&gt; One question.
+&gt;&gt; Yes. So like did they change the model &gt;&gt; Yes. So like
+did they change the model &gt;&gt; Yes. So like did they change the
+model to include the like within the braces to include the like within
+the braces to include the like within the braces curly braces did they
+change the model curly braces did they change the model curly braces did
+they change the model to to to modify the prompt to use the tool or
+modify the prompt to use the tool or modify the prompt to use the tool
+or like was it done manually through? like was it done manually through?
+like was it done manually through? &gt;&gt; It was done through
+prompting. So they &gt;&gt; It was done through prompting. So they
+&gt;&gt; It was done through prompting. So they got like examples of
+each of the tools got like examples of each of the tools got like
+examples of each of the tools in the prompt originally. Um but that's in
+the prompt originally. Um but that's in the prompt originally. Um but
+that's like not enough to get it to learn how like not enough to get it
+to learn how like not enough to get it to learn how to like when and how
+to use tools. Well to like when and how to use tools. Well to like when
+and how to use tools. Well uh so you need the like kind of RL style uh
+so you need the like kind of RL style uh so you need the like kind of RL
+style training after that. training after that. training after that.
+Cool. Um, Cool. Um, Cool. Um, question question question &gt;&gt;
+software perspective. Is there a way to &gt;&gt; software perspective.
+Is there a way to &gt;&gt; software perspective. Is there a way to
+quantify the increase in computational quantify the increase in
+computational quantify the increase in computational ability per token
+to the user? ability per token to the user? ability per token to the
+user? &gt;&gt; Um, the increase in computational &gt;&gt; Um, the
+increase in computational &gt;&gt; Um, the increase in computational
+ability per token. Um, I mean you can ability per token. Um, I mean you
+can ability per token. Um, I mean you can quantify the quantify the
+quantify the improvement in modeling the next token improvement in
+modeling the next token improvement in modeling the next token through
+perplexity or something like through perplexity or something like
+through perplexity or something like this. But yeah, I guess the the
+question this. But yeah, I guess the the question this. But yeah, I
+guess the the question would be like how do you define would be like how
+do you define would be like how do you define computational ability if
+not for computational ability if not for computational ability if not
+for something like perplexity? something like perplexity? something like
+perplexity? Um yeah, good good question though. Um Um yeah, good good
+question though. Um Um yeah, good good question though. Um so now fast
+forwarding into maybe 2024 so now fast forwarding into maybe 2024 so now
+fast forwarding into maybe 2024 or at least the present uh what we do or
+at least the present uh what we do or at least the present uh what we do
+for the present. Um for the present. Um for the present. Um around 2024,
+OpenAI uh released their uh around 2024, OpenAI uh released their uh
+around 2024, OpenAI uh released their uh function calling uh standard
+where their function calling uh standard where their function calling uh
+standard where their function calling standard basically you function
+calling standard basically you function calling standard basically you
+can can can specify tools um in a format like this. specify tools um in
+a format like this. specify tools um in a format like this. And so each
+tool And so each tool And so each tool is uh essentially like get
+weather. Um is uh essentially like get weather. Um is uh essentially
+like get weather. Um and then it will have like a name like and then it
+will have like a name like and then it will have like a name like get
+weather, a description like get the get weather, a description like get
+the get weather, a description like get the current weather for a
+location and then current weather for a location and then current
+weather for a location and then you have parameters like type object uh
+you have parameters like type object uh you have parameters like type
+object uh you know then or sorry this is the you know then or sorry this
+is the you know then or sorry this is the parameters and then each
+parameter is parameters and then each parameter is parameters and then
+each parameter is something like you have a string uh that something
+like you have a string uh that something like you have a string uh that
+is location string which is a city name is location string which is a
+city name is location string which is a city name and then unit which is
+a string Celsius and then unit which is a string Celsius and then unit
+which is a string Celsius and Fahrenheit and then location is and
+Fahrenheit and then location is and Fahrenheit and then location is
+required. So this basically like looks required. So this basically like
+looks required. So this basically like looks like you know a Python
+definition with a like you know a Python definition with a like you know
+a Python definition with a dock string or something like that dock
+string or something like that dock string or something like that right?
+Um they chose a JSON schema uh is right? Um they chose a JSON schema uh
+is right? Um they chose a JSON schema uh is the way to like express this
+because the way to like express this because the way to like express
+this because JSON schema was a thing around. I would JSON schema was a
+thing around. I would JSON schema was a thing around. I would have
+preferred Python but because I find have preferred Python but because I
+find have preferred Python but because I find it a lot easier to read
+than JSON schema it a lot easier to read than JSON schema it a lot
+easier to read than JSON schema but this is what they decided. So um but
+this is what they decided. So um but this is what they decided. So um
+that's what we're uh what we use. And that's what we're uh what we use.
+And that's what we're uh what we use. And then um the function skull uh
+calling then um the function skull uh calling then um the function skull
+uh calling response is that the when an LM makes a response is that the
+when an LM makes a response is that the when an LM makes a function call
+um it will generate a like function call um it will generate a like
+function call um it will generate a like a call like this and then um it
+will a call like this and then um it will a call like this and then um
+it will generate a response that matches the generate a response that
+matches the generate a response that matches the profile of the
+response. uh sorry the LM the LM will generate a uh sorry the LM the LM
+will generate a uh sorry the LM the LM will generate a structured
+function call that matches structured function call that matches
+structured function call that matches the profile of the function and it
+it the profile of the function and it it the profile of the function and
+it it will look a bit like this. Um will look a bit like this. Um will
+look a bit like this. Um the content might be null. So this is the
+content might be null. So this is the content might be null. So this is
+typically like the output of the text typically like the output of the
+text typically like the output of the text that the language model
+generates but that the language model generates but that the language
+model generates but the function call is not null and so the function
+call is not null and so the function call is not null and so what that
+means is you should like your what that means is you should like your
+what that means is you should like your system should take the function
+call and system should take the function call and system should take the
+function call and execute it essentially. execute it essentially.
+execute it essentially. Um and the good thing about this is uh Um and
+the good thing about this is uh Um and the good thing about this is uh
+you can do like type safety, you can do you can do like type safety, you
+can do you can do like type safety, you can do validation, consistent
+parsing. Another validation, consistent parsing. Another validation,
+consistent parsing. Another advantage is all of the language models
+advantage is all of the language models advantage is all of the language
+models have been trained on tons and tons of have been trained on tons
+and tons of have been trained on tons and tons of function calling data.
+So basically like function calling data. So basically like function
+calling data. So basically like if you specify it in this format, the LM
+if you specify it in this format, the LM if you specify it in this
+format, the LM sure it will make mistakes some of the sure it will make
+mistakes some of the sure it will make mistakes some of the time, but
+it's been trained so heavily time, but it's been trained so heavily
+time, but it's been trained so heavily and some of the API providers are
+and some of the API providers are and some of the API providers are
+certainly like enforcing this function certainly like enforcing this
+function certainly like enforcing this function calling format behind
+the scenes too. calling format behind the scenes too. calling format
+behind the scenes too. &gt;&gt; Um yeah. will be text. So like what will
+be text. So like what will be text. So like what &gt;&gt; right your
+system is responsible for &gt;&gt; right your system is responsible for
+&gt;&gt; right your system is responsible for hand handling the function
+call. So the hand handling the function call. So the hand handling the
+function call. So the lm will just return this function call lm will
+just return this function call lm will just return this function call
+and then after that it's your and then after that it's your and then
+after that it's your responsibility to actually execute the
+responsibility to actually execute the responsibility to actually
+execute the code corresponding to this. code corresponding to this. code
+corresponding to this. &gt;&gt; Why am I using the call in the first I
+&gt;&gt; Why am I using the call in the first I &gt;&gt; Why am I using
+the call in the first I can directly use the instead of asking can
+directly use the instead of asking can directly use the instead of
+asking the LM to just return the the LM to just return the the LM to
+just return the function I can to call on myself right function I can to
+call on myself right function I can to call on myself right &gt;&gt;
+well but the input to the LM is like um &gt;&gt; well but the input to
+the LM is like um &gt;&gt; well but the input to the LM is like um what
+is the weather in Pittsburgh today what is the weather in Pittsburgh
+today what is the weather in Pittsburgh today and the output of the LM
+or what is the and the output of the LM or what is the and the output of
+the LM or what is the weather in Boston and Celsius today. weather in
+Boston and Celsius today. weather in Boston and Celsius today. all the
+functions with this parameters. all the functions with this parameters.
+all the functions with this parameters. &gt;&gt; Correct. Yeah. &gt;&gt;
+Correct. Yeah. &gt;&gt; Correct. Yeah. &gt;&gt; It just passes the
+question and gives it &gt;&gt; It just passes the question and gives it
+&gt;&gt; It just passes the question and gives it as like the input. as
+like the input. as like the input. &gt;&gt; Correct. But taking in
+natural language &gt;&gt; Correct. But taking in natural language
+&gt;&gt; Correct. But taking in natural language and turning it into a
+function call is and turning it into a function call is and turning it
+into a function call is not an easy thing to do. Let me let me not an
+easy thing to do. Let me let me not an easy thing to do. Let me let me
+put it that way. Yeah. put it that way. Yeah. put it that way. Yeah.
+&gt;&gt; So the language is only responsible for &gt;&gt; So the
+language is only responsible for &gt;&gt; So the language is only
+responsible for converting it from natural language to converting it
+from natural language to converting it from natural language to &gt;&gt;
+uh correct. Yeah. Yeah. Yeah. Um for for &gt;&gt; uh correct. Yeah.
+Yeah. Yeah. Um for for &gt;&gt; uh correct. Yeah. Yeah. Yeah. Um for for
+like modern LM systems, do they always like modern LM systems, do they
+always like modern LM systems, do they always output like a giant JSON
+object include output like a giant JSON object include output like a
+giant JSON object include all the free form content inside of this all
+the free form content inside of this all the free form content inside of
+this JSON object or JSON object or JSON object or &gt;&gt; um basically
+uh so the the question was &gt;&gt; um basically uh so the the question
+was &gt;&gt; um basically uh so the the question was like do they always
+uh output this JSON like do they always uh output this JSON like do they
+always uh output this JSON object and contain all the text as free
+object and contain all the text as free object and contain all the text
+as free form fields? Basically yes. Um, it form fields? Basically yes.
+Um, it form fields? Basically yes. Um, it sounds kind of crazy uh in in
+some cases sounds kind of crazy uh in in some cases sounds kind of crazy
+uh in in some cases like it's especially crazy when it's like it's
+especially crazy when it's like it's especially crazy when it's code.
+Um, because code. Um, because code. Um, because JSON you need to escape
+quotes, right? JSON you need to escape quotes, right? JSON you need to
+escape quotes, right? So, if your code has a doc string, it's So, if
+your code has a doc string, it's So, if your code has a doc string, it's
+like you're escaping like you're escaping like you're escaping each
+thing of the doc each quote in the each thing of the doc each quote in
+the each thing of the doc each quote in the dock string. So, you have a
+ton of dock string. So, you have a ton of dock string. So, you have a
+ton of backslashes and stuff. And that's backslashes and stuff. And
+that's backslashes and stuff. And that's actually why coding agents
+didn't work actually why coding agents didn't work actually why coding
+agents didn't work very well originally because they very well
+originally because they very well originally because they couldn't like
+make these function calls couldn't like make these function calls
+couldn't like make these function calls with all these backslashes.
+They'd like with all these backslashes. They'd like with all these
+backslashes. They'd like miss a backslash somewhere or they'd miss a
+backslash somewhere or they'd miss a backslash somewhere or they'd miss
+a tab somewhere and like uh things miss a tab somewhere and like uh
+things miss a tab somewhere and like uh things would break. Now all of
+them are trained would break. Now all of them are trained would break.
+Now all of them are trained on so much data that it just works. But on
+so much data that it just works. But on so much data that it just works.
+But uh but yeah, there might be better ways to do this there might be
+better ways to do this there might be better ways to do this though. You
+know, you could uh you could though. You know, you could uh you could
+though. You know, you could uh you could think about that. Um, another
+another think about that. Um, another another think about that. Um,
+another another thing that just I should mention that thing that just I
+should mention that thing that just I should mention that it's a thing
+is parallel function it's a thing is parallel function it's a thing is
+parallel function calling. And so you might think that you calling. And
+so you might think that you calling. And so you might think that you
+would make one uh one call and get one would make one uh one call and
+get one would make one uh one call and get one response to a function
+call, but you can response to a function call, but you can response to a
+function call, but you can actually execute multiple um things actually
+execute multiple um things actually execute multiple um things
+simultaneously. So the the response is simultaneously. So the the
+response is simultaneously. So the the response is like tool calls and
+then you could get like tool calls and then you could get like tool
+calls and then you could get like these multiple tool calls. So you like
+these multiple tool calls. So you like these multiple tool calls. So you
+could actually like look up the weather could actually like look up the
+weather could actually like look up the weather in like both Boston and
+New York in a in like both Boston and New York in a in like both Boston
+and New York in a single tool call or in a single single tool call or in
+a single single tool call or in a single conversation turn with multiple
+tools. So one um one thing that I should So one um one thing that I
+should So one um one thing that I should mention uh and probably a lot
+of people mention uh and probably a lot of people mention uh and
+probably a lot of people have heard about this is um the model have
+heard about this is um the model have heard about this is um the model
+context protocol and the model context context protocol and the model
+context context protocol and the model context protocol is a standard
+protocol for protocol is a standard protocol for protocol is a standard
+protocol for connecting AI applications to external connecting AI
+applications to external connecting AI applications to external systems
+and systems and systems and it's basically the easy way to think it's
+basically the easy way to think it's basically the easy way to think
+about it is it's like APIs for agents or about it is it's like APIs for
+agents or about it is it's like APIs for agents or APIs for language
+models to use and the APIs for language models to use and the APIs for
+language models to use and the way it works is um number one you have a
+way it works is um number one you have a way it works is um number one
+you have a standardized format and it adopts a standardized format and
+it adopts a standardized format and it adopts a client server protocol
+where each server client server protocol where each server client server
+protocol where each server has a set of tools that it provides to has a
+set of tools that it provides to has a set of tools that it provides to
+the agent. So like you know if you have the agent. So like you know if
+you have the agent. So like you know if you have a file system server
+the file system a file system server the file system a file system
+server the file system server might have like list files list server
+might have like list files list server might have like list files list
+files read file and edit files. So it files read file and edit files. So
+it files read file and edit files. So it could have like multiple tools
+could have like multiple tools could have like multiple tools associated
+with it. Um, and then you associated with it. Um, and then you
+associated with it. Um, and then you have like the MCP host, which is
+your AI have like the MCP host, which is your AI have like the MCP host,
+which is your AI application, like your language model, application,
+like your language model, application, like your language model, uh, you
+know, your language model uh, you know, your language model uh, you
+know, your language model client, and then it connects to all of client,
+and then it connects to all of client, and then it connects to all of
+these MCP servers. Um, these MCP servers. Um, these MCP servers. Um, you
+may wonder why this is why they you may wonder why this is why they you
+may wonder why this is why they needed to reinvent APIs uh to give
+needed to reinvent APIs uh to give needed to reinvent APIs uh to give
+access to agents. Um I I think the access to agents. Um I I think the
+access to agents. Um I I think the reason was uh reason was uh reason
+was uh mostly mostly mostly mostly onefold which is like a lot of um
+mostly onefold which is like a lot of um mostly onefold which is like a
+lot of um APIs APIs APIs require an API key. Um and if you require an
+API key. Um and if you require an API key. Um and if you require an API
+key like you would have require an API key like you would have require
+an API key like you would have to give the agent access to the API key
+to give the agent access to the API key to give the agent access to the
+API key um in order for it to use the API. What um in order for it to
+use the API. What um in order for it to use the API. What they do with
+the MCP server is they hide they do with the MCP server is they hide
+they do with the MCP server is they hide the API key behind the MCP
+server and the API key behind the MCP server and the API key behind the
+MCP server and then give the agent access to the MCP then give the agent
+access to the MCP then give the agent access to the MCP server. So it's
+like a special way of server. So it's like a special way of server. So
+it's like a special way of authenticating to the tools. Um so
+authenticating to the tools. Um so authenticating to the tools. Um so
+that's kind of like the the reason why that's kind of like the the
+reason why that's kind of like the the reason why it was originally
+developed by like it was originally developed by like it was originally
+developed by like anthropic uh because they had cloud and anthropic uh
+because they had cloud and anthropic uh because they had cloud and they
+wanted it to be secure and they they wanted it to be secure and they
+they wanted it to be secure and they didn't want to expose API keys to
+the didn't want to expose API keys to the didn't want to expose API keys
+to the agents. Um, so they wanted this like agents. Um, so they wanted
+this like agents. Um, so they wanted this like middle essentially
+middleware between middle essentially middleware between middle
+essentially middleware between the agent and like external APIs or the
+agent and like external APIs or the agent and like external APIs or
+something else like that. But something else like that. But something
+else like that. But what happened was everybody wanted APIs what
+happened was everybody wanted APIs what happened was everybody wanted
+APIs for agents so much that they were just for agents so much that they
+were just for agents so much that they were just like, "Okay, Anthropic
+made APIs for like, "Okay, Anthropic made APIs for like, "Okay,
+Anthropic made APIs for agents. Let's use that." And so now MCP agents.
+Let's use that." And so now MCP agents. Let's use that." And so now MCP
+is everywhere and there's no escaping is everywhere and there's no
+escaping is everywhere and there's no escaping it. So now you need to
+bring up a node it. So now you need to bring up a node it. So now you
+need to bring up a node server for every service you want to uh server
+for every service you want to uh server for every service you want to uh
+communicate with. And it's all web's communicate with. And it's all
+web's communicate with. And it's all web's fault basically. Um but uh
+yeah, so this fault basically. Um but uh yeah, so this fault basically.
+Um but uh yeah, so this is what um this is what MCP is. And uh is what
+um this is what MCP is. And uh is what um this is what MCP is. And uh in
+the second assignment, we're probably in the second assignment, we're
+probably in the second assignment, we're probably going to ask you to
+connect to an MCP going to ask you to connect to an MCP going to ask you
+to connect to an MCP server uh in your influence engine. server uh in
+your influence engine. server uh in your influence engine. &gt;&gt;
+Cool. Yeah. &gt;&gt; Cool. Yeah. &gt;&gt; Cool. Yeah. &gt;&gt; But in in
+practice, is an MCP &gt;&gt; But in in practice, is an MCP &gt;&gt; But
+in in practice, is an MCP essentially just a tool where there is a
+essentially just a tool where there is a essentially just a tool where
+there is a prompt section detailing about the tool, prompt section
+detailing about the tool, prompt section detailing about the tool, how
+to use it, and all? how to use it, and all? how to use it, and all?
+&gt;&gt; Yep. The the the easiest way to think &gt;&gt; Yep. The the the
+easiest way to think &gt;&gt; Yep. The the the easiest way to think
+about it is it's a server. Um it's a about it is it's a server. Um it's
+a about it is it's a server. Um it's a server that has two jobs. Um the
+first server that has two jobs. Um the first server that has two jobs.
+Um the first job is to job is to job is to like when queried like what
+tools do you like when queried like what tools do you like when queried
+like what tools do you have to return this. So it will return have to
+return this. So it will return have to return this. So it will return
+the set of tools that the agent that the the set of tools that the agent
+that the the set of tools that the agent that the MCP server provides to
+the agent and MCP server provides to the agent and MCP server provides
+to the agent and then when you call the tool then when you call the tool
+then when you call the tool um when you call the tool with this um when
+you call the tool with this um when you call the tool with this payload
+it will actually return the payload it will actually return the payload
+it will actually return the response. So the MCP server will like
+response. So the MCP server will like response. So the MCP server will
+like handle the um the function call for you. handle the um the function
+call for you. handle the um the function call for you. &gt;&gt; But how
+does the model know what the MCP &gt;&gt; But how does the model know
+what the MCP &gt;&gt; But how does the model know what the MCP tool is?
+It's just loaded into the tool is? It's just loaded into the tool is?
+It's just loaded into the &gt;&gt; So every MCP server has an endpoint
+that &gt;&gt; So every MCP server has an endpoint that &gt;&gt; So every
+MCP server has an endpoint that returns the the specification of all the
+returns the the specification of all the returns the the specification
+of all the tools it provides. tools it provides. tools it provides.
+&gt;&gt; Oh, I see. &gt;&gt; Oh, I see. &gt;&gt; Oh, I see. &gt;&gt; So
+that that is useful, right? But like &gt;&gt; So that that is useful,
+right? But like &gt;&gt; So that that is useful, right? But like an open
+API server would do that as an open API server would do that as an open
+API server would do that as well. It's not like specific to MCP. well.
+It's not like specific to MCP. well. It's not like specific to MCP. Um,
+cool. Um, cool. Um, cool. So, um, with respect to MCP, I I think So, um,
+with respect to MCP, I I think So, um, with respect to MCP, I I think
+right now there's at least 17,000 uh right now there's at least 17,000
+uh right now there's at least 17,000 uh different MCP servers. Um, as I
+said, different MCP servers. Um, as I said, different MCP servers. Um,
+as I said, this was like very very became very very this was like very
+very became very very this was like very very became very very popular
+uh very very quickly. I think it popular uh very very quickly. I think
+it popular uh very very quickly. I think it started like February or
+something like started like February or something like started like
+February or something like that and it's already very much an that and
+it's already very much an that and it's already very much an industry
+standard. Um very recently the industry standard. Um very recently the
+industry standard. Um very recently the MCP organization which includes
+people MCP organization which includes people MCP organization which
+includes people in anthropic and uh and other places um in anthropic and
+uh and other places um in anthropic and uh and other places um created a
+centralized MCP registry created a centralized MCP registry created a
+centralized MCP registry that's supposed to be like the main MCP that's
+supposed to be like the main MCP that's supposed to be like the main MCP
+registry um and it has a whole bunch of registry um and it has a whole
+bunch of registry um and it has a whole bunch of things but like this
+will a whole bunch things but like this will a whole bunch things but
+like this will a whole bunch of MCPs but it provides MCPs for things of
+MCPs but it provides MCPs for things of MCPs but it provides MCPs for
+things like empowering AI agents to access uh like empowering AI agents
+to access uh like empowering AI agents to access uh real-time web data
+or crawl websites or real-time web data or crawl websites or real-time
+web data or crawl websites or generate speech or um mod generate
+generate speech or um mod generate generate speech or um mod generate
+modern UI components, uh, browse the modern UI components, uh, browse
+the modern UI components, uh, browse the web, things like that. So, it
+gives you web, things like that. So, it gives you web, things like that.
+So, it gives you a lot of, uh, a lot of things. a lot of, uh, a lot of
+things. a lot of, uh, a lot of things. &gt;&gt; These are basically
+functional API &gt;&gt; These are basically functional API &gt;&gt;
+These are basically functional API &gt;&gt; wrapped inside an MCP
+server. Yeah, &gt;&gt; wrapped inside an MCP server. Yeah, &gt;&gt;
+wrapped inside an MCP server. Yeah, that's the best way to think about
+it. that's the best way to think about it. that's the best way to think
+about it. &gt;&gt; You're empowered to generate a new web &gt;&gt;
+You're empowered to generate a new web &gt;&gt; You're empowered to
+generate a new web component. What does that mean? component. What does
+that mean? component. What does that mean? &gt;&gt; Um, so, so this is
+basically a more &gt;&gt; Um, so, so this is basically a more &gt;&gt;
+Um, so, so this is basically a more structured way of generating like
+structured way of generating like structured way of generating like
+JavaScript web components JavaScript web components JavaScript web
+components like th this is just one example of MTV. like th this is just
+one example of MTV. like th this is just one example of MTV. It's not
+really that important. It's not really that important. It's not really
+that important. &gt;&gt; Yeah, you can you can look it up if &gt;&gt;
+Yeah, you can you can look it up if &gt;&gt; Yeah, you can you can look
+it up if you're uh if you're interested. you're uh if you're interested.
+you're uh if you're interested. &gt;&gt; Yeah. &gt;&gt; Yeah. &gt;&gt;
+Yeah. &gt;&gt; Seems like a very business. &gt;&gt; Seems like a very
+business. &gt;&gt; Seems like a very business. &gt;&gt; Yeah. Yeah.
+Well, so this is a very um &gt;&gt; Yeah. Yeah. Well, so this is a very
+um &gt;&gt; Yeah. Yeah. Well, so this is a very um this is a very like
+industry centric this is a very like industry centric this is a very
+like industry centric thing, but it it is also the industry thing, but
+it it is also the industry thing, but it it is also the industry
+standard for how agents interact with standard for how agents interact
+with standard for how agents interact with tools. So it's important to
+know. tools. So it's important to know. tools. So it's important to
+know. &gt;&gt; Yeah. So A to A, you're talking about A to A. So A to A,
+you're talking about A to A. So A to A, you're talking about A to A. Um
+I'll I'll maybe talk about that a Um I'll I'll maybe talk about that a
+Um I'll I'll maybe talk about that a little bit next time. Actually, I
+should little bit next time. Actually, I should little bit next time.
+Actually, I should take a note to talk about that next take a note to
+talk about that next take a note to talk about that next time, but um
+basically A to A is for time, but um basically A to A is for time, but
+um basically A to A is for agents to talk to agents and MCP is for
+agents to talk to agents and MCP is for agents to talk to agents and MCP
+is for agents to talk to tools. You could have agents to talk to tools.
+You could have agents to talk to tools. You could have an agent behind
+the tool, but most of an agent behind the tool, but most of an agent
+behind the tool, but most of the time you don't. Most of the time the
+the time you don't. Most of the time the the time you don't. Most of the
+time the the tool is like something more the tool is like something more
+the tool is like something more deterministic. deterministic.
+deterministic. And also it won't like talk back with And also it won't
+like talk back with And also it won't like talk back with you. it won't
+convert. It's not a you. it won't convert. It's not a you. it won't
+convert. It's not a two-way conversation. It's basically a two-way
+conversation. It's basically a two-way conversation. It's basically a do
+this and I did this. Yeah. Um, do this and I did this. Yeah. Um, do this
+and I did this. Yeah. Um, also if you want to build an MCP server, also
+if you want to build an MCP server, also if you want to build an MCP
+server, it's uh very easy. Uh, this is an MCP it's uh very easy. Uh,
+this is an MCP it's uh very easy. Uh, this is an MCP server. Uh, and has
+anybody used fast server. Uh, and has anybody used fast server. Uh, and
+has anybody used fast API before? It's a easy way to make a API before?
+It's a easy way to make a API before? It's a easy way to make a API
+server. Replace fast API with fast API server. Replace fast API with
+fast API server. Replace fast API with fast MCP and you can get an MCP
+server. So, MCP and you can get an MCP server. So, MCP and you can get
+an MCP server. So, uh, I've used this a little bit recently uh, I've
+used this a little bit recently uh, I've used this a little bit recently
+and it's very nice. you just put a and it's very nice. you just put a
+and it's very nice. you just put a decorator on your Python functions.
+Um, okay. So, now I've been talking Um, okay. So, now I've been talking
+Um, okay. So, now I've been talking about tool calls. Um, separately
+from about tool calls. Um, separately from about tool calls. Um,
+separately from individual tool calls which are more individual tool
+calls which are more individual tool calls which are more like Python
+functions, individual Python like Python functions, individual Python
+like Python functions, individual Python functions, there's also
+programmated functions, there's also programmated functions, there's
+also programmated language models, uh, which is a paper language models,
+uh, which is a paper language models, uh, which is a paper that we did
+at CMU, uh, but now is has that we did at CMU, uh, but now is has that
+we did at CMU, uh, but now is has become pretty standard where you
+become pretty standard where you become pretty standard where you
+actually write Python code, uh, with a a actually write Python code, uh,
+with a a actually write Python code, uh, with a a language model and
+then execute that language model and then execute that language model
+and then execute that Python code and get the answers. Python code and
+get the answers. Python code and get the answers. Um and so Um and so Um
+and so uh basically chain of thought helps in uh basically chain of
+thought helps in uh basically chain of thought helps in things like
+numerical reasoning but you things like numerical reasoning but you
+things like numerical reasoning but you still make errors. Uh natural
+language still make errors. Uh natural language still make errors. Uh
+natural language arithmetic is errorprone. Um so instead arithmetic is
+errorprone. Um so instead arithmetic is errorprone. Um so instead we can
+use code execution as a we can use code execution as a we can use code
+execution as a calculator tool. And the way we did this calculator tool.
+And the way we did this calculator tool. And the way we did this in
+program aided language models is we in program aided language models is
+we in program aided language models is we um we let it generate blocks
+of Python um we let it generate blocks of Python um we let it generate
+blocks of Python and we gave it an example chain of and we gave it an
+example chain of and we gave it an example chain of thought where we
+interspersed Python thought where we interspersed Python thought where
+we interspersed Python with the chain of thought um and just with the
+chain of thought um and just with the chain of thought um and just gave
+a few few shot examples and then gave a few few shot examples and then
+gave a few few shot examples and then when it generated this we would
+then when it generated this we would then when it generated this we
+would then execute the Python code and get the execute the Python code
+and get the execute the Python code and get the output and this is now
+used in most output and this is now used in most output and this is now
+used in most chatbots including uh chat GPT it's um chatbots including
+uh chat GPT it's um chatbots including uh chat GPT it's um uh it's
+called like the code interpreter uh it's called like the code
+interpreter uh it's called like the code interpreter in uh in OpenAI and
+code execution in in uh in OpenAI and code execution in in uh in OpenAI
+and code execution in Gemini or like other stuff like that. Gemini or
+like other stuff like that. Gemini or like other stuff like that. Um but
+basically what we showed is uh Um but basically what we showed is uh Um
+but basically what we showed is uh that we have a um on mathematical
+that we have a um on mathematical that we have a um on mathematical
+reasoning data sets reasoning data sets reasoning data sets with a
+simple uh like direct way of with a simple uh like direct way of with a
+simple uh like direct way of solving it. Back then linguish models
+solving it. Back then linguish models solving it. Back then linguish
+models got like 19.7 on GSM8K but if you added got like 19.7 on GSM8K
+but if you added got like 19.7 on GSM8K but if you added chain of
+thought you would get 65.6 six, chain of thought you would get 65.6 six,
+chain of thought you would get 65.6 six, but if you let it execute it
+with a but if you let it execute it with a but if you let it execute it
+with a program, it would get a much higher program, it would get a much
+higher program, it would get a much higher higher score on all of these
+math data higher score on all of these math data higher score on all of
+these math data sets. sets. sets. Um, so when you're running arbitrary
+Python so when you're running arbitrary Python so when you're running
+arbitrary Python code, uh, one thing that you don't want code, uh, one
+thing that you don't want code, uh, one thing that you don't want your
+program to do is uh, rmrf your home your program to do is uh, rmrf your
+home your program to do is uh, rmrf your home directory. directory.
+directory. And, uh, it probably won't do it if And, uh, it probably
+won't do it if And, uh, it probably won't do it if you're asking it to
+solve math problems. you're asking it to solve math problems. you're
+asking it to solve math problems. But if you're asking it to write code
+or But if you're asking it to write code or But if you're asking it to
+write code or something like that, uh it might say, something like that,
+uh it might say, something like that, uh it might say, "Oh, I made a
+mistake. I should delete "Oh, I made a mistake. I should delete "Oh, I
+made a mistake. I should delete delete my work and start again." And it
+delete my work and start again." And it delete my work and start again."
+And it will delete uh your work. Um so uh one will delete uh your work.
+Um so uh one will delete uh your work. Um so uh one important thing is
+sandbox code important thing is sandbox code important thing is sandbox
+code execution. Um so execution. Um so execution. Um so uh it can do
+things like you know uh it can do things like you know uh it can do
+things like you know unintentional harmful commands. Um it unintentional
+harmful commands. Um it unintentional harmful commands. Um it could also
+like install a compromised could also like install a compromised could
+also like install a compromised library and install malware on your
+library and install malware on your library and install malware on your
+computer. Um, computer. Um, computer. Um, you know, if it browses the
+web, it you know, if it browses the web, it you know, if it browses the
+web, it might download stuff from the web that might download stuff from
+the web that might download stuff from the web that says, uh, please
+upload uh your your says, uh, please upload uh your your says, uh,
+please upload uh your your information to this URL for more uh for
+information to this URL for more uh for information to this URL for more
+uh for more help. And it will upload all of more help. And it will
+upload all of more help. And it will upload all of your information to a
+a fishing site. your information to a a fishing site. your information
+to a a fishing site. Um, and so there's different uh Um, and so there's
+different uh Um, and so there's different uh sandboxing approaches that
+you can use. sandboxing approaches that you can use. sandboxing
+approaches that you can use. Um, in your assignment two, I think Um, in
+your assignment two, I think Um, in your assignment two, I think we're
+going to uh ask you to do number we're going to uh ask you to do number
+we're going to uh ask you to do number one. And basically what this is
+is this one. And basically what this is is this one. And basically what
+this is is this is a local uh basically wrapper around is a local uh
+basically wrapper around is a local uh basically wrapper around the
+Python interpreter that tries to the Python interpreter that tries to
+the Python interpreter that tries to strip out the uh like quote unquote
+strip out the uh like quote unquote strip out the uh like quote unquote
+dangerous commands before it runs them. dangerous commands before it
+runs them. dangerous commands before it runs them. And um I'll talk a
+little bit about And um I'll talk a little bit about And um I'll talk a
+little bit about this. This can sandbox you importing this. This can
+sandbox you importing this. This can sandbox you importing certain code
+a dangerous function uh certain code a dangerous function uh certain
+code a dangerous function uh dangerous functions and other stuff like
+dangerous functions and other stuff like dangerous functions and other
+stuff like this but it still runs in the same this but it still runs in
+the same this but it still runs in the same process as the rest of your
+code. It can process as the rest of your code. It can process as the
+rest of your code. It can access memory. Um also it's near access
+memory. Um also it's near access memory. Um also it's near impossible to
+like get rid of all impossible to like get rid of all impossible to like
+get rid of all dangerous codes. So if there's some like dangerous codes.
+So if there's some like dangerous codes. So if there's some like code
+engulfed like malware uh you know code engulfed like malware uh you know
+code engulfed like malware uh you know somewhere online it's going to be
+really somewhere online it's going to be really somewhere online it's
+going to be really hard to prevent like all security hard to prevent
+like all security hard to prevent like all security things. Another
+thing is um things. Another thing is um things. Another thing is um
+containerbased isolation. So this is containerbased isolation. So this
+is containerbased isolation. So this is like running things in docker.
+Um this like running things in docker. Um this like running things in
+docker. Um this gives you complete uh OS level isolation gives you
+complete uh OS level isolation gives you complete uh OS level isolation
+and network restrictions. Um so but it and network restrictions. Um so
+but it and network restrictions. Um so but it can consume resources.
+It's also a lot can consume resources. It's also a lot can consume
+resources. It's also a lot harder to set up and run and it takes harder
+to set up and run and it takes harder to set up and run and it takes
+time to get stuff started. So you know time to get stuff started. So you
+know time to get stuff started. So you know running stuff in Docker is
+just a bit of running stuff in Docker is just a bit of running stuff in
+Docker is just a bit of a pain. Um so uh so that's an issue. Um a pain.
+Um so uh so that's an issue. Um a pain. Um so uh so that's an issue. Um
+then there's also things like running then there's also things like
+running then there's also things like running within web assembly. So if
+you're within web assembly. So if you're within web assembly. So if
+you're running an agent like on uh in a web uh running an agent like on
+uh in a web uh running an agent like on uh in a web uh you can you can
+do that as well on a in you can you can do that as well on a in you can
+you can do that as well on a in a web browser you can do that as well. a
+web browser you can do that as well. a web browser you can do that as
+well. Um that being said if you want to do Um that being said if you
+want to do Um that being said if you want to do this seriously I do
+recommend these uh this seriously I do recommend these uh this seriously
+I do recommend these uh options. So like if you actually want to
+options. So like if you actually want to options. So like if you
+actually want to build like an agent that's doing coding build like an
+agent that's doing coding build like an agent that's doing coding uh
+tasks or things like this um uh tasks or things like this um uh tasks or
+things like this um definitely uh consider these. There's a definitely
+uh consider these. There's a definitely uh consider these. There's a lot
+of services that support this. Um lot of services that support this. Um
+lot of services that support this. Um like E2B is a good open source one
+uh like E2B is a good open source one uh like E2B is a good open source
+one uh where you can basically spin up where you can basically spin up
+where you can basically spin up sandboxes on your computer um or or
+sandboxes on your computer um or or sandboxes on your computer um or or
+their cloud. Um and then there's also their cloud. Um and then there's
+also their cloud. Um and then there's also other ones like Daytona.
+other ones like Daytona. other ones like Daytona. Um so just to give an
+example of what Um so just to give an example of what Um so just to give
+an example of what like sandboxing looks like if you're like sandboxing
+looks like if you're like sandboxing looks like if you're doing an
+abbased method um you can do doing an abbased method um you can do doing
+an abbased method um you can do things like uh say okay these modules
+things like uh say okay these modules things like uh say okay these
+modules are okay modules to use are okay modules to use are okay modules
+to use um and then you can block other modules. um and then you can
+block other modules. um and then you can block other modules. So you can
+block things like OS, So you can block things like OS, So you can block
+things like OS, subprocess, socket and CIS and not allow subprocess,
+socket and CIS and not allow subprocess, socket and CIS and not allow
+them to be used. Um and you can uh you them to be used. Um and you can
+uh you them to be used. Um and you can uh you know also look for like
+double underbars know also look for like double underbars know also look
+for like double underbars uh that allow you to access particular uh that
+allow you to access particular uh that allow you to access particular
+types of methods like uh you know the types of methods like uh you know
+the types of methods like uh you know the built-in methods in Python.
+built-in methods in Python. built-in methods in Python. Um so this is uh
+the implementation Um so this is uh the implementation Um so this is uh
+the implementation within the hugging face small agents uh within the
+hugging face small agents uh within the hugging face small agents uh
+repository for instance. repository for instance. repository for
+instance. So you can um use tools within programs So you can um use
+tools within programs So you can um use tools within programs and uh so
+I I talked about parallel tool and uh so I I talked about parallel tool
+and uh so I I talked about parallel tool calling. So you could like do
+parallel calling. So you could like do parallel calling. So you could
+like do parallel tool calls normally but that doesn't tool calls
+normally but that doesn't tool calls normally but that doesn't give you
+things like control flow or you give you things like control flow or you
+give you things like control flow or you know composition of tool calls
+in know composition of tool calls in know composition of tool calls in
+interesting ways or things. And so um interesting ways or things. And so
+um interesting ways or things. And so um you can when performing more
+complex you can when performing more complex you can when performing
+more complex tasks sometimes it's better to tasks sometimes it's better
+to tasks sometimes it's better to incorporate tools by just like
+providing incorporate tools by just like providing incorporate tools by
+just like providing the agent with the ability to run Python the agent
+with the ability to run Python the agent with the ability to run Python
+and say these are the tools that you're and say these are the tools that
+you're and say these are the tools that you're allowed to use. Um and
+then you can use allowed to use. Um and then you can use allowed to use.
+Um and then you can use things like pandas mapplot lab um or things like
+pandas mapplot lab um or things like pandas mapplot lab um or even task
+specific expert crafted tools. even task specific expert crafted tools.
+even task specific expert crafted tools. Um so the most famous work on
+uh doing Um so the most famous work on uh doing Um so the most famous
+work on uh doing this is uh gorilla and basically um it this is uh
+gorilla and basically um it this is uh gorilla and basically um it
+creates data sets uh with thousands of creates data sets uh with
+thousands of creates data sets uh with thousands of APIs with different
+interfaces and tries APIs with different interfaces and tries APIs with
+different interfaces and tries to get the uh model to be able to call to
+get the uh model to be able to call to get the uh model to be able to
+call them. Um them. Um them. Um sorry I'm going to go a little bit sorry
+I'm going to go a little bit sorry I'm going to go a little bit quickly
+because we have lots of student quickly because we have lots of student
+quickly because we have lots of student presentations and I want to make
+sure we presentations and I want to make sure we presentations and I
+want to make sure we get to them. But um uh so the the way it get to
+them. But um uh so the the way it get to them. But um uh so the the way
+it works is they curated a data set um works is they curated a data set
+um works is they curated a data set um where they downloaded a whole
+bunch of where they downloaded a whole bunch of where they downloaded a
+whole bunch of API calls. I think people didn't notice API calls. I
+think people didn't notice API calls. I think people didn't notice this
+but in the original uh like gorilla this but in the original uh like
+gorilla this but in the original uh like gorilla paper they're all like
+torch uh torch paper they're all like torch uh torch paper they're all
+like torch uh torch and tensorflow and hugging face. So and tensorflow
+and hugging face. So and tensorflow and hugging face. So they're all
+like uh machine learning they're all like uh machine learning they're
+all like uh machine learning related stuff but they create a uh a
+related stuff but they create a uh a related stuff but they create a uh
+a corpus where basically they uh do corpus where basically they uh do
+corpus where basically they uh do self-instruct and they generate self-
+instruct and they generate self-instruct and they generate synthetic
+data um given uh like APIs synthetic data um given uh like APIs
+synthetic data um given uh like APIs where it says come up with an where
+it says come up with an where it says come up with an instruction that
+would require you to instruction that would require you to instruction
+that would require you to use this API to solve it. And so um they use
+this API to solve it. And so um they use this API to solve it. And so um
+they create training data for this and then create training data for
+this and then create training data for this and then they train their
+gorilla model and um they train their gorilla model and um they train
+their gorilla model and um then you can uh retrieve uh the then you can
+uh retrieve uh the then you can uh retrieve uh the potential APIs from
+the API database and potential APIs from the API database and potential
+APIs from the API database and uh generate generate the output. So um
+there's a number of things going So um there's a number of things going
+So um there's a number of things going on here. The first thing is like
+this is on here. The first thing is like this is on here. The first
+thing is like this is a good way to create training data if a good way
+to create training data if a good way to create training data if you
+want to create training data but you want to create training data but
+you want to create training data but also at during inference time you
+need also at during inference time you need also at during inference
+time you need to do retrieval of the APIs that you to do retrieval of
+the APIs that you to do retrieval of the APIs that you have access to um
+and then uh provide have access to um and then uh provide have access to
+um and then uh provide them as function calls as potential them as
+function calls as potential them as function calls as potential
+functions that you could call um and functions that you could call um
+and functions that you could call um and then uh have the model actually
+call the then uh have the model actually call the then uh have the model
+actually call the functions. Yeah, functions. Yeah, functions. Yeah,
+&gt;&gt; you basically retrieve API const &gt;&gt; you basically
+retrieve API const &gt;&gt; you basically retrieve API const &gt;&gt; um
+you can retrieve potential APIs by &gt;&gt; um you can retrieve
+potential APIs by &gt;&gt; um you can retrieve potential APIs by
+training a retriever essentially. Um so training a retriever
+essentially. Um so training a retriever essentially. Um so you uh like
+in this self- instruct you uh like in this self- instruct you uh like in
+this self- instruct instant like in these um instruction API instant
+like in these um instruction API instant like in these um instruction
+API pairs you know the gold standard API pairs you know the gold
+standard API pairs you know the gold standard API because you generated
+the instruction because you generated the instruction because you
+generated the instruction from the API. So you can train a from the API.
+So you can train a from the API. So you can train a retriever that tries
+to retrieve the retriever that tries to retrieve the retriever that
+tries to retrieve the gold standard API out of all the other gold
+standard API out of all the other gold standard API out of all the other
+APIs. And um like training retrievers is APIs. And um like training
+retrievers is APIs. And um like training retrievers is kind of like out
+of the scope of the kind of like out of the scope of the kind of like
+out of the scope of the class, but basically you you try to do class,
+but basically you you try to do class, but basically you you try to do
+embedding matching between the like embedding matching between the like
+embedding matching between the like encoded instruction encoded API
+ducks. encoded instruction encoded API ducks. encoded instruction
+encoded API ducks. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Yes. &gt;&gt; Um
+so &gt;&gt; Um so &gt;&gt; Um so I guess it works. Um and then the uh
+the I guess it works. Um and then the uh the I guess it works. Um and
+then the uh the other thing uh to note here is um for other thing uh to
+note here is um for other thing uh to note here is um for tool use the
+data set that came out of tool use the data set that came out of tool
+use the data set that came out of Guerilla became kind of like the
+Guerilla became kind of like the Guerilla became kind of like the
+standard benchmark for benchmarking tool standard benchmark for
+benchmarking tool standard benchmark for benchmarking tool use uh in
+language models and I think use uh in language models and I think use uh
+in language models and I think people look at it maybe a little bit
+people look at it maybe a little bit people look at it maybe a little
+bit less nowadays but still use it but it's less nowadays but still use
+it but it's less nowadays but still use it but it's called the Berkeley
+function calling called the Berkeley function calling called the
+Berkeley function calling leaderboard and you can go and search
+leaderboard and you can go and search leaderboard and you can go and
+search for this and look at like which language for this and look at
+like which language for this and look at like which language models are
+the best ones for um like models are the best ones for um like models
+are the best ones for um like calling APIs appropriately um based on
+calling APIs appropriately um based on calling APIs appropriately um
+based on API descriptions API descriptions API descriptions and one
+important thing here is this is and one important thing here is this is
+and one important thing here is this is not a fixed set of APIs like
+tool former not a fixed set of APIs like tool former not a fixed set of
+APIs like tool former this is like you provide the APIs that this is
+like you provide the APIs that this is like you provide the APIs that
+the agent has access to and then you the agent has access to and then
+you the agent has access to and then you check whether um it's able to
+predict check whether um it's able to predict check whether um it's able
+to predict based on the uh like APIs that are based on the uh like APIs
+that are based on the uh like APIs that are provided in context. So um
+recently of course uh 2020 fast So um recently of course uh 2020 fast So
+um recently of course uh 2020 fast forward to 2025 and uh re reasoning
+and forward to 2025 and uh re reasoning and forward to 2025 and uh re
+reasoning and reinforcement learning is popular. So of reinforcement
+learning is popular. So of reinforcement learning is popular. So of
+course we have reinforcement learning course we have reinforcement
+learning course we have reinforcement learning for tool use and um the
+motivation is for tool use and um the motivation is for tool use and um
+the motivation is that uh SFT struggles with complex tool that uh SFT
+struggles with complex tool that uh SFT struggles with complex tool use
+and they basically do a use and they basically do a use and they
+basically do a comprehensive study on reward design for comprehensive
+study on reward design for comprehensive study on reward design for um
+uh doing reasoning models that have um uh doing reasoning models that
+have um uh doing reasoning models that have the ability to use tools and
+they follow the ability to use tools and they follow the ability to use
+tools and they follow the deepseek R1 paper in providing both the
+deepseek R1 paper in providing both the deepseek R1 paper in providing
+both format rewards and uh correctness format rewards and uh correctness
+format rewards and uh correctness rewards. So the format reward is like
+rewards. So the format reward is like rewards. So the format reward is
+like the tool the tool call is in the correct the tool the tool call is
+in the correct the tool the tool call is in the correct format. Sure,
+that's easy to check, format. Sure, that's easy to check, format. Sure,
+that's easy to check, right? We just validated against the right? We
+just validated against the right? We just validated against the JSON
+schema and and we're done. Um the JSON schema and and we're done. Um the
+JSON schema and and we're done. Um the correctness reward here is kind
+of correctness reward here is kind of correctness reward here is kind of
+interesting because it allows them to interesting because it allows them
+to interesting because it allows them to gradually push towards a
+completely gradually push towards a completely gradually push towards a
+completely correct tool call and give partial correct tool call and give
+partial correct tool call and give partial credit. So basically um they
+checked if credit. So basically um they checked if credit. So basically
+um they checked if the uh the uh the uh the tool names in the generated
+output the tool names in the generated output the tool names in the
+generated output overlap with the tool names in the gold overlap with
+the tool names in the gold overlap with the tool names in the gold
+standard uh tools. Um and so then also standard uh tools. Um and so then
+also standard uh tools. Um and so then also if you're generating too
+many tool calls if you're generating too many tool calls if you're
+generating too many tool calls you get penalized for that. Um and then
+you get penalized for that. Um and then you get penalized for that. Um
+and then they also measure the overlap for each they also measure the
+overlap for each they also measure the overlap for each of the tool
+calls um among the parameter of the tool calls um among the parameter of
+the tool calls um among the parameter names and the parameter content.
+So um names and the parameter content. So um names and the parameter
+content. So um you know like this uh gradually and like you know like
+this uh gradually and like you know like this uh gradually and like if
+in order to get the completely if in order to get the completely if in
+order to get the completely correct tool call you need to get all of
+correct tool call you need to get all of correct tool call you need to
+get all of these at 100%. these at 100%. these at 100%. And uh the the
+range is between minus3 And uh the the range is between minus3 And uh
+the the range is between minus3 if you get like all of these uh if you
+if you get like all of these uh if you if you get like all of these uh
+if you get all of them wrong in in plus4. get all of them wrong in in
+plus4. get all of them wrong in in plus4. &gt;&gt; So what's G&amp;P
+again? &gt;&gt; So what's G&amp;P again? &gt;&gt; So what's G&amp;P
+again? &gt;&gt; Uh this is gold standard and predicted I &gt;&gt; Uh
+this is gold standard and predicted I &gt;&gt; Uh this is gold standard
+and predicted I think. Yeah. think. Yeah. think. Yeah. Um and basically
+uh they have some Um and basically uh they have some Um and basically uh
+they have some interesting results here. I'm just going interesting
+results here. I'm just going interesting results here. I'm just going to
+very quickly say the main one and the to very quickly say the main one
+and the to very quickly say the main one and the main one is they
+actually found better main one is they actually found better main one is
+they actually found better results with cold start uh reasoning results
+with cold start uh reasoning results with cold start uh reasoning than
+they did with SFTbased reasoning. than they did with SFTbased reasoning.
+than they did with SFTbased reasoning. So um they did a little bit of So
+um they did a little bit of So um they did a little bit of supervised
+fine-tuning and then they did supervised fine-tuning and then they did
+supervised fine-tuning and then they did uh re just training the
+reasoning model uh re just training the reasoning model uh re just
+training the reasoning model from scratch and they actually got the from
+scratch and they actually got the from scratch and they actually got the
+best results from training from scratch. best results from training from
+scratch. best results from training from scratch. Um I haven't looked
+super deeply into Um I haven't looked super deeply into Um I haven't
+looked super deeply into the paper to see if they have a like the paper
+to see if they have a like the paper to see if they have a like better
+uh you know explanation of why better uh you know explanation of why
+better uh you know explanation of why that is but it's also a trend that
+we that is but it's also a trend that we that is but it's also a trend
+that we see in deepcar one and other stuff like see in deepcar one and
+other stuff like see in deepcar one and other stuff like that as well.
+that as well. that as well. &gt;&gt; Warm start exactly stand &gt;&gt;
+Warm start exactly stand &gt;&gt; Warm start exactly stand &gt;&gt; it
+means no SFT beforehand. Yeah. &gt;&gt; it means no SFT beforehand.
+Yeah. &gt;&gt; it means no SFT beforehand. Yeah. &gt;&gt; Um so like if
+you had SFT you can call &gt;&gt; Um so like if you had SFT you can call
+&gt;&gt; Um so like if you had SFT you can call it a warm start because
+you've kind of it a warm start because you've kind of it a warm start
+because you've kind of warmed up the model to be good at it warmed up
+the model to be good at it warmed up the model to be good at it before
+you you start doing RL. And so we talked about reasoning for And so we
+talked about reasoning for And so we talked about reasoning for tool
+use. And so of course we have tool tool use. And so of course we have
+tool tool use. And so of course we have tool use for reasoning as well.
+use for reasoning as well. use for reasoning as well. So this is the the
+opposite one. And so So this is the the opposite one. And so So this is
+the the opposite one. And so basically it's leveraging uh external
+basically it's leveraging uh external basically it's leveraging uh
+external tools within uh LM reasoning. Um they do tools within uh LM
+reasoning. Um they do tools within uh LM reasoning. Um they do RL
+directly from base models um and add RL directly from base models um and
+add RL directly from base models um and add code interpreters within the
+RL training code interpreters within the RL training code interpreters
+within the RL training loop. And uh they demonstrate that if loop. And
+uh they demonstrate that if loop. And uh they demonstrate that if they
+uh if they do this they get much they uh if they do this they get much
+they uh if they do this they get much higher results uh much better
+results higher results uh much better results higher results uh much
+better results and the model is able to learn to like and the model is
+able to learn to like and the model is able to learn to like maintain
+those results even after you maintain those results even after you
+maintain those results even after you train a reseting model. Yeah, you
+have some contrast here but Yeah, you have some contrast here but Yeah,
+you have some contrast here but maybe I'll skip it in the um uh in the
+maybe I'll skip it in the um uh in the maybe I'll skip it in the um uh
+in the interest of time. And then a final thing interest of time. And
+then a final thing interest of time. And then a final thing uh that we
+need to think about in uh that we need to think about in uh that we need
+to think about in addition to safety and sandboxing and addition to
+safety and sandboxing and addition to safety and sandboxing and stuff is
+robustness. Um this is a stuff is robustness. Um this is a stuff is
+robustness. Um this is a problem from the point of view of problem from
+the point of view of problem from the point of view of benchmarking and
+a problem from the benchmarking and a problem from the benchmarking and
+a problem from the point of view of language models being point of view
+of language models being point of view of language models being able to
+use tools effectively. And uh able to use tools effectively. And uh able
+to use tools effectively. And uh the issue is uh APIs go out of date or
+the issue is uh APIs go out of date or the issue is uh APIs go out of
+date or um you might run um you might run um you might run a file
+editing tool and the file editing a file editing tool and the file
+editing a file editing tool and the file editing tool will fail because
+you have the tool will fail because you have the tool will fail because
+you have the parameters a little bit wrong and parameters a little bit
+wrong and parameters a little bit wrong and language models need to be
+good at being language models need to be good at being language models
+need to be good at being able to deal with this. Um and so this able to
+deal with this. Um and so this able to deal with this. Um and so this is
+a paper that uh we did on is a paper that uh we did on is a paper that
+uh we did on benchmarking failures in tool augmented benchmarking
+failures in tool augmented benchmarking failures in tool augmented
+language models. And what we did is we language models. And what we did
+is we language models. And what we did is we essentially like broke some
+of the APIs essentially like broke some of the APIs essentially like
+broke some of the APIs uh to make make it so that they didn't uh to make
+make it so that they didn't uh to make make it so that they didn't work.
+And often they and we measured a work. And often they and we measured a
+work. And often they and we measured a few things. few things. few
+things. Um the first thing that we measured is Um the first thing that
+we measured is Um the first thing that we measured is um that we um that
+we um that we uh measured the awareness of models um uh measured the
+awareness of models um uh measured the awareness of models um to uh like
+we measured the awareness of to uh like we measured the awareness of to
+uh like we measured the awareness of models models models that the tool
+was broken. So we tried to that the tool was broken. So we tried to that
+the tool was broken. So we tried to check whether the model said oh this
+check whether the model said oh this check whether the model said oh
+this tool is broken I I won't be able to use tool is broken I I won't be
+able to use tool is broken I I won't be able to use it. Um, and that's
+kind of important um, it. Um, and that's kind of important um, it. Um,
+and that's kind of important um, because like the agent uh, if the agent
+because like the agent uh, if the agent because like the agent uh, if
+the agent sees a tool is broken, it should be able sees a tool is
+broken, it should be able sees a tool is broken, it should be able to
+try to come up with something else to try to come up with something else
+to try to come up with something else instead of just like calling the
+tool instead of just like calling the tool instead of just like calling
+the tool over and over and over again. They over and over and over
+again. They over and over and over again. They actually surprisingly low
+few models actually surprisingly low few models actually surprisingly
+low few models were able to tell that like the the were able to tell
+that like the the were able to tell that like the the results were wrong
+or uh, that you know results were wrong or uh, that you know results
+were wrong or uh, that you know wasn't returning something. And then um
+wasn't returning something. And then um wasn't returning something. And
+then um we also tested the case where some of we also tested the case
+where some of we also tested the case where some of the tools were
+replaceable across the tools were replaceable across the tools were
+replaceable across different uh like tasks. So for example different uh
+like tasks. So for example different uh like tasks. So for example um
+for uh um for uh um for uh me me me um or like um or like um or like uh
+yeah let's say um let's say language uh yeah let's say um let's say
+language uh yeah let's say um let's say language like this if this was a
+language related like this if this was a language related like this if
+this was a language related tool there were like other tools in the tool
+there were like other tools in the tool there were like other tools in
+the toolbox that could be used and so they toolbox that could be used
+and so they toolbox that could be used and so they would be able to uh
+replace it with would be able to uh replace it with would be able to uh
+replace it with another tool and then they would try to another tool and
+then they would try to another tool and then they would try to we'd see
+if they'd be able to use the we'd see if they'd be able to use the we'd
+see if they'd be able to use the other tool. Um but like one thing we
+other tool. Um but like one thing we other tool. Um but like one thing
+we noticed is uh the awareness was not noticed is uh the awareness was
+not noticed is uh the awareness was not always equal to task success. So
+just always equal to task success. So just always equal to task success.
+So just because it could recognize that the tool because it could
+recognize that the tool because it could recognize that the tool was
+broken didn't necessarily mean that was broken didn't necessarily mean
+that was broken didn't necessarily mean that it would be able to you
+know fix it or it would be able to you know fix it or it would be able
+to you know fix it or figure it out. So basically this is a at figure it
+out. So basically this is a at figure it out. So basically this is a at
+least when we benchmarked the models least when we benchmarked the
+models least when we benchmarked the models about a year ago this was a
+major issue. about a year ago this was a major issue. about a year ago
+this was a major issue. And then uh one final thing that I will And then
+uh one final thing that I will And then uh one final thing that I will
+talk about in the like maybe one uh one talk about in the like maybe one
+uh one talk about in the like maybe one uh one minute that I have before
+we switch over minute that I have before we switch over minute that I
+have before we switch over to the uh the student presentations is to the
+uh the student presentations is to the uh the student presentations is
+uh creating tools. So language models uh creating tools. So language
+models uh creating tools. So language models actually are able to create
+tools. And actually are able to create tools. And actually are able to
+create tools. And the way we did this is um we started out the way we
+did this is um we started out the way we did this is um we started out
+with primitive functions which are with primitive functions which are
+with primitive functions which are things like uh basic mathematical
+things like uh basic mathematical things like uh basic mathematical
+primitives or um you know uh individual primitives or um you know uh
+individual primitives or um you know uh individual pandas functions and
+we ran models that pandas functions and we ran models that pandas
+functions and we ran models that basically um we ran models and we
+basically um we ran models and we basically um we ran models and we
+prompted the model to either um import prompted the model to either um
+import prompted the model to either um import existing tools uh create
+new tools or existing tools uh create new tools or existing tools uh
+create new tools or don't use any tool at all to try to don't use any
+tool at all to try to don't use any tool at all to try to solve the
+problem. solve the problem. solve the problem. And we ran these three
+different methods And we ran these three different methods And we ran
+these three different methods and we did each of them K times and the
+and we did each of them K times and the and we did each of them K times
+and the like K equals five. And what that meant like K equals five. And
+what that meant like K equals five. And what that meant was we
+essentially were doing 15 was we essentially were doing 15 was we
+essentially were doing 15 different rollouts with different different
+rollouts with different different rollouts with different varieties of
+tools. And varieties of tools. And varieties of tools. And then we did
+self-consistency and then we did self-consistency and then we did self-
+consistency and based on the self-consistency we decided based on the
+self-consistency we decided based on the self-consistency we decided
+which answer was correct. And then we which answer was correct. And then
+we which answer was correct. And then we found if creating a tool
+resulted in a found if creating a tool resulted in a found if creating a
+tool resulted in a higher level of correctness, this is higher level of
+correctness, this is higher level of correctness, this is maybe an
+example where it would be good maybe an example where it would be good
+maybe an example where it would be good to have a tool that would help
+us out to have a tool that would help us out to have a tool that would
+help us out with this. And so we added this to our with this. And so we
+added this to our with this. And so we added this to our toolbox. And so
+we gradually like toolbox. And so we gradually like toolbox. And so we
+gradually like increased the size of our toolbox. And increased the size
+of our toolbox. And increased the size of our toolbox. And um then if we
+had tools that weren't um then if we had tools that weren't um then if
+we had tools that weren't used very often, we prune them out of used
+very often, we prune them out of used very often, we prune them out of
+our toolbox. And so this is a test time our toolbox. And so this is a
+test time our toolbox. And so this is a test time thing that we can do
+where we like thing that we can do where we like thing that we can do
+where we like continually process test time instances. continually
+process test time instances. continually process test time instances. we
+see if it seems like creating a tool we see if it seems like creating a
+tool we see if it seems like creating a tool would result in you know
+more consistent would result in you know more consistent would result in
+you know more consistent outputs or better accuracy or something outputs
+or better accuracy or something outputs or better accuracy or something
+like that and uh gradually add to the like that and uh gradually add to
+the like that and uh gradually add to the toolbox. toolbox. toolbox. Um,
+and basically what we were able to Um, and basically what we were able
+to Um, and basically what we were able to find was this gave us uh
+significant find was this gave us uh significant find was this gave us
+uh significant accuracy improvements and it was also accuracy
+improvements and it was also accuracy improvements and it was also able
+to um able to um able to um create uh toolboxes that had uh create uh
+toolboxes that had uh create uh toolboxes that had uh relatively small
+uh sizes but uh relatively small uh sizes but uh relatively small uh
+sizes but uh significantly outperformed uh just using significantly
+outperformed uh just using significantly outperformed uh just using no
+uh induction at all. no uh induction at all. no uh induction at all.
+Cool. Um yeah, that's what I have about Cool. Um yeah, that's what I
+have about Cool. Um yeah, that's what I have about tools. Uh are there
+any uh any questions tools. Uh are there any uh any questions tools. Uh
+are there any uh any questions here? here? here? Yeah, Yeah, Yeah,
+&gt;&gt; the MCP thing like how usable is the MCP &gt;&gt; the MCP thing
+like how usable is the MCP &gt;&gt; the MCP thing like how usable is the
+MCP server without changing your application server without changing
+your application server without changing your application like you still
+have to change all the like you still have to change all the like you
+still have to change all the prompts so that the model knows prompts so
+that the model knows prompts so that the model knows &gt;&gt; how usable
+is an MCP server without &gt;&gt; how usable is an MCP server without
+&gt;&gt; how usable is an MCP server without changing your uh like core
+application changing your uh like core application changing your uh like
+core application code. code. code. I would say that if you have a I
+would say that if you have a I would say that if you have a sufficiently
+good sufficiently good sufficiently good tool calling language model, it
+should tool calling language model, it should tool calling language
+model, it should be okay because the tool calling be okay because the
+tool calling be okay because the tool calling language models have been
+language models have been language models have been basically primed to
+basically primed to basically primed to be able to um like be able to um
+like be able to um like look at the function descriptions and look at
+the function descriptions and look at the function descriptions and the
+tool description and call uh if it's the tool description and call uh if
+it's the tool description and call uh if it's appropriate. Um, and just
+to give an appropriate. Um, and just to give an appropriate. Um, and
+just to give an example, like we're developing like the example, like
+we're developing like the example, like we're developing like the open
+hands uh agent and like if it has open hands uh agent and like if it has
+open hands uh agent and like if it has access to a search tool and I ask
+it to access to a search tool and I ask it to access to a search tool
+and I ask it to search for something, it will search for search for
+something, it will search for search for something, it will search for
+something. Otherwise, it will try to use something. Otherwise, it will
+try to use something. Otherwise, it will try to use its web browser tool
+and go to Google its web browser tool and go to Google its web browser
+tool and go to Google and search. So like it's able to and search. So
+like it's able to and search. So like it's able to recognize that if it
+has a search tool, recognize that if it has a search tool, recognize
+that if it has a search tool, it should use that. If it doesn't have a
+it should use that. If it doesn't have a it should use that. If it
+doesn't have a search tool, it should take some other, search tool, it
+should take some other, search tool, it should take some other, you
+know, means. Yeah. Uh, Uh, Uh, if there's multiple tools available, how
+if there's multiple tools available, how if there's multiple tools
+available, how does it pick the best one? does it pick the best one?
+does it pick the best one? &gt;&gt; How good is it at picking the best
+one? &gt;&gt; How good is it at picking the best one? &gt;&gt; How good
+is it at picking the best one? That's a good question. I don't think
+That's a good question. I don't think That's a good question. I don't
+think they are particularly good at this. Um, they are particularly good
+at this. Um, they are particularly good at this. Um, if you give it a
+policy about what it if you give it a policy about what it if you give
+it a policy about what it should do, then um, like I I think it should
+do, then um, like I I think it should do, then um, like I I think it
+will will will it will be better but you'll need to it will be better
+but you'll need to it will be better but you'll need to like explicitly
+instruct it or train it. like explicitly instruct it or train it. like
+explicitly instruct it or train it. Um and if you train it then sure you
+Um and if you train it then sure you Um and if you train it then sure
+you know through RL it can decide which one know through RL it can
+decide which one know through RL it can decide which one to use but um
+and just to give one to use but um and just to give one to use but um
+and just to give one example of this uh it's usually a good example of
+this uh it's usually a good example of this uh it's usually a good idea
+to prompt the model to use a tool idea to prompt the model to use a tool
+idea to prompt the model to use a tool if you have a relevant tool um
+because if you have a relevant tool um because if you have a relevant
+tool um because uh like it's usually better to use a uh like it's
+usually better to use a uh like it's usually better to use a tool to do
+like for example calculation tool to do like for example calculation
+tool to do like for example calculation than than than uh doing it
+yourself although recently uh doing it yourself although recently uh
+doing it yourself although recently it's maybe not as clear because all
+the it's maybe not as clear because all the it's maybe not as clear
+because all the models have been trained super hard to models have been
+trained super hard to models have been trained super hard to do like
+lots of math but Um, yeah, if you're presenting, it'd be Um, yeah, if
+you're presenting, it'd be Um, yeah, if you're presenting, it'd be great
+to get one person up here. I'll great to get one person up here. I'll
+great to get one person up here. I'll maybe continue. Um, so, uh, who
+who's maybe continue. Um, so, uh, who who's maybe continue. Um, so, uh,
+who who's presenting presenting presenting cohorts? Um, so cohorts? Um,
+so cohorts? Um, so you definitely don't want to provide you definitely
+don't want to provide you definitely don't want to provide lots of
+duplicate tools because it'll lots of duplicate tools because it'll lots
+of duplicate tools because it'll blow up your context window and you
+know blow up your context window and you know blow up your context
+window and you know confuse the um confuse the model. But confuse the um
+confuse the model. But confuse the um confuse the model. But like I
+think overall uh having the like I think overall uh having the like I
+think overall uh having the necessary tools is probably better than
+necessary tools is probably better than necessary tools is probably
+better than not having them. Yeah, not having them. Yeah, not having
+them. Yeah, &gt;&gt; I saw another hand.

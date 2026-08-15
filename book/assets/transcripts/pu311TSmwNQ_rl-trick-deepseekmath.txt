@@ -1,0 +1,81 @@
+# rl-trick-deepseekmath
+# video: https://www.youtube.com/watch?v=pu311TSmwNQ
+
+Let's break down the core idea behind
+this paper, DeepSeek Math, and the
+reinforcement learning trick that
+quietly powers DeepSeek's reasoning
+models.
+To make a model better at math, you
+reward it when it gets the answer right
+and nudge it to do more of that. Simple.
+Except the standard recipe secretly runs
+a second neural network, just as big as
+the first, whose only job is to guess
+how good each step was. DeepSeek asked,
+"What if we just delete it?" A 7 billion
+model, and it hits 52% on competition
+math.
+First, the fuel. Great math reasoning
+needs great math data, and the open web
+is full of it, buried in noise. So, they
+build a little filter, hand it a seed of
+known math pages, train a fast
+classifier to recognize, "This looks
+like math." Sweep Common Crawl, keep the
+best, and repeat. Round after round, it
+pulls 120 billion tokens of real
+mathematics out of the internet.
+Now, the reinforcement learning. The
+usual method, PPO, has a problem hiding
+in plain sight. To know whether an
+answer was better than expected, it
+trains a second model, the critic, to
+predict a baseline score for every
+token. That critic is about the same
+size as the model you actually care
+about. Double the memory, double the
+compute, and it's finicky to train when
+the only reward comes at the very end.
+Here's DeepSeek's fix, and it's
+beautifully cheap. Skip the critic
+entirely. For one question, sample a
+whole group of answers, say eight. Score
+them all. Now, the baseline isn't a
+network's guess, it's just the group's
+own average. Each answer's advantage is
+simply how far above or below the group
+mean it landed. Beat the average, get
+reinforced, fall below, get pushed down.
+The group grades itself on a curve, and
+the second network is gone.
+They say it plainly.
+If RL tricks that delete half the
+computer your thing, like, subscribe,
+and send it to the friend still training
+a critic network.
+And it works. That 7 billion base model
+already scores 51% on the math
+benchmark. Open source territory that
+used to belong to giants. Then GRPO
+pushes it further. Grade school math
+jumps to 88% competition math past 50.
+Same model, cheaper RL, better
+reasoning.
+In their words,
+the recipe, mine a mountain of math from
+the open web, then reinforce reasoning
+without a critic, sample a group, let
+their average be the baseline, and push
+the above average answers up. That's
+GRPO, and it's the engine that would
+later drive our one.
+One line, you don't need a critic
+network to judge an answer. Just sample
+a group and grade against their average.
+Cheaper RL, sharper reasoning.
+Which is a funny idea to sit with. The
+model improves by comparing itself to
+other versions of itself. How far does
+self-competition alone get you? That's
+my read. Tell me yours. Until next time.

@@ -1,0 +1,173 @@
+# deepseek-v4-1m-context
+# video: https://www.youtube.com/watch?v=5mL7qxQ9GLw
+
+Let's break down the core idea behind
+this paper, DeepSeek V4, towards highly
+efficient million-token context
+intelligence from DeepSeek AI.
+A million tokens. That's a stack of
+context taller than most entire novels
+handed to a model all at once. Every
+file in a code base, a year of chat
+history, a pile of research papers. The
+dream of an AI that reasons over that
+much at once keeps smashing into the
+same wall. Attention gets
+catastrophically expensive as the
+context grows. DeepSeek V4's whole
+mission is to knock that wall down, to
+make a million-token context not a
+heroic one-off, but something you run
+routinely. And it pulls it off while
+using a small fraction of the compute
+and memory its predecessor needed.
+Here's the wall. In a normal
+transformer, every token has to attend
+to every other token. So, the cost grows
+with the square of the context length.
+Double the context, quadruple the work.
+At a million tokens, that's
+astronomical. And there's a second cost,
+the KV cache, the model's running memory
+of every past token, keeps growing,
+eating gigabytes of GPU memory just to
+remember what it's already seen.
+Together, those two are what make long
+context a luxury. But long context is
+exactly what the frontier now needs.
+Reasoning models that think for pages,
+agents running for hours, analysis
+across whole document sets. So, the
+question is, how do you keep a million
+tokens in mind without paying a million
+tokens worth of cost?
+DeepSeek V4's answer is to stop treating
+all that memory as equally precious. The
+KV cache is where every past token is
+stored for attention to look at. So, if
+you shrink and prune what's in there,
+everything downstream gets cheaper. V4
+uses a hybrid of two compressed
+attentions in different layers. The
+first is compressed sparse attention. It
+does two things at once. It squeezes the
+KV cache down along the sequence,
+compressing runs of tokens into leaner
+summaries, and then it attends sparsely,
+letting each new token look at only a
+selected handful of the most relevant
+past chunks instead of all million.
+Compress the memory, then read only the
+parts that matter. The second flavor is
+heavily compressed attention. This one
+compresses the KV cache far more
+aggressively. A tiny dense summary of
+the whole past, but then it attends to
+all of it because now there's so little
+to attend to. One keeps detail but reads
+sparsely. The other reads everything but
+keeps almost nothing. Stack both kinds
+through the network and you get the best
+of each. The model still sees the whole
+million token sweep, but the compute and
+the memory collapse to a sliver of what
+full attention would demand.
+The second upgrade is quieter, but
+clever. It rebuilds the residual
+connection. Every deep network leans on
+residuals, the little shortcut that lets
+a layer add its update on top of the
+input, so signals and gradients flow
+cleanly through hundreds of layers. V4
+replaces that single shortcut with
+hyperconnections. Instead of one stream
+running through the network, several
+parallel streams, with the layers
+learning how to mix between them. A
+richer set of highways for information
+than a single lane. The catch with
+giving a network that much freedom is
+that it can wander off and destabilize
+training. So they keep the mixing
+manifold constrained, mathematically
+reined in, so the streams stay
+well-behaved. Stronger information flow
+without the instability that usually
+comes with it.
+The third upgrade is the optimizer, the
+algorithm that actually turns gradients
+into weight updates. For years almost
+everyone has used Adam and its cousins.
+V4 switches to a newer optimizer called
+Muon, which conditions those updates
+more carefully, and in practice
+converges faster and trains more stably
+at this scale. Faster convergence means
+fewer steps to reach the same quality
+and on a model with over a trillion
+parameters trained on 32 trillion
+tokens, that's a very large amount of
+compute and money saved. A small change
+to the update rule, a big change to the
+bill.
+The efficiency engine, in their words.
+If making a million token context
+actually affordable is the kind of
+engineering you're here for, like,
+subscribe and pass it to the friend
+still hitting context length exceeded.
+Put it together and the long context
+numbers are the headline. At a full
+million token context, DeepSeek V4 Pro
+runs each token for just 27% of the
+compute its predecessor needed and holds
+its memory in 10% of the KV cache. The
+lighter flash model pushes that to a
+tenth of the compute and 7% of the
+memory. That's the difference between a
+million token context being a stunt and
+being routine and it doesn't trade away
+smarts to get there. In its maximum
+reasoning mode, it sets a new bar among
+open models and goes toe-to-toe with the
+frontier closed models, Gemini, GPT,
+Claude on reasoning, coding and agentic
+tasks while being the one that can
+actually afford to think across a
+million tokens.
+The efficiency win.
+So, the recipe for affordable million
+token context. Attention's quadratic
+cost and a bloated KV cache are what
+make long context expensive. So, shrink
+what attention has to look at. Blend two
+compressed attentions. One that squeezes
+the memory and then reads only the
+relevant chunks and one that squeezes
+the memory even harder and reads all of
+the little that's left. Upgrade the
+plain residual into constrained hyper
+connections for richer, stable
+information flow. Swap in the Muon
+optimizer for faster, steadier training.
+The result, frontier-level reasoning
+that keeps a million tokens in mind for
+a fraction of the cost.
+The one-line version, DeepSeek V4 makes
+a million token context routine by
+compressing and pruning what attention
+has to remember, so it can think across
+a novel's worth of tokens at a fraction
+of the compute and memory.
+The theme across these DeepSeek papers
+is the same, and I love it. The frontier
+isn't only about training a bigger
+brain. It's about refusing to pay full
+price for the obvious approach. Full
+attention over a million tokens is the
+obvious approach, and it's ruinous. So,
+they asked which parts of the past
+actually deserve full attention, and the
+answer turned out to be, not many.
+That's my read. Tell me yours. Until
+next time.

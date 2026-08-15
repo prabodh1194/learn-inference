@@ -1,0 +1,2296 @@
+# cmu-llm-inference-2-probability-review
+# video: https://www.youtube.com/watch?v=UKuPCxozypU
+# captions: manual
+
+Okay, Okay, Okay, hello everyone. I'd like to get started. hello
+everyone. I'd like to get started. hello everyone. I'd like to get
+started. So, I the first thing I'd like to point So, I the first thing
+I'd like to point So, I the first thing I'd like to point out is on the
+class schedule. out is on the class schedule. out is on the class
+schedule. Until 2 minutes ago, there was nothing Until 2 minutes ago,
+there was nothing Until 2 minutes ago, there was nothing for this
+lecture. Now there is something for this lecture. Now there is something
+for this lecture. Now there is something for this lecture. So, for this
+lecture. So, for this lecture. So, you can you can go here. It has the
+code you can you can go here. It has the code you can you can go here.
+It has the code link here. And this time I'm not going link here. And
+this time I'm not going link here. And this time I'm not going to be
+going through slides. I'm going to to be going through slides. I'm going
+to to be going through slides. I'm going to be going through like
+demonstrating some be going through like demonstrating some be going
+through like demonstrating some stuff and I do put a notebook. So, stuff
+and I do put a notebook. So, stuff and I do put a notebook. So, there's
+no no slides link but you can there's no no slides link but you can
+there's no no slides link but you can click through and run it yourself.
+click through and run it yourself. click through and run it yourself.
+The reason why I want to do this is I The reason why I want to do this
+is I The reason why I want to do this is I want to show like a very
+minimal example want to show like a very minimal example want to show
+like a very minimal example of some of the like algorithms that of some
+of the like algorithms that of some of the like algorithms that we're
+going to be using this time to set we're going to be using this time to
+set we're going to be using this time to set everything up everything up
+everything up so that you can use it properly. So, I Oh, yeah. And
+actually before So, I Oh, yeah. And actually before So, I Oh, yeah. And
+actually before that, let me do some logistics that, let me do some
+logistics that, let me do some logistics announcements, which is number
+one announcements, which is number one announcements, which is number
+one starting next week, we will have office starting next week, we will
+have office starting next week, we will have office hours. hours. hours.
+The TAs are already and I are arranging The TAs are already and I are
+arranging The TAs are already and I are arranging everything,
+everything, everything, but but but that will be posted on Piazza. that
+will be posted on Piazza. that will be posted on Piazza. All of the
+class videos will try to post All of the class videos will try to post
+All of the class videos will try to post on Piazza as soon as we can. on
+Piazza as soon as we can. on Piazza as soon as we can. Um, the homework
+is not out yet, but it will the homework is not out yet, but it will the
+homework is not out yet, but it will homework one will be out soon. Any
+any homework one will be out soon. Any any homework one will be out
+soon. Any any other questions that people had about other questions that
+people had about other questions that people had about general logistics
+things? Are we all set? Are we all set? Are we all set? Okay. Okay.
+Okay. Cool. So, let me go ahead with this. And so, some of this may be
+Some of this may be relatively Some of this may be relatively Some of
+this may be relatively elementary to everyone, but elementary to
+everyone, but elementary to everyone, but to some people, but one thing
+I've to some people, but one thing I've to some people, but one thing
+I've noticed is that actually a lot of these noticed is that actually a
+lot of these noticed is that actually a lot of these concepts are not,
+you know, as concepts are not, you know, as concepts are not, you know,
+as universally held as I may originally universally held as I may
+originally universally held as I may originally thought. So, I just want
+to make sure thought. So, I just want to make sure thought. So, I just
+want to make sure that we get everybody on the same page. that we get
+everybody on the same page. that we get everybody on the same page. Um,
+and so today is a four-part Um, and so today is a four-part Um, and so
+today is a four-part is in four parts. The first thing I want is in four
+parts. The first thing I want is in four parts. The first thing I want
+to talk about is some probability to talk about is some probability to
+talk about is some probability fundamentals. fundamentals. fundamentals.
+And these are going to go into like And these are going to go into like
+And these are going to go into like basically everything we do. So,
+we'll basically everything we do. So, we'll basically everything we do.
+So, we'll talk about that first. The second thing talk about that first.
+The second thing talk about that first. The second thing I'm going to do
+is just going to show I'm going to do is just going to show I'm going to
+do is just going to show very basic implementation of a very basic
+implementation of a very basic implementation of a transformer model.
+Again, I assume that transformer model. Again, I assume that transformer
+model. Again, I assume that most people have dealt with this before,
+most people have dealt with this before, most people have dealt with
+this before, but um, but um, but um, this implementation may also be
+useful this implementation may also be useful this implementation may
+also be useful if you want to try it out in future if you want to try it
+out in future if you want to try it out in future work. So, I'll just go
+through it work. So, I'll just go through it work. So, I'll just go
+through it quickly. quickly. quickly. And then after that, I want to
+show some And then after that, I want to show some And then after that,
+I want to show some generation algorithms and how we can generation
+algorithms and how we can generation algorithms and how we can evaluate
+models using language models as evaluate models using language models as
+evaluate models using language models as a judge. And then finally, I
+want to a judge. And then finally, I want to a judge. And then finally,
+I want to talk a little bit about meta generation talk a little bit
+about meta generation talk a little bit about meta generation
+algorithms, which are like re-ranking algorithms, which are like re-
+ranking algorithms, which are like re-ranking algorithms that allow you
+to pick the algorithms that allow you to pick the algorithms that allow
+you to pick the best output. best output. best output. And not
+everything is in the code. I'm And not everything is in the code. I'm
+And not everything is in the code. I'm going to go off going to go off
+going to go off off track a little bit some of the time off track a
+little bit some of the time off track a little bit some of the time and
+also please feel free to ask any and also please feel free to ask any
+and also please feel free to ask any questions. questions. questions.
+Um, Um, Um, So, yeah, let's get started. So, yeah, let's get started.
+So, yeah, let's get started. Um, so the first thing that I want to Um,
+so the first thing that I want to Um, so the first thing that I want to
+talk about is probability fundamentals. talk about is probability
+fundamentals. talk about is probability fundamentals. And so, I'm going
+to go through some And so, I'm going to go through some And so, I'm
+going to go through some basic concepts and I would definitely basic
+concepts and I would definitely basic concepts and I would definitely
+encourage you to go walk along with the encourage you to go walk along
+with the encourage you to go walk along with the code. code. code. You
+can run it locally if you click open You can run it locally if you click
+open You can run it locally if you click open in collab, you can run it
+on collab, but in collab, you can run it on collab, but in collab, you
+can run it on collab, but you'll have to like copy paste in the you'll
+have to like copy paste in the you'll have to like copy paste in the
+library files. So, it might not be library files. So, it might not be
+library files. So, it might not be might not be super convenient. might
+not be super convenient. might not be super convenient. Um, the first
+thing we do is just set up Um, the first thing we do is just set up Um,
+the first thing we do is just set up our environment with torch and
+numpy and our environment with torch and numpy and our environment with
+torch and numpy and and matplotlib and import everything. and matplotlib
+and import everything. and matplotlib and import everything. So, this is
+not interesting. So, this is not interesting. So, this is not
+interesting. Um, Um, Um, So, the first thing I want to talk about So,
+the first thing I want to talk about So, the first thing I want to talk
+about is conditional probabilities. And the is conditional
+probabilities. And the is conditional probabilities. And the reason why
+I want to talk about reason why I want to talk about reason why I want
+to talk about conditional probabilities is because we conditional
+probabilities is because we conditional probabilities is because we are
+are are dealing with dealing with dealing with auto regressive language
+models mostly auto regressive language models mostly auto regressive
+language models mostly and auto regressive language models are and auto
+regressive language models are and auto regressive language models are
+based on conditional probabilities where based on conditional
+probabilities where based on conditional probabilities where we predict
+the probability of the next we predict the probability of the next we
+predict the probability of the next token. token. token. Um, Um, Um,
+Have people learned of any variety of Have people learned of any variety
+of Have people learned of any variety of language models other than
+transformers? language models other than transformers? language models
+other than transformers? Yes. Yes. Yes. Okay. Okay. Okay. Word
+embeddings. Word embeddings. Word embeddings. Word embeddings. Word
+embeddings. Word embeddings. So, that's a good point. Is a word So,
+that's a good point. Is a word So, that's a good point. Is a word
+embedding a language model? embedding a language model? embedding a
+language model? According to our definition last week. Anyone remember
+what the definition of a Anyone remember what the definition of a Anyone
+remember what the definition of a language model last week was? It's not
+a not a trick question, yeah. It's not a not a trick question, yeah.
+It's not a not a trick question, yeah. It's actually predict one
+specific token It's actually predict one specific token It's actually
+predict one specific token given like the given like the given like the
+previous tokens that you already have. previous tokens that you already
+have. previous tokens that you already have. Yeah, model that predicts
+the next token Yeah, model that predicts the next token Yeah, model that
+predicts the next token given the previous token. Yes, that's given the
+previous token. Yes, that's given the previous token. Yes, that's
+specifically an auto regressive language specifically an auto regressive
+language specifically an auto regressive language model. So, if we go
+even broader, it's a a model that Yeah. Generates text. Yeah. Generates
+text. Yeah. Generates text. That generates text. Um, yes. That generates
+text. Um, yes. That generates text. Um, yes. It should have the ability
+to generate It should have the ability to generate It should have the
+ability to generate text. That's actually not how I defined text. That's
+actually not how I defined text. That's actually not how I defined it on
+Tuesday though. it on Tuesday though. it on Tuesday though. Yeah. It
+generates sequences of tokens. Yeah. It generates sequences of tokens.
+Yeah. It generates sequences of tokens. Sequences of tokens. Sequences
+of tokens. Sequences of tokens. Yes, but that's also not how I defined
+Yes, but that's also not how I defined Yes, but that's also not how I
+defined it last it last it last Tuesday. It assigns probabilities to
+Tuesday. It assigns probabilities to Tuesday. It assigns probabilities
+to sequences. Yeah, assigning probabilities sequences. Yeah, assigning
+probabilities sequences. Yeah, assigning probabilities to sequences. So,
+to sequences. So, to sequences. So, and then specifically auto
+regressive and then specifically auto regressive and then specifically
+auto regressive models assign probabilities to sequences models assign
+probabilities to sequences models assign probabilities to sequences by
+predicting the next token. by predicting the next token. by predicting
+the next token. Um, and so, when we predict the next Um, and so, when we
+predict the next Um, and so, when we predict the next token, that's a
+conditional probability. token, that's a conditional probability. token,
+that's a conditional probability. It's the probability of the next the
+It's the probability of the next the It's the probability of the next
+the next token given all of the previous next token given all of the
+previous next token given all of the previous tokens. tokens. tokens.
+Um, or you know, the probability of Y Um, or you know, the probability
+of Y Um, or you know, the probability of Y given X where X is given X
+where X is given X where X is X is the previous tokens. X is the
+previous tokens. X is the previous tokens. Um, Um, Um, So, now going
+back to the the question, So, now going back to the the question, So,
+now going back to the the question, is word2vec a language model? If if
+so, yes. If not, why not? Any ideas? Who knows word2vec by the Any
+ideas? Who knows word2vec by the Any ideas? Who knows word2vec by the
+way? Maybe not everybody. It's yeah. Maybe not everybody. It's yeah.
+Maybe not everybody. It's yeah. I think it is I think it is I think it
+is assigning probability which is a assigning probability which is a
+assigning probability which is a definite definite definite generation
+of generation of generation of like embeddings like embeddings like
+embeddings Yeah, so word2vec for people who aren't Yeah, so word2vec for
+people who aren't Yeah, so word2vec for people who aren't familiar, I
+can draw it quickly on the familiar, I can draw it quickly on the
+familiar, I can draw it quickly on the board. board. board. Basically,
+it's a way of learning Basically, it's a way of learning Basically, it's
+a way of learning embeddings for for tokens, but Um, what it does is
+word2vec is actually Um, what it does is word2vec is actually Um, what
+it does is word2vec is actually a software toolkit. It's not a software
+toolkit. It's not a software toolkit. It's not any individual method.
+It's any individual method. It's any individual method. It's either of
+two methods where either of two methods where either of two methods
+where basically, basically, basically, um, based on the surrounding
+tokens, you're predicting the tokens in the you're predicting the tokens
+in the you're predicting the tokens in the center or based on the token
+in the center or based on the token in the center or based on the token
+in the center, you're predicting the center, you're predicting the
+center, you're predicting the surrounding tokens and then you use that
+surrounding tokens and then you use that surrounding tokens and then you
+use that to learn to learn to learn you use that to learn embeddings.
+But you use that to learn embeddings. But you use that to learn
+embeddings. But this actually violates the principle of this actually
+violates the principle of this actually violates the principle of going
+from left to right and so, it going from left to right and so, it going
+from left to right and so, it can't be an auto regressive model. And
+can't be an auto regressive model. And can't be an auto regressive
+model. And if you work really really hard, you can if you work really
+really hard, you can if you work really really hard, you can kind of
+turn it into a language model kind of turn it into a language model kind
+of turn it into a language model that actually predicts the probability
+that actually predicts the probability that actually predicts the
+probability of sequences, but it's of sequences, but it's of sequences,
+but it's like like like not designed for that purpose. not designed for
+that purpose. not designed for that purpose. Um, Um, Um, so, so, so, any
+other ideas? BERT is also similar by any other ideas? BERT is also
+similar by any other ideas? BERT is also similar by the way. BERT is a
+masked it's called a the way. BERT is a masked it's called a the way.
+BERT is a masked it's called a masked language model, but it's actually
+masked language model, but it's actually masked language model, but it's
+actually really hard to get it to assign it really hard to get it to
+assign it really hard to get it to assign it probabilities sequences.
+probabilities sequences. probabilities sequences. Um, any others? Yeah.
+Um, any others? Yeah. Um, any others? Yeah. Diffusion models. Yes, very
+good. But Diffusion models. Yes, very good. But Diffusion models. Yes,
+very good. But that's not the one I'm looking for. Recurrent neural
+networks. Yeah, that's Recurrent neural networks. Yeah, that's Recurrent
+neural networks. Yeah, that's a very good one. Did anyone take a kind a
+very good one. Did anyone take a kind a very good one. Did anyone take a
+kind of old school NLP class? of old school NLP class? of old school NLP
+class? What did you learn as language models What did you learn as
+language models What did you learn as language models there? there?
+there? BM25. BM25 is more of a a waiting a BM25. BM25 is more of a a
+waiting a BM25. BM25 is more of a a waiting a waiting thing. Yeah.
+Grammar. N-gram models. Yeah, Yeah. Grammar. N-gram models. Yeah, Yeah.
+Grammar. N-gram models. Yeah, there we go. there we go. there we go. So,
+n-gram models are maybe not So, n-gram models are maybe not So, n-gram
+models are maybe not not taught so widely anymore, but not taught so
+widely anymore, but not taught so widely anymore, but they're a good
+illustrative they're a good illustrative they're a good illustrative
+model that we can we can work with. An model that we can we can work
+with. An model that we can we can work with. An n-gram model basically
+what it is is it n-gram model basically what it is is it n-gram model
+basically what it is is it predicts the next predicts the next predicts
+the next the next word based on the previous n-1 the next word based on
+the previous n-1 the next word based on the previous n-1 words. words.
+words. And And And um, the um, the um, the in this particular case, I
+set up a in this particular case, I set up a in this particular case, I
+set up a bigram model, which is a 2-gram. So, it bigram model, which is
+a 2-gram. So, it bigram model, which is a 2-gram. So, it predicts the
+next word based on the predicts the next word based on the predicts the
+next word based on the previous one word. The next word based previous
+one word. The next word based previous one word. The next word based on
+the previous one word. So, on the previous one word. So, on the previous
+one word. So, um, I came up with a a fake um, I came up with a a fake
+um, I came up with a a fake n-gram model where I just kind of n-gram
+model where I just kind of n-gram model where I just kind of assigned
+probabilities to this very assigned probabilities to this very assigned
+probabilities to this very small vocab of small vocab of small vocab of
+beginning of sentence the cat dog park beginning of sentence the cat dog
+park beginning of sentence the cat dog park mat sat ran walked played on
+in too mat sat ran walked played on in too mat sat ran walked played on
+in too quickly slowly. quickly slowly. quickly slowly. Um, and end of
+sentence symbol. Um, and end of sentence symbol. Um, and end of sentence
+symbol. And And And uh, uh, uh, I or more accurately Claude came up with
+I or more accurately Claude came up with I or more accurately Claude
+came up with these probabilities for each of the each these
+probabilities for each of the each these probabilities for each of the
+each of the tokens here. So, given the of the tokens here. So, given the
+of the tokens here. So, given the beginning of the sentence, beginning
+of the sentence, beginning of the sentence, um, um, um, what what is the
+next possible word? what what is the next possible word? what what is
+the next possible word? Like the cat dog park. Like the cat dog park.
+Like the cat dog park. Given the, what is the next possible Given the,
+what is the next possible Given the, what is the next possible word? Cat
+dog park, etc. etc. And so, word? Cat dog park, etc. etc. And so, word?
+Cat dog park, etc. etc. And so, this definitely satisfies this this
+definitely satisfies this this definitely satisfies this this this this
+equation here, but it equation here, but it equation here, but it also
+additionally also additionally also additionally Who mentioned the
+Markov assumption last Who mentioned the Markov assumption last Who
+mentioned the Markov assumption last time? Yeah. So, this this has a
+Markov time? Yeah. So, this this has a Markov time? Yeah. So, this this
+has a Markov assumption, which means that we are only assumption, which
+means that we are only assumption, which means that we are only paying
+attention to a certain number of paying attention to a certain number of
+paying attention to a certain number of previous words and so, we're
+basically previous words and so, we're basically previous words and so,
+we're basically lopping off everything except the the lopping off
+everything except the the lopping off everything except the the
+immediately previous word and just immediately previous word and just
+immediately previous word and just ignoring it and only conditioning on
+ignoring it and only conditioning on ignoring it and only conditioning
+on previous word. So, um, So, um, So, um, what this gives us is this
+gives us a what this gives us is this gives us a what this gives us is
+this gives us a set of conditional probabilities that set of conditional
+probabilities that set of conditional probabilities that look a bit like
+this. And so given S look a bit like this. And so given S look a bit
+like this. And so given S given the previous word was S, you know, given
+the previous word was S, you know, given the previous word was S, you
+know, we can predict any of these words. Given we can predict any of
+these words. Given we can predict any of these words. Given that the
+previous word was the, we can that the previous word was the, we can
+that the previous word was the, we can predict any of these words, any
+of these predict any of these words, any of these predict any of these
+words, any of these nouns. Uh given uh that the previous nouns. Uh given
+uh that the previous nouns. Uh given uh that the previous word was cat,
+we could predict things word was cat, we could predict things word was
+cat, we could predict things like sat, ran, walked, played, etc., like
+sat, ran, walked, played, etc., like sat, ran, walked, played, etc.,
+etc. etc. etc. So um we're not actually going to use So um we're not
+actually going to use So um we're not actually going to use any of these
+models. I'm just using them any of these models. I'm just using them any
+of these models. I'm just using them here because they're, you know,
+very here because they're, you know, very here because they're, you
+know, very fast to calculate and uh easy for fast to calculate and uh
+easy for fast to calculate and uh easy for illustrative purposes.
+illustrative purposes. illustrative purposes. But um uh there we are.
+But um uh there we are. But um uh there we are. Any questions there?
+Who's actually like implemented or used Who's actually like implemented
+or used Who's actually like implemented or used an n-gram model an
+n-gram model an n-gram model in a class? in a class? in a class? Wow, I
+feel 2025. That's uh Wow, I feel 2025. That's uh Wow, I feel 2025.
+That's uh exciting exciting to see the change. The exciting exciting to
+see the change. The exciting exciting to see the change. The this was
+like the staple uh 5 years ago, this was like the staple uh 5 years ago,
+this was like the staple uh 5 years ago, I think. So. I think. So. I
+think. So. Um Um Um cool. Okay. So now I want to talk about cool. Okay.
+So now I want to talk about cool. Okay. So now I want to talk about
+sampling from language models, and this sampling from language models,
+and this sampling from language models, and this is the most simple
+inference algorithm is the most simple inference algorithm is the most
+simple inference algorithm that we're going to use. It's also a that
+we're going to use. It's also a that we're going to use. It's also a
+very um very um very um a very special inference algorithm, a very
+special inference algorithm, a very special inference algorithm, which
+I'm going to talk about in a which I'm going to talk about in a which
+I'm going to talk about in a second. second. second. And so basically
+the way we sample from And so basically the way we sample from And so
+basically the way we sample from a language model a language model a
+language model is we start is we start is we start from the uh beginning
+token and use the from the uh beginning token and use the from the uh
+beginning token and use the conditional probabilities to sample the
+conditional probabilities to sample the conditional probabilities to
+sample the next word. next word. next word. Um update the current
+context and Um update the current context and Um update the current
+context and repeat. repeat. repeat. And uh then we continue until we
+reach And uh then we continue until we reach And uh then we continue
+until we reach an end token or maximum length. an end token or maximum
+length. an end token or maximum length. And so this is like what we do
+in every And so this is like what we do in every And so this is like
+what we do in every auto-regressive language model. Uh it's auto-
+regressive language model. Uh it's auto-regressive language model. Uh
+it's the same for transformers. The only the same for transformers. The
+only the same for transformers. The only difference is difference is
+difference is here for updating the current context, here for updating
+the current context, here for updating the current context, we're just
+remembering the previous we're just remembering the previous we're just
+remembering the previous word. In a transformer model, we run it word.
+In a transformer model, we run it word. In a transformer model, we run
+it through many, many layers of the through many, many layers of the
+through many, many layers of the transformer model and like append the
+uh transformer model and like append the uh transformer model and like
+append the uh the embeddings to the KB cache and all the embeddings to
+the KB cache and all the embeddings to the KB cache and all the other
+things. So um but the overall the other things. So um but the overall
+the other things. So um but the overall uh you know, way of implementing
+this is uh you know, way of implementing this is uh you know, way of
+implementing this is the same. So the same. So the same. So um what we
+do is we take our vocabulary. um what we do is we take our vocabulary.
+um what we do is we take our vocabulary. Um we uh Um we uh Um we uh get
+a list of all of the he's in the get a list of all of the he's in the
+get a list of all of the he's in the vocabulary vocabulary vocabulary
+and uh we start our sequence with just and uh we start our sequence with
+just and uh we start our sequence with just the beginning of sentence.
+So uh the beginning of sentence. So uh the beginning of sentence. So uh
+set that as our our current index. set that as our our current index.
+set that as our our current index. And then we step through until we get
+to And then we step through until we get to And then we step through
+until we get to a max length. And actually this max a max length. And
+actually this max a max length. And actually this max length is
+important uh when you're length is important uh when you're length is
+important uh when you're using, you know, any sort of uh using, you
+know, any sort of uh using, you know, any sort of uh like like like
+neural network or deep learning-based neural network or deep learning-
+based neural network or deep learning-based model because it may go on
+forever if model because it may go on forever if model because it may go
+on forever if you're not careful. So you you kind of you're not careful.
+So you you kind of you're not careful. So you you kind of need to set
+this so you don't run out of need to set this so you don't run out of
+need to set this so you don't run out of memory. memory. memory. Um Um
+Um so I'll I'll get to temperature um so I'll I'll get to temperature um
+so I'll I'll get to temperature um or no, I'll I'll explain temperature
+or no, I'll I'll explain temperature or no, I'll I'll explain
+temperature now. So um now. So um now. So um we're going to talk about a
+lot of we're going to talk about a lot of we're going to talk about a
+lot of different sampling algorithms. different sampling algorithms.
+different sampling algorithms. Temperature sampling is a very common
+Temperature sampling is a very common Temperature sampling is a very
+common one that we use. And basically the idea one that we use. And
+basically the idea one that we use. And basically the idea behind
+temperature sampling is that we behind temperature sampling is that we
+behind temperature sampling is that we want to um want to um want to um
+we might want to make the distribution we might want to make the
+distribution we might want to make the distribution more peaky or less
+peaky so that we get more peaky or less peaky so that we get more peaky
+or less peaky so that we get more higher probability outputs or lower
+more higher probability outputs or lower more higher probability outputs
+or lower probability outputs. probability outputs. probability outputs.
+And so And so And so in a mathematical equation um in a mathematical
+equation, what we um in a mathematical equation, what we um in a
+mathematical equation, what we do is do is do is we take the probability
+of I. of I. of I. And so typically Um Um Um typically if we have a
+probability, um typically if we have a probability, um typically if we
+have a probability, um the all all of this will add up to one the all
+all of this will add up to one the all all of this will add up to one uh
+because it's a probability and uh because it's a probability and uh
+because it's a probability and probabilities need to add up to one.
+probabilities need to add up to one. probabilities need to add up to
+one. And so this sum is just one, so we don't And so this sum is just
+one, so we don't And so this sum is just one, so we don't need to worry
+about it. So the need to worry about it. So the need to worry about it.
+So the probability of I is the probability of probability of I is the
+probability of probability of I is the probability of I, right? So um I,
+right? So um I, right? So um typically you could just cancel this
+typically you could just cancel this typically you could just cancel
+this out. But what we do what we do when we out. But what we do what we
+do when we out. But what we do what we do when we have a temperature
+have a temperature have a temperature is we is we is we make an
+adjustment where we take where we take where we take E E E to the log
+probability to the log probability to the log probability of I. of I. of
+I. E to the log probability of J. And um And um And um then we multiply
+it by 1 divided by the then we multiply it by 1 divided by the then we
+multiply it by 1 divided by the temperature. And so what does this mean
+And so what does this mean And so what does this mean when the
+temperature is one? Any ideas? Any ideas? Any ideas? Yeah, nothing
+happens. It's a no-op Yeah, nothing happens. It's a no-op Yeah, nothing
+happens. It's a no-op because you you get one over one, this because you
+you get one over one, this because you you get one over one, this is
+one, and then E and log cancel out is one, and then E and log cancel out
+is one, and then E and log cancel out and we get uh you get the same
+thing we and we get uh you get the same thing we and we get uh you get
+the same thing we had before. had before. had before. Um what does this
+mean when we set the Um what does this mean when we set the Um what does
+this mean when we set the temperature to uh temperature to uh
+temperature to uh be be be infinity? Uh Uh Uh the all of the values will
+become one. the all of the values will become one. the all of the values
+will become one. And so what that means is what if our And so what that
+means is what if our And so what that means is what if our vocabulary
+size is 1,000? Yeah, each of the each of them will have Yeah, each of
+the each of them will have Yeah, each of the each of them will have one
+by 1,000. So it gives us a uniform one by 1,000. So it gives us a
+uniform one by 1,000. So it gives us a uniform probability distribution.
+probability distribution. probability distribution. Um what if we set
+this to zero? For the prob for the probability. For the prob for the
+probability. For the prob for the probability. Um it it might be it
+might be undefined Um it it might be it might be undefined Um it it
+might be it might be undefined at infinity, but what's the limit as it
+at infinity, but what's the limit as it at infinity, but what's the
+limit as it approaches infinity? There's only one single probable word.
+There's only one single probable word. There's only one single probable
+word. So basically what happens is the largest So basically what happens
+is the largest So basically what happens is the largest uh the largest
+token becomes infinitely uh the largest token becomes infinitely uh the
+largest token becomes infinitely larger than all of the other tokens.
+larger than all of the other tokens. larger than all of the other
+tokens. Um because uh it's exponent um because Um because uh it's
+exponent um because Um because uh it's exponent um because it's
+multiplied and then exponentiated. it's multiplied and then
+exponentiated. it's multiplied and then exponentiated. So basically like
+what that means is you So basically like what that means is you So
+basically like what that means is you get a one-hot vector. get a one-
+hot vector. get a one-hot vector. Um Um Um where a single word where a
+single word where a single word a single uh actually I mean basically a
+single uh actually I mean basically a single uh actually I mean
+basically word is a token, but let's just say word is a token, but let's
+just say word is a token, but let's just say token. Where a single token
+gets a token. Where a single token gets a token. Where a single token
+gets a probability of one and all of the other probability of one and
+all of the other probability of one and all of the other ones get a
+probability of zero. So ones get a probability of zero. So ones get a
+probability of zero. So you'll always pick the most probable you'll
+always pick the most probable you'll always pick the most probable
+token. token. token. Um slight caveat, if two tokens have Um slight
+caveat, if two tokens have Um slight caveat, if two tokens have exactly
+the same probability, then um exactly the same probability, then um
+exactly the same probability, then um you would get a uniform
+distribution you would get a uniform distribution you would get a
+uniform distribution over all of the most probable tokens, over all of
+the most probable tokens, over all of the most probable tokens, but
+basically it is um but basically it is um but basically it is um uh uh
+uh you pick the most probable token. you pick the most probable token.
+you pick the most probable token. So um that's what we're doing here. So
+um that's what we're doing here. So um that's what we're doing here. Uh
+we're basically um Uh we're basically um Uh we're basically um taking
+the log of uh of the taking the log of uh of the taking the log of uh of
+the probabilities. probabilities. probabilities. Uh we're dividing it by
+the temperature, Uh we're dividing it by the temperature, Uh we're
+dividing it by the temperature, and then we're taking the softmax. And
+and then we're taking the softmax. And and then we're taking the
+softmax. And the softmax is basically exponentiating the softmax is
+basically exponentiating the softmax is basically exponentiating and
+then normalizing. So um that's what and then normalizing. So um that's
+what and then normalizing. So um that's what we do here. we do here. we
+do here. Um so once we've done this, uh we then Um so once we've done
+this, uh we then Um so once we've done this, uh we then sample the next
+token. So if we're not sample the next token. So if we're not sample the
+next token. So if we're not taking the temperature, we sample it taking
+the temperature, we sample it taking the temperature, we sample it
+according to the original probability according to the original
+probability according to the original probability distribution. If we um
+distribution. If we um distribution. If we um if we do take the
+temperature, we sample if we do take the temperature, we sample if we do
+take the temperature, we sample it according to the adjusted probability
+it according to the adjusted probability it according to the adjusted
+probability distribution. distribution. distribution. Uh we append this
+as the next word to Uh we append this as the next word to Uh we append
+this as the next word to the sequence, and we continue until we the
+sequence, and we continue until we the sequence, and we continue until
+we hit the end of uh end of sequence token. Okay? Great. So um let's
+let's try it out. Great. So um let's let's try it out. Great. So um
+let's let's try it out. Um I'm just sampling uh some outputs Um I'm just
+sampling uh some outputs Um I'm just sampling uh some outputs from the
+model. And my model gave us uh the dog played, And my model gave us uh
+the dog played, And my model gave us uh the dog played, the cat played
+quickly, uh the dog the cat played quickly, uh the dog the cat played
+quickly, uh the dog played in the park walked. Um so I I played in the
+park walked. Um so I I played in the park walked. Um so I I don't know
+if anybody's heard of a don't know if anybody's heard of a don't know if
+anybody's heard of a garden path sentence, but this feels garden path
+sentence, but this feels garden path sentence, but this feels like a
+garden path sentence here. It's like a garden path sentence here. It's
+like a garden path sentence here. It's uh one of those sentences that
+kind of uh one of those sentences that kind of uh one of those sentences
+that kind of seems to make sense until you hear the seems to make sense
+until you hear the seems to make sense until you hear the last word and
+then it doesn't make any last word and then it doesn't make any last
+word and then it doesn't make any sense at all. sense at all. sense at
+all. Um but basically the reason why we use Um but basically the reason
+why we use Um but basically the reason why we use big transformers is
+because bigram big transformers is because bigram big transformers is
+because bigram models like this are really bad models models like this
+are really bad models models like this are really bad models of
+language, so they give you lots of of language, so they give you lots of
+of language, so they give you lots of like very unnatural things. Uh so
+um but like very unnatural things. Uh so um but like very unnatural
+things. Uh so um but anyway, like this is uh we can generate anyway,
+like this is uh we can generate anyway, like this is uh we can generate
+something that vaguely looks like something that vaguely looks like
+something that vaguely looks like English in this way. English in this
+way. English in this way. So anyway, we're not going to use this So
+anyway, we're not going to use this So anyway, we're not going to use
+this model. Um we're not going to use this model. Um we're not going to
+use this model. Um we're not going to use this model to do anything.
+It's mainly for model to do anything. It's mainly for model to do
+anything. It's mainly for demonstration purposes. demonstration
+purposes. demonstration purposes. And the the next demonstration that I
+And the the next demonstration that I And the the next demonstration
+that I would like to make is um how we estimate would like to make is um
+how we estimate would like to make is um how we estimate quantities
+through sampling. quantities through sampling. quantities through
+sampling. Um Um Um and and and the basic idea is here we have a true the
+basic idea is here we have a true the basic idea is here we have a true
+conditional probability of the next word conditional probability of the
+next word conditional probability of the next word given the current
+word. So we know we given the current word. So we know we given the
+current word. So we know we know this according to our bigram model.
+know this according to our bigram model. know this according to our
+bigram model. Um Um Um but what if I said I wanted the joint but what if
+I said I wanted the joint but what if I said I wanted the joint
+probability of two words co-occurring probability of two words co-
+occurring probability of two words co-occurring here? here? here? And so
+the joint probability would be um And so the joint probability would be
+um And so the joint probability would be um not not not uh not the
+conditional probability where we not the conditional probability where
+we not the conditional probability where we divided by uh P of X, but
+just the thing divided by uh P of X, but just the thing divided by uh P
+of X, but just the thing on top of this. So just like what's the on top
+of this. So just like what's the on top of this. So just like what's the
+probability that these two words, if you probability that these two
+words, if you probability that these two words, if you looked at any two
+arbitrary words, that looked at any two arbitrary words, that looked at
+any two arbitrary words, that the first word would be X and the next the
+first word would be X and the next the first word would be X and the
+next word word word So does anyone have a a good way to So does anyone
+have a a good way to So does anyone have a a good way to calculate this?
+Um calculate this? Um calculate this? Um like like like could you uh
+could you write a program could you uh could you write a program could
+you uh could you write a program that like that like that like solves
+for this value by taking in this solves for this value by taking in this
+solves for this value by taking in this big uh this big matrix? Yeah. Uh
+Uh Uh the probability of both words not the probability of both words
+not the probability of both words not occurring together. Yeah, I mean,
+if you occurring together. Yeah, I mean, if you occurring together.
+Yeah, I mean, if you could get that, you could get uh could get that,
+you could get uh could get that, you could get uh you could maybe use
+that to find this. you could maybe use that to find this. you could
+maybe use that to find this. But basically, long story short, coming But
+basically, long story short, coming But basically, long story short,
+coming up with an analytical solution to this up with an analytical
+solution to this up with an analytical solution to this is maybe
+possible, but it's hard. Like is maybe possible, but it's hard. Like is
+maybe possible, but it's hard. Like there's it's not very easy to
+there's it's not very easy to there's it's not very easy to take these
+conditional probabilities and take these conditional probabilities and
+take these conditional probabilities and come up with a system of
+equations that come up with a system of equations that come up with a
+system of equations that would allow you to come up with this would
+allow you to come up with this would allow you to come up with this
+joint probability. joint probability. joint probability. Um and it
+becomes even more impossible Um and it becomes even more impossible Um
+and it becomes even more impossible when you start talking about like
+when you start talking about like when you start talking about like
+finding this joint probability for a finding this joint probability for
+a finding this joint probability for a transformer-based model. You just
+transformer-based model. You just transformer-based model. You just
+wouldn't be able to do it, right? wouldn't be able to do it, right?
+wouldn't be able to do it, right? So, um what we do instead is we um we
+So, um what we do instead is we um we So, um what we do instead is we um
+we can actually estimate quantities through can actually estimate
+quantities through can actually estimate quantities through sampling.
+sampling. sampling. And so, what we can do is we can And so, what we can
+do is we can And so, what we can do is we can generate a whole bunch of
+uh sentences generate a whole bunch of uh sentences generate a whole
+bunch of uh sentences with the model using our sampling with the model
+using our sampling with the model using our sampling algorithm and
+estimate this uh algorithm and estimate this uh algorithm and estimate
+this uh like estimate this unknown quantity, like estimate this unknown
+quantity, like estimate this unknown quantity, this joint probability of
+the two. this joint probability of the two. this joint probability of
+the two. So, So, So, um why is why is this useful? Um this is um why is
+why is this useful? Um this is um why is why is this useful? Um this is
+useful for a very large number of useful for a very large number of
+useful for a very large number of reasons. Um it can be useful for,
+reasons. Um it can be useful for, reasons. Um it can be useful for, for
+example, for example, for example, let's say you have a transformer-
+based let's say you have a transformer-based let's say you have a
+transformer-based model where you can calculate model where you can
+calculate model where you can calculate conditional probabilities and
+you want conditional probabilities and you want conditional
+probabilities and you want to know what percentage of the time it to
+know what percentage of the time it to know what percentage of the time
+it generates toxic content. generates toxic content. generates toxic
+content. So, there's no analytical solution where So, there's no
+analytical solution where So, there's no analytical solution where you
+throw in your, you know, transformer you throw in your, you know,
+transformer you throw in your, you know, transformer and uh where you
+throw in your and uh where you throw in your and uh where you throw in
+your transformer and like say, "Okay, transformer and like say, "Okay,
+transformer and like say, "Okay, now uh run the system of equations and
+now uh run the system of equations and now uh run the system of
+equations and tell me how much toxic content there tell me how much
+toxic content there tell me how much toxic content there is." But what
+you can do is you can is." But what you can do is you can is." But what
+you can do is you can sample a million outputs and see what sample a
+million outputs and see what sample a million outputs and see what
+percentage of them are toxic. And so, percentage of them are toxic. And
+so, percentage of them are toxic. And so, that gives you the expectate
+expected that gives you the expectate expected that gives you the
+expectate expected number of like toxic outputs that it number of like
+toxic outputs that it number of like toxic outputs that it would
+generate given a particular prompt would generate given a particular
+prompt would generate given a particular prompt or something like this.
+or something like this. or something like this. Um but I'm going to
+we're going to do Um but I'm going to we're going to do Um but I'm going
+to we're going to do something a little bit more boring, something a
+little bit more boring, something a little bit more boring, which is
+just uh which is just uh which is just uh you know, estimating the joint
+you know, estimating the joint you know, estimating the joint
+probability of any two tokens in a probability of any two tokens in a
+probability of any two tokens in a sequence. And so, um what we have
+here sequence. And so, um what we have here sequence. And so, um what we
+have here is we have our our bigram count. Um is we have our our bigram
+count. Um is we have our our bigram count. Um we have the total bigrams.
+We sample a we have the total bigrams. We sample a we have the total
+bigrams. We sample a certain number of sequences and based on certain
+number of sequences and based on certain number of sequences and based
+on this, we find the current index and the this, we find the current
+index and the this, we find the current index and the next index and we
+just add to the bigram next index and we just add to the bigram next
+index and we just add to the bigram count and the total number of
+bigrams. count and the total number of bigrams. count and the total
+number of bigrams. And uh then we're when we're done, uh we And uh then
+we're when we're done, uh we And uh then we're when we're done, uh we
+divide the bigram counts by the total divide the bigram counts by the
+total divide the bigram counts by the total number of bigrams and that
+gives us the number of bigrams and that gives us the number of bigrams
+and that gives us the joint probability of having these two in joint
+probability of having these two in joint probability of having these two
+in a sequence. a sequence. a sequence. Um Um Um and and and so, so, so,
+uh let's run that. I also have a uh let's run that. I also have a uh
+let's run that. I also have a function to estimate conditional function
+to estimate conditional function to estimate conditional probabilities
+from sequences, but this probabilities from sequences, but this
+probabilities from sequences, but this is a little bit is a little bit
+is a little bit like uninteresting at this point because like
+uninteresting at this point because like uninteresting at this point
+because we already know the conditional we already know the conditional
+we already know the conditional probabilities, so why do we need to, you
+probabilities, so why do we need to, you probabilities, so why do we
+need to, you know, estimate them from sequences? So, know, estimate them
+from sequences? So, know, estimate them from sequences? So, we'll uh
+we'll do that later. we'll uh we'll do that later. we'll uh we'll do
+that later. Um Um Um So, what I want to do now So, what I want to do now
+So, what I want to do now Oh, actually, sorry. No, I I am going to Oh,
+actually, sorry. No, I I am going to Oh, actually, sorry. No, I I am
+going to demonstrate that we're going to estimate demonstrate that we're
+going to estimate demonstrate that we're going to estimate conditional
+probabilities from conditional probabilities from conditional
+probabilities from sequences. And the reason why is because sequences.
+And the reason why is because sequences. And the reason why is because
+um the more we sample, the better our um the more we sample, the better
+our um the more we sample, the better our estimates become. estimates
+become. estimates become. Um and so, if we sample more and more Um and
+so, if we sample more and more Um and so, if we sample more and more
+outputs, our estimates are going to outputs, our estimates are going to
+outputs, our estimates are going to become more and more accurate. And I
+become more and more accurate. And I become more and more accurate. And
+I want to demonstrate this by looking at want to demonstrate this by
+looking at want to demonstrate this by looking at the um the um the um
+at the conditional probabilities that we at the conditional
+probabilities that we at the conditional probabilities that we estimate
+by counting up all of the estimate by counting up all of the estimate by
+counting up all of the bigrams and then dividing by the number bigrams
+and then dividing by the number bigrams and then dividing by the number
+of times we saw a previous word and of times we saw a previous word and
+of times we saw a previous word and comparing that with the true
+conditional comparing that with the true conditional comparing that with
+the true conditional probabilities that we know because we probabilities
+that we know because we probabilities that we know because we know this
+is a bigram model. So, um know this is a bigram model. So, um know this
+is a bigram model. So, um yeah, sorry. Actually, maybe just to to yeah,
+sorry. Actually, maybe just to to yeah, sorry. Actually, maybe just to
+to rewind a little bit. The way we can rewind a little bit. The way we
+can rewind a little bit. The way we can estimate a conditional
+probability from estimate a conditional probability from estimate a
+conditional probability from a sequence is we look at the current ID, a
+sequence is we look at the current ID, a sequence is we look at the
+current ID, we look at the next ID, we calculate the we look at the next
+ID, we calculate the we look at the next ID, we calculate the bigram
+count, we count calculate the bigram count, we count calculate the
+bigram count, we count calculate the count of the first word in that
+bigram, count of the first word in that bigram, count of the first word
+in that bigram, and then we can calculate the and then we can calculate
+the and then we can calculate the conditional probability by dividing
+the conditional probability by dividing the conditional probability by
+dividing the bigram count with the um bigram count with the um bigram
+count with the um with the current word count. So, with the current word
+count. So, with the current word count. So, basically, calculate um this
+without the basically, calculate um this without the basically,
+calculate um this without the like X in the bottom. like X in the
+bottom. like X in the bottom. So, um let's do this and we're going to
+So, um let's do this and we're going to So, um let's do this and we're
+going to calculate the bigram counts uh or the calculate the bigram
+counts uh or the calculate the bigram counts uh or the conditional uh
+probabilities for cat conditional uh probabilities for cat conditional
+uh probabilities for cat given the, sat given cat, the given on, given
+the, sat given cat, the given on, given the, sat given cat, the given
+on, and on given sat. and on given sat. and on given sat. And um I I
+won't go through like all of And um I I won't go through like all of And
+um I I won't go through like all of this code here cuz it's a little bit
+um this code here cuz it's a little bit um this code here cuz it's a
+little bit um uh a little bit involved, but uh a little bit involved,
+but uh a little bit involved, but let's run this. And what we can see is
+if we sample a And what we can see is if we sample a And what we can see
+is if we sample a hundred outputs, um the actual condition hundred
+outputs, um the actual condition hundred outputs, um the actual
+condition conditional probability of uh on given conditional probability
+of uh on given conditional probability of uh on given the is 0.5 and we
+happen to get it like the is 0.5 and we happen to get it like the is 0.5
+and we happen to get it like exactly right uh exactly right uh exactly
+right uh uh when we sampled only a hundred uh when we sampled only a
+hundred uh when we sampled only a hundred outputs, but all of the other
+ones, we outputs, but all of the other ones, we outputs, but all of the
+other ones, we actually got zero. Um we got zero actually got zero. Um
+we got zero actually got zero. Um we got zero percent probability for
+like sat given percent probability for like sat given percent
+probability for like sat given on, for instance. So, uh basically, if
+on, for instance. So, uh basically, if on, for instance. So, uh
+basically, if we only sampled a hundred examples, we we only sampled a
+hundred examples, we we only sampled a hundred examples, we got a really
+bad estimate of many of got a really bad estimate of many of got a
+really bad estimate of many of these uh these uh these uh of many of
+these. But then if we scaled of many of these. But then if we scaled of
+many of these. But then if we scaled up to like 500 or a thousand or
+5,000, up to like 500 or a thousand or 5,000, up to like 500 or a
+thousand or 5,000, uh uh uh 10,000 uh 50,000, 10,000 uh 50,000, 10,000
+uh 50,000, uh sorry. Uh uh sorry. Uh uh sorry. Uh wait. wait. wait. Uh a
+hundred, Uh a hundred, Uh a hundred, uh or sorry, 10, 50, a hundred,
+500, a uh or sorry, 10, 50, a hundred, 500, a uh or sorry, 10, 50, a
+hundred, 500, a thousand, 5,000, and 10,000. We can see thousand, 5,000,
+and 10,000. We can see thousand, 5,000, and 10,000. We can see that
+gradually like our estimates are that gradually like our estimates are
+that gradually like our estimates are converging to the actual value
+that we converging to the actual value that we converging to the actual
+value that we know is correct. And so, like the more know is correct.
+And so, like the more know is correct. And so, like the more we sample,
+uh the better estimates we we sample, uh the better estimates we we
+sample, uh the better estimates we get. get. get. Um and this is like
+looking at all of Um and this is like looking at all of Um and this is
+like looking at all of the outputs, how much does our error the outputs,
+how much does our error the outputs, how much does our error converge
+after we sampled that many converge after we sampled that many converge
+after we sampled that many times. Yeah. times. Yeah. times. Yeah. Does
+it somehow Great question. So, the question was, Great question. So, the
+question was, Great question. So, the question was, does this somehow
+depend on the does this somehow depend on the does this somehow depend
+on the temperature? Um temperature? Um temperature? Um Does anyone have
+an idea about whether Does anyone have an idea about whether Does anyone
+have an idea about whether this depends on the temperature? this depends
+on the temperature? this depends on the temperature? I'm going to show
+you a a plot, but um I'm going to show you a a plot, but um I'm going to
+show you a a plot, but um yeah. That's the one that modifies That's the
+one that modifies That's the one that modifies Yeah, it does and the
+answer is it Yeah, it does and the answer is it Yeah, it does and the
+answer is it depends on uh the temperature because depends on uh the
+temperature because depends on uh the temperature because the
+temperature modifies the the temperature modifies the the temperature
+modifies the probability. So, um yes, that's probability. So, um yes,
+that's probability. So, um yes, that's absolutely correct. And
+absolutely correct. And absolutely correct. And the actual answer is one
+is a very the actual answer is one is a very the actual answer is one is
+a very special temperature. It's the only special temperature. It's the
+only special temperature. It's the only temperature that can see the
+true temperature that can see the true temperature that can see the true
+probability distribution. Um and it's probability distribution. Um and
+it's probability distribution. Um and it's actually the only temperature
+where you actually the only temperature where you actually the only
+temperature where you can um can um can um like like like uh where where
+you can accurately sample uh where where you can accurately sample uh
+where where you can accurately sample from the joint distribution
+according to from the joint distribution according to from the joint
+distribution according to that temperature, all all kinds of other that
+temperature, all all kinds of other that temperature, all all kinds of
+other things. So, um if you sample with a things. So, um if you sample
+with a things. So, um if you sample with a probability of one, you're
+actually probability of one, you're actually probability of one, you're
+actually guaranteed to get an unbiased uh guaranteed to get an unbiased
+uh guaranteed to get an unbiased uh if you sample from the conditional
+pro if you sample from the conditional pro if you sample from the
+conditional pro probabilities or or sorry, from the probabilities or or
+sorry, from the probabilities or or sorry, from the joint probability
+distribution that you joint probability distribution that you joint
+probability distribution that you can get from the conditional
+probability can get from the conditional probability can get from the
+conditional probability distribution. So, I don't have the distribution.
+So, I don't have the distribution. So, I don't have the autoregressive
+autoregressive autoregressive uh equation up here, but basically like uh
+equation up here, but basically like uh equation up here, but basically
+like if you multiply all of these together, if you multiply all of these
+together, if you multiply all of these together, you get the joint
+distribution of all of you get the joint distribution of all of you get
+the joint distribution of all of the tokens of the sequence, right? So,
+the tokens of the sequence, right? So, the tokens of the sequence,
+right? So, um um um yeah. If you don't use one, uh yeah. If you don't
+use one, uh yeah. If you don't use one, uh if you don't use one, you get
+it uh if you don't use one, you get it uh if you don't use one, you get
+it uh incorrect. incorrect. incorrect. Cool. And then these are the um
+the Cool. And then these are the um the Cool. And then these are the um
+the final estimated conditional final estimated conditional final
+estimated conditional probabilities. Uh we'd have to scroll up
+probabilities. Uh we'd have to scroll up probabilities. Uh we'd have to
+scroll up to compare them to the the real uh to compare them to the the
+real uh to compare them to the the real uh conditional probabilities,
+but like as conditional probabilities, but like as conditional
+probabilities, but like as you sample more, you're going to get you
+sample more, you're going to get you sample more, you're going to get
+this closer and closer to the um to the this closer and closer to the um
+to the this closer and closer to the um to the actual distribution.
+actual distribution. actual distribution. So, So, So, um this is
+important for a number of um this is important for a number of um this
+is important for a number of reasons. Uh any any questions here? This is
+also important for model This is also important for model This is also
+important for model training. Anyone know why this is training. Anyone
+know why this is training. Anyone know why this is important for model
+training? Any ideas? Prevent like Prevent like Prevent like evil content
+speaking. evil content speaking. evil content speaking. Prevent evil
+contents. Um It's not the Prevent evil contents. Um It's not the Prevent
+evil contents. Um It's not the answer I was looking for, but uh maybe.
+answer I was looking for, but uh maybe. answer I was looking for, but uh
+maybe. Um Um Um Yeah. I guess Yeah. So, basically, if we want to So,
+Yeah. So, basically, if we want to So, Yeah. So, basically, if we want
+to So, the the answer was if we want to match the the answer was if we
+want to match the the answer was if we want to match the true
+probability distribution of the true probability distribution of the
+true probability distribution of like text on the internet, we just need
+like text on the internet, we just need like text on the internet, we
+just need to sample an infinite amount of text on to sample an infinite
+amount of text on to sample an infinite amount of text on the internet
+and we'll get a unbiased the internet and we'll get a unbiased the
+internet and we'll get a unbiased sample of uh sample of uh sample of uh
+you know, of the text. I mean, what what you know, of the text. I mean,
+what what you know, of the text. I mean, what what does unbiased mean
+here? You know, does unbiased mean here? You know, does unbiased mean
+here? You know, depending on what sites you download and depending on
+what sites you download and depending on what sites you download and
+stuff like that, you might not be able stuff like that, you might not be
+able stuff like that, you might not be able to get like all of the words
+that people to get like all of the words that people to get like all of
+the words that people have ever said, but you know, you can have ever
+said, but you know, you can have ever said, but you know, you can get
+pretty close with the internet. But get pretty close with the internet.
+But get pretty close with the internet. But the other implication is if
+you have a the other implication is if you have a the other implication
+is if you have a small sample, it is it's not going to be small sample,
+it is it's not going to be small sample, it is it's not going to be able
+to give you a good estimate of what able to give you a good estimate of
+what able to give you a good estimate of what all the text on the
+internet looks like. all the text on the internet looks like. all the
+text on the internet looks like. So, when you train on only a small So,
+when you train on only a small So, when you train on only a small sample
+of data, uh you're going to risk sample of data, uh you're going to risk
+sample of data, uh you're going to risk overfitting and other stuff like
+that. overfitting and other stuff like that. overfitting and other stuff
+like that. So, it all boils down to to basically So, it all boils down
+to to basically So, it all boils down to to basically this. this. this.
+So, um So, um So, um yeah. So, then the next thing I want to yeah. So,
+then the next thing I want to yeah. So, then the next thing I want to
+talk about is marginalization, which is talk about is marginalization,
+which is talk about is marginalization, which is uh summing over
+variables. And uh summing over variables. And uh summing over variables.
+And this is also uh important and we're this is also uh important and
+we're this is also uh important and we're going to be talking about it a
+lot in going to be talking about it a lot in going to be talking about
+it a lot in our meta generation uh section, our meta generation uh
+section, our meta generation uh section, but um but um but um so, can
+somebody so, can somebody so, can somebody uh I kind of actually already
+said the uh I kind of actually already said the uh I kind of actually
+already said the answer. So, marginalization is basically answer. So,
+marginalization is basically answer. So, marginalization is basically
+taking the sum, uh for example, taking taking the sum, uh for example,
+taking taking the sum, uh for example, taking the sum over Y and
+predicting the the the sum over Y and predicting the the the sum over Y
+and predicting the the probability of X or taking the sum over
+probability of X or taking the sum over probability of X or taking the
+sum over X and predicting the probability of Y. X and predicting the
+probability of Y. X and predicting the probability of Y. Does anyone
+know why it's called Does anyone know why it's called Does anyone know
+why it's called marginalization, by the way? Anyone heard of this
+before? Yeah. Yeah, exactly. You write the sum in the Yeah, exactly. You
+write the sum in the Yeah, exactly. You write the sum in the margin of
+the table. So, what if this is margin of the table. So, what if this is
+margin of the table. So, what if this is a table of all of the
+probabilities? a table of all of the probabilities? a table of all of
+the probabilities? Actually, this is a conditional Actually, this is a
+conditional Actually, this is a conditional probability, so it's not not
+as probability, so it's not not as probability, so it's not not as
+interesting. But, if you have the joint interesting. But, if you have
+the joint interesting. But, if you have the joint the table of the joint
+probabilities, the table of the joint probabilities, the table of the
+joint probabilities, you would write you would write you would write the
+sum in the margin over here because the sum in the margin over here
+because the sum in the margin over here because it would be the sum of
+all of the it would be the sum of all of the it would be the sum of all
+of the like values in the row or all of the like values in the row or
+all of the like values in the row or all of the values in the column.
+So, that's where values in the column. So, that's where values in the
+column. So, that's where the where the word came from. Great. Okay. So,
+um the way we do this Great. Okay. So, um the way we do this Great.
+Okay. So, um the way we do this is is not uh that tricky. Uh basically,
+is is not uh that tricky. Uh basically, is is not uh that tricky. Uh
+basically, um in PyTorch, it's a single call. Um we um in PyTorch, it's
+a single call. Um we um in PyTorch, it's a single call. Um we just sum
+over the dimension uh like just sum over the dimension uh like just sum
+over the dimension uh like dimension one or dimension zero. dimension
+one or dimension zero. dimension one or dimension zero. And um we
+estimated the joint And um we estimated the joint And um we estimated
+the joint probabilities from the sequence, so probabilities from the
+sequence, so probabilities from the sequence, so we're going to base
+this on the joint we're going to base this on the joint we're going to
+base this on the joint probabilities. And actually, I have the
+probabilities. And actually, I have the probabilities. And actually, I
+have the joint probabilities here. joint probabilities here. joint
+probabilities here. And you can see that the marginal And you can see
+that the marginal And you can see that the marginal probability of uh
+this being the current probability of uh this being the current
+probability of uh this being the current word is uh word is uh word is
+uh is this. So, the highest um is this. So, the highest um is this. So,
+the highest um the highest probability current word is the highest
+probability current word is the highest probability current word is the
+start of sentence symbol. Uh the start of sentence symbol. Uh the start
+of sentence symbol. Uh the start of sentence symbol can never the start
+of sentence symbol can never the start of sentence symbol can never be
+the next word, so its probability is be the next word, so its
+probability is be the next word, so its probability is zero. zero. zero.
+And um and then we have like different And um and then we have like
+different And um and then we have like different values. And we got all
+of this without values. And we got all of this without values. And we
+got all of this without me not, you know, ever being able to me not, you
+know, ever being able to me not, you know, ever being able to calculate
+this directly or analytically calculate this directly or analytically
+calculate this directly or analytically um um um because we can sample
+and we can because we can sample and we can because we can sample and we
+can calculate these things. Okay. So, um Okay. So, um Okay. So, um in
+particular, why I wanted to talk in particular, why I wanted to talk in
+particular, why I wanted to talk about um about um about um uh
+marginalization is I want to talk uh marginalization is I want to talk
+uh marginalization is I want to talk about latent Uh yeah, sorry. Sure.
+So, this this should go to zero. Um So, this this should go to zero. Um
+So, this this should go to zero. Um like if you sample infinitely uh cuz
+like if you sample infinitely uh cuz like if you sample infinitely uh
+cuz we're sampling in an unbiased manner and we're sampling in an
+unbiased manner and we're sampling in an unbiased manner and we're just
+calculating counts. So, this we're just calculating counts. So, this
+we're just calculating counts. So, this error should should go to zero
+if I do error should should go to zero if I do error should should go to
+zero if I do more. Like you you want to you want to more. Like you you
+want to you want to more. Like you you want to you want to try? try?
+try? Let's uh Let's uh Let's uh let's make my laptop a little bit let's
+make my laptop a little bit let's make my laptop a little bit hotter. I
+might need to change. Okay. Maybe this will just work. My sampling is
+also not optimized. I I'm My sampling is also not optimized. I I'm My
+sampling is also not optimized. I I'm using very inefficient inference
+using very inefficient inference using very inefficient inference
+algorithms of Python for loops. So, algorithms of Python for loops. So,
+algorithms of Python for loops. So, this uh this this this uh this this
+this uh this this I would suggest you use an optimized I would suggest
+you use an optimized I would suggest you use an optimized implementation
+if you try this actually implementation if you try this actually
+implementation if you try this actually try this. try this. try this.
+So, yeah, while while that's working, So, yeah, while while that's
+working, So, yeah, while while that's working, maybe I will I will go on
+to the next maybe I will I will go on to the next maybe I will I will go
+on to the next part. So, um part. So, um part. So, um Latent variables.
+So, this is hidden Latent variables. So, this is hidden Latent
+variables. So, this is hidden structure. structure. structure. Um Um Um
+uh like hidden variables that are not uh like hidden variables that are
+not uh like hidden variables that are not maybe necessarily the input
+that you maybe necessarily the input that you maybe necessarily the
+input that you have or the output that you care about, have or the
+output that you care about, have or the output that you care about, uh
+but somehow uh you know, have an uh but somehow uh you know, have an uh
+but somehow uh you know, have an effect on uh effect on uh effect on uh
+on the final output. So, you you like to on the final output. So, you
+you like to on the final output. So, you you like to include them.
+include them. include them. So, there's a really um common variety So,
+there's a really um common variety So, there's a really um common
+variety of latent variable that we use in uh of latent variable that we
+use in uh of latent variable that we use in uh language models nowadays.
+language models nowadays. language models nowadays. Um anybody Um
+anybody Um anybody have an idea of uh what this might be have an idea of
+uh what this might be have an idea of uh what this might be off the top
+of your head? And this needs off the top of your head? And this needs
+off the top of your head? And this needs to be a probabilistic variable,
+so it's to be a probabilistic variable, so it's to be a probabilistic
+variable, so it's not like the hidden embeddings or not like the hidden
+embeddings or not like the hidden embeddings or something like It's uh
+very very popular as of about uh It's uh very very popular as of about
+uh It's uh very very popular as of about uh uh uh uh 12 months ago or 12
+months ago or 12 months ago or 9 months ago. What's a big trend in
+language models What's a big trend in language models What's a big trend
+in language models nowadays? nowadays? nowadays? Is it reasoning? Yes,
+reasoning. So, um Is it reasoning? Yes, reasoning. So, um Is it
+reasoning? Yes, reasoning. So, um re- recently, a big trend in language
+re- recently, a big trend in language re- recently, a big trend in
+language models is reasoning models. And models is reasoning models. And
+models is reasoning models. And basically, what reasoning models do is
+basically, what reasoning models do is basically, what reasoning models
+do is they have a long they have a chain of they have a long they have a
+chain of they have a long they have a chain of thought or a long chain
+of thought that thought or a long chain of thought that thought or a
+long chain of thought that they use before giving you the final they use
+before giving you the final they use before giving you the final answer
+with the hope that adding this answer with the hope that adding this
+answer with the hope that adding this chain of thought will improve the
+chain of thought will improve the chain of thought will improve the
+overall quality of the final answer. overall quality of the final
+answer. overall quality of the final answer. And so, And so, And so,
+here X is uh the first word uh sorry, X here X is uh the first word uh
+sorry, X here X is uh the first word uh sorry, X would be like your
+input prompt. would be like your input prompt. would be like your input
+prompt. Uh Z would be the reasoning trace of a Uh Z would be the
+reasoning trace of a Uh Z would be the reasoning trace of a reasoning
+model, and Y would be the reasoning model, and Y would be the reasoning
+model, and Y would be the final answer that you would be final answer
+that you would be final answer that you would be providing. Um
+providing. Um providing. Um and so, and so, and so, um that that's one
+example. There are um that that's one example. There are um that that's
+one example. There are other examples, but this is definitely other
+examples, but this is definitely other examples, but this is definitely
+the most prominent example nowadays. the most prominent example
+nowadays. the most prominent example nowadays. Um and so, the idea is um
+Um and so, the idea is um Um and so, the idea is um if you calculate So,
+let's say we have a model that has So, let's say we have a model that
+has So, let's say we have a model that has no chain of thought or no
+reasoning no chain of thought or no reasoning no chain of thought or no
+reasoning whatsoever. whatsoever. whatsoever. Um it would be calculating
+the um just the conditional probability the um just the conditional
+probability the um just the conditional probability of the answer. A
+model with chain of thought might generate um might generate might
+generate um might generate might generate um might generate the chain of
+thought and then generate the chain of thought and then generate the
+chain of thought and then generate the answer. So, this is calculating
+the the answer. So, this is calculating the the answer. So, this is
+calculating the joint probability of joint probability of joint
+probability of uh the chain of thought and then the uh the chain of
+thought and then the uh the chain of thought and then the answer.
+answer. answer. And let's say we don't care about the And let's say we
+don't care about the And let's say we don't care about the chain of
+thought and we just throw it chain of thought and we just throw it chain
+of thought and we just throw it away, but we can actually sample lots
+away, but we can actually sample lots away, but we can actually sample
+lots and lots of them. So, this is a method and lots of them. So, this
+is a method and lots of them. So, this is a method called self-
+consistency that's used called self-consistency that's used called self-
+consistency that's used pretty widely. pretty widely. pretty widely. Um
+and we're also going to talk about Um and we're also going to talk about
+Um and we're also going to talk about minimum base risk, which is kind
+of minimum base risk, which is kind of minimum base risk, which is kind
+of similar to self-consistency in a way. similar to self-consistency in
+a way. similar to self-consistency in a way. And what that means is you
+do So, you sample you sample the chain of So, you sample you sample the
+chain of So, you sample you sample the chain of thought and you um and
+you actually like thought and you um and you actually like thought and
+you um and you actually like I could have just used that as well. Um I
+could have just used that as well. Um I could have just used that as
+well. Um and then you sum over uh and then you sum over uh and then you
+sum over uh sum over all of the samples that you sum over all of the
+samples that you sum over all of the samples that you got. got. got. And
+this gives you an estimate of P of Y And this gives you an estimate of P
+of Y And this gives you an estimate of P of Y given X. And um or it's an
+estimate of P of Y P And um or it's an estimate of P of Y P And um or
+it's an estimate of P of Y P of Y given X. of Y given X. of Y given X.
+And this um And this um And this um this is, you know, similar to
+predicting this is, you know, similar to predicting this is, you know,
+similar to predicting directly, but because the probability of directly,
+but because the probability of directly, but because the probability of
+Y gets more accurate by adding this Y gets more accurate by adding this
+Y gets more accurate by adding this reasoning, um you actually get a
+better reasoning, um you actually get a better reasoning, um you
+actually get a better estimate and you get better uh better estimate and
+you get better uh better estimate and you get better uh better results
+when you do this. So, we're results when you do this. So, we're results
+when you do this. So, we're going to talk a lot more about this, but
+going to talk a lot more about this, but going to talk a lot more about
+this, but this is like the connection to modern this is like the
+connection to modern this is like the connection to modern language
+models. Um language models. Um language models. Um but here I'm uh going
+to focus on kind but here I'm uh going to focus on kind but here I'm uh
+going to focus on kind of the uh of the uh of the uh like like like I
+I'm I'm just focusing on uh like the I I'm I'm just focusing on uh like
+the I I'm I'm just focusing on uh like the the basic idea of this. the
+basic idea of this. the basic idea of this. And actually, this just
+finished. It's not converging as fast as I thought It's not converging
+as fast as I thought It's not converging as fast as I thought it would
+be, but you can see it it would be, but you can see it it would be, but
+you can see it definitely went down from uh from where definitely went
+down from uh from where definitely went down from uh from where it was
+was before. So, yeah, I'm I'm almost a little bit yeah, I'm I'm almost a
+little bit yeah, I'm I'm almost a little bit worried I have a bug in my
+code. So, I worried I have a bug in my code. So, I worried I have a bug
+in my code. So, I need to go back and and double-check need to go back
+and and double-check need to go back and and double-check that, but this
+should uh eventually that, but this should uh eventually that, but this
+should uh eventually approach zero. approach zero. approach zero. Um Um
+Um so, yeah. so, yeah. so, yeah. And so, like in this uh particular And
+so, like in this uh particular And so, like in this uh particular
+example, um example, um example, um you know, we could we could generate
+and you know, we could we could generate and you know, we could we could
+generate and we could say the first word is X, the we could say the
+first word is X, the we could say the first word is X, the last word is
+Y, and then all the words last word is Y, and then all the words last
+word is Y, and then all the words in the middle are the latent
+variables. in the middle are the latent variables. in the middle are the
+latent variables. So, that's kind of like what we do with So, that's
+kind of like what we do with So, that's kind of like what we do with uh
+with chain of thought. uh with chain of thought. uh with chain of
+thought. Um just in the interest of of uh Um just in the interest of of
+uh Um just in the interest of of uh finishing everything. So, um
+finishing everything. So, um finishing everything. So, um just to go
+back to the point about just to go back to the point about just to go
+back to the point about temperature and biased estimates, temperature
+and biased estimates, temperature and biased estimates, um um um so, uh
+this is what, you know, so, uh this is what, you know, so, uh this is
+what, you know, temperature sampling looks like. temperature sampling
+looks like. temperature sampling looks like. Um and so, like let's run
+with Um and so, like let's run with Um and so, like let's run with
+temperature sampling temperature sampling temperature sampling uh the
+same experiment that I ran uh the same experiment that I ran uh the same
+experiment that I ran before. before. before. And basically, what we can
+see is that And basically, what we can see is that And basically, what
+we can see is that if we sample from a model where if we sample from a
+model where if we sample from a model where temperature is one,
+temperature is one, temperature is one, um this gives us an unbiased
+estimate of um this gives us an unbiased estimate of um this gives us an
+unbiased estimate of what the actual conditional what the actual
+conditional what the actual conditional probabilities are. And so, our
+error probabilities are. And so, our error probabilities are. And so,
+our error goes down and down and down and down. goes down and down and
+down and down. goes down and down and down and down. But, if we're
+sampling from an But, if we're sampling from an But, if we're sampling
+from an uh from a biased estimate of what the uh from a biased estimate
+of what the uh from a biased estimate of what the probability is, then
+this indeed will probability is, then this indeed will probability is,
+then this indeed will plateau and this will not give us a, you plateau
+and this will not give us a, you plateau and this will not give us a,
+you know, correct estimate of what uh what know, correct estimate of
+what uh what know, correct estimate of what uh what the output of the
+model would look like. So, So, So, why is this important? Um this is why
+is this important? Um this is why is this important? Um this is
+important because almost nobody does important because almost nobody
+does important because almost nobody does this uh this temperature
+sampling of this uh this temperature sampling of this uh this
+temperature sampling of one. Uh like you some language models one. Uh
+like you some language models one. Uh like you some language models
+enforce it. Like I think uh 01 uh enforce it. Like I think uh 01 uh
+enforce it. Like I think uh 01 uh like the the OpenAI reasoning models
+like the the OpenAI reasoning models like the the OpenAI reasoning
+models enforce temperature of one, and you're enforce temperature of
+one, and you're enforce temperature of one, and you're not allowed to do
+uh other temperatures, not allowed to do uh other temperatures, not
+allowed to do uh other temperatures, but um a lot of uh models for
+various but um a lot of uh models for various but um a lot of uh models
+for various reasons, which I'm going to talk about reasons, which I'm
+going to talk about reasons, which I'm going to talk about in a second,
+use um in a second, use um in a second, use um like like like uh use
+this. And actually, uh use this. And actually, uh use this. And
+actually, if we go even more extreme if we go even more extreme if we go
+even more extreme and we say we're going to set the and we say we're
+going to set the and we say we're going to set the temperature to zero,
+we're going to do temperature to zero, we're going to do temperature to
+zero, we're going to do greedy um we're going to do this greedy. Let's
+we're going to do this greedy. Let's we're going to do this greedy.
+Let's see. &gt;&gt; But &gt;&gt; But &gt;&gt; But my my code was not
+robust to sample from my my code was not robust to sample from my my
+code was not robust to sample from uh uh uh from zero. But like if you
+did greedy it from zero. But like if you did greedy it from zero. But
+like if you did greedy it would be even more biased. So, um like would
+be even more biased. So, um like would be even more biased. So, um like
+what does this what does this what does this uh uh uh what this means is
+um unless we're what this means is um unless we're what this means is um
+unless we're sampling with a temperature of one we're sampling with a
+temperature of one we're sampling with a temperature of one we're not
+getting like the actual language not getting like the actual language
+not getting like the actual language models like model of language,
+right? models like model of language, right? models like model of
+language, right? We're getting something that's like a We're getting
+something that's like a We're getting something that's like a biased
+distribution that the the model biased distribution that the the model
+biased distribution that the the model isn't actually isn't actually
+isn't actually uh generating. uh generating. uh generating. Um Um Um
+cool. So, like let's say um cool. So, like let's say um cool. So, like
+let's say um then the question is like why do we want then the question
+is like why do we want then the question is like why do we want to do
+inference? Uh we actually had a to do inference? Uh we actually had a to
+do inference? Uh we actually had a question about this uh last time, but
+uh question about this uh last time, but uh question about this uh last
+time, but uh one reason why we might want to do one reason why we might
+want to do one reason why we might want to do inference is to get good
+outputs in inference is to get good outputs in inference is to get good
+outputs in which case, you know, we want to use any which case, you
+know, we want to use any which case, you know, we want to use any
+inference algorithm that will give us inference algorithm that will give
+us inference algorithm that will give us the best outputs by whatever
+definition the best outputs by whatever definition the best outputs by
+whatever definition of good we have. of good we have. of good we have.
+Um the other reason could be we actually Um the other reason could be we
+actually Um the other reason could be we actually want to understand the
+qualities of the want to understand the qualities of the want to
+understand the qualities of the language model and if we do then
+language model and if we do then language model and if we do then um um
+um basically sampling with the temperature basically sampling with the
+temperature basically sampling with the temperature of one is the only
+way to get the true of one is the only way to get the true of one is the
+only way to get the true distribution of the model. So, that's a
+distribution of the model. So, that's a distribution of the model. So,
+that's a good a good thing to remember. Okay. Um that that's the first
+part. Are Okay. Um that that's the first part. Are Okay. Um that that's
+the first part. Are there any um any questions about that? there any um
+any questions about that? there any um any questions about that? Yeah.
+Is there any use case where you set the Is there any use case where you
+set the Is there any use case where you set the temperature to greater
+than one? Um temperature to greater than one? Um temperature to greater
+than one? Um I have I have I have almost never seen this. I've seen this
+almost never seen this. I've seen this almost never seen this. I've seen
+this like a little bit, but almost never. Um like a little bit, but
+almost never. Um like a little bit, but almost never. Um and actually I
+think you'll you might and actually I think you'll you might and
+actually I think you'll you might see the reason why in the see the
+reason why in the see the reason why in the uh in the slide or in the
+notebook after uh in the slide or in the notebook after uh in the slide
+or in the notebook after the one that I'm going to talk about, the one
+that I'm going to talk about, the one that I'm going to talk about, but
+usually one is kind of the upper but usually one is kind of the upper
+but usually one is kind of the upper limit of what people said. limit of
+what people said. limit of what people said. Yes. Yeah, um I'll that's
+great. Why don't I Yeah, um I'll that's great. Why don't I Yeah, um I'll
+that's great. Why don't I uh show the next notebook and then uh I uh
+show the next notebook and then uh I uh show the next notebook and then
+uh I get there. Cool. Um so, I actually don't know if I'll really go I
+actually don't know if I'll really go I actually don't know if I'll
+really go through this. I'm kind of assuming, you through this. I'm kind
+of assuming, you through this. I'm kind of assuming, you know, everybody
+has either taken NLP or know, everybody has either taken NLP or know,
+everybody has either taken NLP or deep learning or something. So, this
+is deep learning or something. So, this is deep learning or something.
+So, this is just a transformer model. The nice thing just a transformer
+model. The nice thing just a transformer model. The nice thing about
+this transformer model is that about this transformer model is that
+about this transformer model is that it's a very, very simple. Um
+there's it's a very, very simple. Um there's it's a very, very simple.
+Um there's like 2,000 uh like 2,000 uh like 2,000 uh 2,000 lines of code
+in the hugging face 2,000 lines of code in the hugging face 2,000 lines
+of code in the hugging face transformers implementation of GPT-2 and
+transformers implementation of GPT-2 and transformers implementation of
+GPT-2 and this one has like a a couple hundred. Um this one has like a a
+couple hundred. Um this one has like a a couple hundred. Um but uh yeah,
+it's basically um the GPT-2 but uh yeah, it's basically um the GPT-2 but
+uh yeah, it's basically um the GPT-2 model. Um the the few things that I
+model. Um the the few things that I model. Um the the few things that I
+think would be like particularly think would be like particularly think
+would be like particularly interesting to take a look at are how
+interesting to take a look at are how interesting to take a look at are
+how big is this model. Um so, GPT-2 small um big is this model. Um so,
+GPT-2 small um big is this model. Um so, GPT-2 small um basically it had
+a vocab of uh 5,000. It basically it had a vocab of uh 5,000. It
+basically it had a vocab of uh 5,000. It had 12 layers, uh 12 heads, and
+an had 12 layers, uh 12 heads, and an had 12 layers, uh 12 heads, and an
+embedding size of 768. Um this had 24 embedding size of 768. Um this had
+24 embedding size of 768. Um this had 24 layers, 16 heads, embedding
+size of layers, 16 heads, embedding size of layers, 16 heads, embedding
+size of 1024. Um 1024. Um 1024. Um and then large had 36 layers, 20
+heads, and then large had 36 layers, 20 heads, and then large had 36
+layers, 20 heads, embedding size of 1280. So, um this is embedding size
+of 1280. So, um this is embedding size of 1280. So, um this is
+approximately like 10x smaller than the approximately like 10x smaller
+than the approximately like 10x smaller than the the models that we use
+nowadays for most the models that we use nowadays for most the models
+that we use nowadays for most of these dimensions. of these dimensions.
+of these dimensions. Um except maybe layers. The the size Um except
+maybe layers. The the size Um except maybe layers. The the size here is.
+here is. here is. Cool. Um so, let's go on to the Cool. Um so, let's go
+on to the Cool. Um so, let's go on to the generation part. And so, here
+in the generation um what I And so, here in the generation um what I And
+so, here in the generation um what I want to do is I want to do two
+things. I want to do is I want to do two things. I want to do is I want
+to do two things. I want to get like a qualitative idea of want to get
+like a qualitative idea of want to get like a qualitative idea of what
+the output looks like when we what the output looks like when we what
+the output looks like when we sample at different temperatures uh to
+sample at different temperatures uh to sample at different temperatures
+uh to answer like some of the questions that answer like some of the
+questions that answer like some of the questions that we just had now.
+And then separately we just had now. And then separately we just had
+now. And then separately from there I want to demonstrate how we from
+there I want to demonstrate how we from there I want to demonstrate how
+we can do like some very rudimentary can do like some very rudimentary
+can do like some very rudimentary evaluation. And it's this is not like,
+evaluation. And it's this is not like, evaluation. And it's this is not
+like, you know, the gold standard way of doing you know, the gold
+standard way of doing you know, the gold standard way of doing
+evaluation of language model outputs, evaluation of language model
+outputs, evaluation of language model outputs, but it'll give you an
+idea and like a but it'll give you an idea and like a but it'll give you
+an idea and like a starting place where you can start until starting
+place where you can start until starting place where you can start until
+we get to the gold standard ways. So, we get to the gold standard ways.
+So, we get to the gold standard ways. So, um here are temperature
+values. Uh um here are temperature values. Uh um here are temperature
+values. Uh so, zero is greedy sampling. Um it's so, zero is greedy
+sampling. Um it's so, zero is greedy sampling. Um it's deterministic. It
+should always give you deterministic. It should always give you
+deterministic. It should always give you the same result. the same
+result. the same result. Um a temperature of 0.5 is kind of a Um a
+temperature of 0.5 is kind of a Um a temperature of 0.5 is kind of a
+more conservative variety of sampling more conservative variety of
+sampling more conservative variety of sampling and it will pick and it
+will pick and it will pick uh focus on things that kind of have uh focus
+on things that kind of have uh focus on things that kind of have high
+probabilities. high probabilities. high probabilities. Uh one is, you
+know, the only true Uh one is, you know, the only true Uh one is, you
+know, the only true sampling number and then 1.5 is creative sampling
+number and then 1.5 is creative sampling number and then 1.5 is creative
+sampling, uh sampling, uh sampling, uh more more diverse outputs. So,
+let's go more more diverse outputs. So, let's go more more diverse
+outputs. So, let's go ahead and initialize that. ahead and initialize
+that. ahead and initialize that. Um one thing I will notice is um Um one
+thing I will notice is um Um one thing I will notice is um I kind of
+cheated here and uh I kind of cheated here and uh I kind of cheated here
+and uh I'm using an API key. Uh so, I'm like I'm using an API key. Uh
+so, I'm like I'm using an API key. Uh so, I'm like actually asking
+Claude to uh evaluate my actually asking Claude to uh evaluate my
+actually asking Claude to uh evaluate my results for me, but all the
+generations results for me, but all the generations results for me, but
+all the generations are going to be from from my model. Oh, and by the
+way, I'm going to try to Oh, and by the way, I'm going to try to Oh, and
+by the way, I'm going to try to get everybody um number one, I'm going
+get everybody um number one, I'm going get everybody um number one, I'm
+going to try to get everybody like credits to try to get everybody like
+credits to try to get everybody like credits that you can use on API
+based language that you can use on API based language that you can use
+on API based language models. Everybody will get $50, so it's models.
+Everybody will get $50, so it's models. Everybody will get $50, so it's
+not it's not a lot, but it should be not it's not a lot, but it should
+be not it's not a lot, but it should be enough for like these language
+models to enough for like these language models to enough for like these
+language models to judge sell things and we want everybody judge sell
+things and we want everybody judge sell things and we want everybody to
+sign up for AWS if you haven't to sign up for AWS if you haven't to sign
+up for AWS if you haven't already with your Andrew ID and tell us
+already with your Andrew ID and tell us already with your Andrew ID and
+tell us your AWS number and we have a quiz that your AWS number and we
+have a quiz that your AWS number and we have a quiz that you created
+already. Okay. Um the quiz will be with the one Okay. Um the quiz will
+be with the one Okay. Um the quiz will be with the one uh today. So,
+please uh try to add your uh today. So, please uh try to add your uh
+today. So, please uh try to add your add your number there and I'll try
+to add your number there and I'll try to add your number there and I'll
+try to get you AWS credits as soon as possible. get you AWS credits as
+soon as possible. get you AWS credits as soon as possible. But back to
+the normally scheduled But back to the normally scheduled But back to
+the normally scheduled programming, um I'll I'll do temperature
+programming, um I'll I'll do temperature programming, um I'll I'll do
+temperature sampling and this time we're doing it sampling and this time
+we're doing it sampling and this time we're doing it with GPT-2, so
+it'll give us like actual with GPT-2, so it'll give us like actual with
+GPT-2, so it'll give us like actual like somewhat uh reasonable looking
+like somewhat uh reasonable looking like somewhat uh reasonable looking
+results. Oh, uh one one other one small thing Oh, uh one one other one
+small thing Oh, uh one one other one small thing that I probably should
+mention um that I probably should mention um that I probably should
+mention um is within this Oh, actually maybe maybe it's not here. Oh,
+actually maybe maybe it's not here. Oh, actually maybe maybe it's not
+here. Um but uh Um but uh Um but uh if you're using a Mac, I would if
+you're using a Mac, I would if you're using a Mac, I would definitely
+recommend that you use the definitely recommend that you use the
+definitely recommend that you use the Mac uh Mac accelerator. I think
+like Mac uh Mac accelerator. I think like Mac uh Mac accelerator. I
+think like most people have Macs here and if you most people have Macs
+here and if you most people have Macs here and if you have Apple silicon
+that makes it a lot have Apple silicon that makes it a lot have Apple
+silicon that makes it a lot faster. So, um there's an example of faster.
+So, um there's an example of faster. So, um there's an example of that
+uh that uh that uh in this uh in this notebook. in this uh in this
+notebook. in this uh in this notebook. Um cool. So, here are the here
+are the texts and I'm going to here are the texts and I'm going to here
+are the texts and I'm going to generate uh based on a prompt the future
+of uh based on a prompt the future of uh based on a prompt the future of
+artificial intelligence is artificial intelligence is artificial
+intelligence is and I'm generating three from each of and I'm generating
+three from each of and I'm generating three from each of these uh
+outputs. So, basically doing these uh outputs. So, basically doing these
+uh outputs. So, basically doing inference three times for each.
+inference three times for each. inference three times for each. So, if
+we look at greedy uh So, if we look at greedy uh So, if we look at
+greedy uh greedy here, greedy here, greedy here, um um um it gives us
+the same answer always. And it gives us the same answer always. And it
+gives us the same answer always. And it says the future of artificial it
+says the future of artificial it says the future of artificial
+intelligence is uncertain period. We're intelligence is uncertain
+period. We're intelligence is uncertain period. We're not sure what the
+future will look like, not sure what the future will look like, not sure
+what the future will look like, said Dr. Michael S. Schweinfeld. said
+Dr. Michael S. Schweinfeld. said Dr. Michael S. Schweinfeld. Um who I
+don't know if that's a real Um who I don't know if that's a real Um who
+I don't know if that's a real person or not, but person or not, but
+person or not, but given given given I think it might I think it might
+be I think it might I think it might be I think it might I think it
+might be given that this is greedy decoding and given that this is
+greedy decoding and given that this is greedy decoding and it's probably
+not going to be too it's probably not going to be too it's probably not
+going to be too creative, but uh but yeah. creative, but uh but yeah.
+creative, but uh but yeah. Um Um Um then for this one down here, then
+for this one down here, then for this one down here, oh actually um oh
+actually um oh actually um one one piece of one one piece of one one
+piece of uh uh uh knowledge about greedy decoding uh that knowledge
+about greedy decoding uh that knowledge about greedy decoding uh that I
+should say here before it drives you I should say here before it drives
+you I should say here before it drives you crazy um is when you do
+greedy decoding, crazy um is when you do greedy decoding, crazy um is
+when you do greedy decoding, will you always get the same result? will
+you always get the same result? will you always get the same result? I
+got the same result three times. Yes? Yeah, um no. Sorry. Yeah, um no.
+Sorry. Yeah, um no. Sorry. You will not always get the same result. You
+will not always get the same result. You will not always get the same
+result. Uh Uh Uh and there's a reason for it. Um and there's a reason
+for it. Um and there's a reason for it. Um Does anyone know the reason
+for why you Does anyone know the reason for why you Does anyone know the
+reason for why you you might call uh you might call uh you might call uh
+like like like um GPT-4 or Claude or something like um GPT-4 or Claude
+or something like um GPT-4 or Claude or something like that with a
+temperature of zero and get that with a temperature of zero and get that
+with a temperature of zero and get different results? different results?
+different results? So, so kind of uh yeah. Cuz you're still sampling for
+the Cuz you're still sampling for the Cuz you're still sampling for the
+probabilities and not the not the actual probabilities and not the not
+the actual probabilities and not the not the actual values. What do you
+mean by the values. What do you mean by the values. What do you mean by
+the probabilities? We said So, actually when when you We said So,
+actually when when you We said So, actually when when you switch it to
+zero, it's mostly just switch it to zero, it's mostly just switch it to
+zero, it's mostly just picking the the highest scoring ones. picking the
+the highest scoring ones. picking the the highest scoring ones. So, um
+So, um So, um uh uh uh specifically in the case of zero, you'll
+specifically in the case of zero, you'll specifically in the case of
+zero, you'll be picking the the argmax. be picking the the argmax. be
+picking the the argmax. Yeah. Floating point errors can propagate.
+Floating point errors can propagate. Floating point errors can
+propagate. Yes. Uh so, this is uh very, very, very, Yes. Uh so, this is
+uh very, very, very, Yes. Uh so, this is uh very, very, very, very
+tricky, but it has to do with the very tricky, but it has to do with the
+very tricky, but it has to do with the hardware that all of these models
+are hardware that all of these models are hardware that all of these
+models are running on. running on. running on. Um and basically all of
+these models are Um and basically all of these models are Um and
+basically all of these models are running on GPUs. And what's the
+running on GPUs. And what's the running on GPUs. And what's the
+characteristic of GPUs? characteristic of GPUs? characteristic of GPUs?
+They have lots of They have lots of They have lots of lots of threads,
+right? That are all lots of threads, right? That are all lots of
+threads, right? That are all running at the same time. running at the
+same time. running at the same time. And so, there there's two ways you
+can And so, there there's two ways you can And so, there there's two
+ways you can do um a sum on a GPU. One way you can do do um a sum on a
+GPU. One way you can do do um a sum on a GPU. One way you can do a sum a
+sum a sum is you say okay, thread one, let's say we have 16 okay, thread
+one, let's say we have 16 okay, thread one, let's say we have 16
+threads. Um thread one, you calculated threads. Um thread one, you
+calculated threads. Um thread one, you calculated one, so you get to go
+first. Thread two, one, so you get to go first. Thread two, one, so you
+get to go first. Thread two, you calculated two, so you get to go you
+calculated two, so you get to go you calculated two, so you get to go
+first. Thread three, you calculated first. Thread three, you calculated
+first. Thread three, you calculated three, so you get to go first. And
+then three, so you get to go first. And then three, so you get to go
+first. And then you just add them all in order. you just add them all in
+order. you just add them all in order. Uh but the problem is if you do
+this, Uh but the problem is if you do this, Uh but the problem is if you
+do this, you you have a whole lot of locks and um you you have a whole
+lot of locks and um you you have a whole lot of locks and um like some
+threads might finish a little like some threads might finish a little
+like some threads might finish a little bit faster than others just due
+to how bit faster than others just due to how bit faster than others
+just due to how hot the GPU was or whether it had a good hot the GPU was
+or whether it had a good hot the GPU was or whether it had a good day
+yesterday or day yesterday or day yesterday or things like this. And so
+um things like this. And so um things like this. And so um the if you
+add all these locks, it hurts the if you add all these locks, it hurts
+the if you add all these locks, it hurts your efficiency a whole lot. So
+your efficiency a whole lot. So your efficiency a whole lot. So
+theoretically you could turn on uh theoretically you could turn on uh
+theoretically you could turn on uh determinism on GPUs and make things
+go determinism on GPUs and make things go determinism on GPUs and make
+things go all in order, but um in reality none of all in order, but um
+in reality none of all in order, but um in reality none of the people
+serving things on GPUs does the people serving things on GPUs does the
+people serving things on GPUs does this. So what happens instead is
+this. So what happens instead is this. So what happens instead is thread
+thread seven finishes a little thread thread seven finishes a little
+thread thread seven finishes a little bit faster. Uh so thread seven
+gets to bit faster. Uh so thread seven gets to bit faster. Uh so thread
+seven gets to go first and then thread two finishes. go first and then
+thread two finishes. go first and then thread two finishes. And so
+thread two gets to go next and And so thread two gets to go next and And
+so thread two gets to go next and then thread one finishes and then
+thread then thread one finishes and then thread then thread one finishes
+and then thread three finishes. And so the addition three finishes. And
+so the addition three finishes. And so the addition happens in a
+different order every time happens in a different order every time
+happens in a different order every time uh just based on like uh just
+based on like uh just based on like well, nothing is random, but mostly
+uh well, nothing is random, but mostly uh well, nothing is random, but
+mostly uh mostly random factors. And so because of mostly random
+factors. And so because of mostly random factors. And so because of
+this, if you combine this with the fact this, if you combine this with
+the fact this, if you combine this with the fact that that that the very
+small the very small the very small um floating point numbers depending
+on um floating point numbers depending on um floating point numbers
+depending on the order you add them will round the order you add them
+will round the order you add them will round differently. differently.
+differently. Uh this can cause very small differences Uh this can cause
+very small differences Uh this can cause very small differences uh when
+you run. uh when you run. uh when you run. And so these differences are
+are really And so these differences are are really And so these
+differences are are really really tiny. Um but you have something really
+tiny. Um but you have something really tiny. Um but you have something
+like an argmax um when you select a like an argmax um when you select a
+like an argmax um when you select a vocabulary item. So if the maximum
+vocabulary item. So if the maximum vocabulary item. So if the maximum
+vocabulary item changes just once in vocabulary item changes just once
+in vocabulary item changes just once in your like 1,000 token generated
+your like 1,000 token generated your like 1,000 token generated
+sequence, then it will change everything sequence, then it will change
+everything sequence, then it will change everything that happened after
+that. So uh you only that happened after that. So uh you only that
+happened after that. So uh you only need a very tiny difference uh
+caused by need a very tiny difference uh caused by need a very tiny
+difference uh caused by these floating point errors to throw these
+floating point errors to throw these floating point errors to throw
+things off. Um and so you'll notice if things off. Um and so you'll
+notice if things off. Um and so you'll notice if you run like something
+with Claude, you run like something with Claude, you run like something
+with Claude, you'll you'll get it the same like five you'll you'll get
+it the same like five you'll you'll get it the same like five times, but
+then you'll get a different times, but then you'll get a different
+times, but then you'll get a different one or something like this. Um
+one or something like this. Um one or something like this. Um This is
+compounded further by two This is compounded further by two This is
+compounded further by two things. Uh the first thing is a mixture
+things. Uh the first thing is a mixture things. Uh the first thing is a
+mixture of experts. And so mixture of experts of experts. And so mixture
+of experts of experts. And so mixture of experts are very popular thing.
+We'll talk about are very popular thing. We'll talk about are very
+popular thing. We'll talk about them a little bit, but basically you're
+them a little bit, but basically you're them a little bit, but basically
+you're choosing which parts of the network to choosing which parts of
+the network to choosing which parts of the network to use. So now
+instead of having an argmax use. So now instead of having an argmax use.
+So now instead of having an argmax over just the token, you also have an
+over just the token, you also have an over just the token, you also have
+an argmax over the experts. So you have argmax over the experts. So you
+have argmax over the experts. So you have like many many more argmaxes.
+like many many more argmaxes. like many many more argmaxes. And then
+let's say you're running an And then let's say you're running an And
+then let's say you're running an agent or something like that, like a
+agent or something like that, like a agent or something like that, like
+a coding agent. Now you don't just have coding agent. Now you don't just
+have coding agent. Now you don't just have one prediction, you have many
+many one prediction, you have many many one prediction, you have many
+many predictions. So um like when we were predictions. So um like when
+we were predictions. So um like when we were trying to reproduce our
+coding agent trying to reproduce our coding agent trying to reproduce
+our coding agent results with Claude, we would never be results with
+Claude, we would never be results with Claude, we would never be able to
+get the same results on the same able to get the same results on the
+same able to get the same results on the same even on the same instance
+with like even on the same instance with like even on the same instance
+with like greedy sampling, yeah. I was wondering greedy sampling, yeah.
+I was wondering greedy sampling, yeah. I was wondering if there's if
+there's if there's because there's still this uh because there's still
+this uh because there's still this uh randomness, you know, it's very
+small, randomness, you know, it's very small, randomness, you know, it's
+very small, whether or not that whether or not that whether or not that
+uh corresponds to uh corresponds to uh corresponds to uh what
+temperature exactly like uh what temperature exactly like uh what
+temperature exactly like empirically whether or not it's empirically
+whether or not it's empirically whether or not it's it's set to zero,
+but because of these it's set to zero, but because of these it's set to
+zero, but because of these hardware um quirks, it's actually more
+hardware um quirks, it's actually more hardware um quirks, it's actually
+more closer to like a number that's 0.01 or closer to like a number
+that's 0.01 or closer to like a number that's 0.01 or something. Has
+anyone that has ever something. Has anyone that has ever something. Has
+anyone that has ever tried to measure that? That's a great tried to
+measure that? That's a great tried to measure that? That's a great idea.
+Just to repeat, it's like what is idea. Just to repeat, it's like what
+is idea. Just to repeat, it's like what is the empirical temperature uh
+the empirical temperature uh the empirical temperature uh despite
+despite the fact that your set despite despite the fact that your set
+despite despite the fact that your set temperature is zero, what's the
+actual temperature is zero, what's the actual temperature is zero,
+what's the actual temperature that you're getting? And I I temperature
+that you're getting? And I I temperature that you're getting? And I I
+don't know the answer to that. don't know the answer to that. don't know
+the answer to that. Yeah, good question. Yeah, good question. Yeah, good
+question. Does it get Does it get Does it get Does it get Does it get
+Does it get compounded by also using multiple compounded by also using
+multiple compounded by also using multiple instances of GPUs? instances
+of GPUs? instances of GPUs? Uh does it get compounded by using Uh does
+it get compounded by using Uh does it get compounded by using multiple
+instances of GPUs? Yeah, it it multiple instances of GPUs? Yeah, it it
+multiple instances of GPUs? Yeah, it it depends where you aggregate, but
+like if depends where you aggregate, but like if depends where you
+aggregate, but like if you know, one GPU is more likely to have you
+know, one GPU is more likely to have you know, one GPU is more likely to
+have a larger difference than the threads a larger difference than the
+threads a larger difference than the threads within the GPU, so it
+certainly would. within the GPU, so it certainly would. within the GPU,
+so it certainly would. Yeah. Yeah. Yeah. Does it Does it Does it I think
+you should make this whole I think you should make this whole I think
+you should make this whole Does quantization make the problem Does
+quantization make the problem Does quantization make the problem worse?
+Yeah, it will because you'll have worse? Yeah, it will because you'll
+have worse? Yeah, it will because you'll have more rounding errors. more
+rounding errors. more rounding errors. Can you Can you Can you use this
+behavior to infer what kind of use this behavior to infer what kind of
+use this behavior to infer what kind of quantization quantization
+quantization Open AI is using or something like that? Open AI is using
+or something like that? Open AI is using or something like that? Then
+you use this behavior to infer what Then you use this behavior to infer
+what Then you use this behavior to infer what kind of quantization it's
+using. So kind of quantization it's using. So kind of quantization it's
+using. So basically you want to uh basically you want to uh basically
+you want to uh like uncover uh what quantization uh like uncover uh what
+quantization uh like uncover uh what quantization uh Open AI is using or
+something like that. Open AI is using or something like that. Open AI is
+using or something like that. Good uh good idea. Please please do Good
+uh good idea. Please please do Good uh good idea. Please please do that.
+Uh I'll give you I'll give you an that. Uh I'll give you I'll give you
+an that. Uh I'll give you I'll give you an A+ on the project if you can
+uh can A+ on the project if you can uh can A+ on the project if you can
+uh can demonstrate that. Um demonstrate that. Um demonstrate that. Um Uh
+Uh Uh or prove prove that. Uh I'll I'll give a or prove prove that. Uh
+I'll I'll give a or prove prove that. Uh I'll I'll give a high a high
+bar, but high a high bar, but high a high bar, but um um um Cool. Okay,
+so now let's go to the um Cool. Okay, so now let's go to the um Cool.
+Okay, so now let's go to the um temperature 0.5. temperature 0.5.
+temperature 0.5. So um the future of artificial So um the future of
+artificial So um the future of artificial intelligence is intelligence
+is intelligence is um in question if you are a software um in question
+if you are a software um in question if you are a software developer and
+you are looking for a new developer and you are looking for a new
+developer and you are looking for a new way to create and deploy
+applications. way to create and deploy applications. way to create and
+deploy applications. Uh clear in the future of the world is Uh clear in
+the future of the world is Uh clear in the future of the world is
+bright. The future is bright. The future bright. The future is bright.
+The future bright. The future is bright. The future is bright. is
+bright. is bright. Um very bright. It's a lot like the Um very bright.
+It's a lot like the Um very bright. It's a lot like the future of
+computers. I'm not sure about future of computers. I'm not sure about
+future of computers. I'm not sure about the word intelligence. the word
+intelligence. the word intelligence. Um Um Um And then uh for one, you
+have like And then uh for one, you have like And then uh for one, you
+have like largely up in the air many eagerly await largely up in the air
+many eagerly await largely up in the air many eagerly await it and think
+seen it and think seen it and think seen Jokowi's creation. I expect to
+see Jokowi's creation. I expect to see Jokowi's creation. I expect to
+see everyone around be everyone around be everyone around be um clear
+Watamakan to 2017. The future um clear Watamakan to 2017. The future um
+clear Watamakan to 2017. The future of artificial intelligence is clear.
+of artificial intelligence is clear. of artificial intelligence is
+clear. Facebook just hopped out. Facebook just hopped out. Facebook just
+hopped out. Um Um Um going to be very interesting. It will going to be
+very interesting. It will going to be very interesting. It will change
+the way we think and treat change the way we think and treat change the
+way we think and treat people. people. people. Um the future of
+artificial and then Um the future of artificial and then Um the future
+of artificial and then going up above temperature of one, going up above
+temperature of one, going up above temperature of one, the future of
+artificial intelligence the future of artificial intelligence the future
+of artificial intelligence clashing across the league allies and
+clashing across the league allies and clashing across the league allies
+and designer gangs. So you can fear the designer gangs. So you can fear
+the designer gangs. So you can fear the wildling bastard Bengal ear.
+wildling bastard Bengal ear. wildling bastard Bengal ear. So um So um So
+um maybe this is kind of your answer why we maybe this is kind of your
+answer why we maybe this is kind of your answer why we don't use a
+temperature larger than one. don't use a temperature larger than one.
+don't use a temperature larger than one. Uh it just kind of goes off the
+rails. Uh it just kind of goes off the rails. Uh it just kind of goes
+off the rails. So um So um So um So then the question is we looked at So
+then the question is we looked at So then the question is we looked at
+this and we kind of like had an idea uh this and we kind of like had an
+idea uh this and we kind of like had an idea uh what was going on here
+from our, you what was going on here from our, you what was going on
+here from our, you know, own qualitative qualitative know, own
+qualitative qualitative know, own qualitative qualitative analysis, but
+we can't do this all the analysis, but we can't do this all the
+analysis, but we can't do this all the time, right? Like I couldn't do
+this time, right? Like I couldn't do this time, right? Like I couldn't
+do this very well in Chinese for sure. Um very well in Chinese for sure.
+Um very well in Chinese for sure. Um uh uh uh and you know, I couldn't
+look at and you know, I couldn't look at and you know, I couldn't look
+at thousands uh thousands of examples. thousands uh thousands of
+examples. thousands uh thousands of examples. Um and so you can run
+this. Um and so you can run this. Um and so you can run this. Um Um Um
+And so what I want to do next is I want And so what I want to do next is
+I want And so what I want to do next is I want to actually like evaluate
+the outputs to actually like evaluate the outputs to actually like
+evaluate the outputs and see how good they are. and see how good they
+are. and see how good they are. And And And there's a number of ways to
+do this like there's a number of ways to do this like there's a number
+of ways to do this like I mentioned before uh on Tuesday. So the I
+mentioned before uh on Tuesday. So the I mentioned before uh on Tuesday.
+So the first way you can do this is you can um first way you can do this
+is you can um first way you can do this is you can um use some sort of
+deterministic metrics use some sort of deterministic metrics use some
+sort of deterministic metrics that you can calculate, you know, that you
+can calculate, you know, that you can calculate, you know, directly from
+uh the generated text. And directly from uh the generated text. And
+directly from uh the generated text. And for this I'm going to use a
+diversity for this I'm going to use a diversity for this I'm going to
+use a diversity metric. metric. metric. And um And um And um so the
+diversity metric so the diversity metric so the diversity metric is um
+is um is um that I'm going to use here is the ratio that I'm going to
+use here is the ratio that I'm going to use here is the ratio of unique
+words um in the set of unique words um in the set of unique words um in
+the set uh compared to the total number of uh compared to the total
+number of uh compared to the total number of words. words. words. Um oh
+so sorry, this is the diversity Um oh so sorry, this is the diversity Um
+oh so sorry, this is the diversity within uh within a single example.
+And within uh within a single example. And within uh within a single
+example. And then um for the cross-generation then um for the cross-
+generation then um for the cross-generation diversity, um what I'm going
+to try to diversity, um what I'm going to try to diversity, um what I'm
+going to try to do is uh do is uh do is uh find the overlap of uh find
+the overlap of uh find the overlap of uh words or bigrams uh between the
+uh the words or bigrams uh between the uh the words or bigrams uh
+between the uh the two outputs. And if there there's less two outputs.
+And if there there's less two outputs. And if there there's less
+overlap, then it will be more diverse. So these are kind of like this is
+just So these are kind of like this is just So these are kind of like
+this is just an example of a deterministic metric you an example of a
+deterministic metric you an example of a deterministic metric you could
+do. You could could also measure could do. You could could also measure
+could do. You could could also measure the length. You could measure um
+the length. You could measure um the length. You could measure um you
+know, uh other uh other varieties of you know, uh other uh other
+varieties of you know, uh other uh other varieties of things like this.
+things like this. things like this. Um but a another uh popular way of
+Um but a another uh popular way of Um but a another uh popular way of
+evaluating things is using a language evaluating things is using a
+language evaluating things is using a language model as a judge. And so
+this is model as a judge. And so this is model as a judge. And so this
+is the reason why this is nice is it's like the reason why this is nice
+is it's like the reason why this is nice is it's like super easy to do
+super powerful things super easy to do super powerful things super easy
+to do super powerful things uh uh uh with this by just asking a language
+with this by just asking a language with this by just asking a language
+model a question about the output. Um model a question about the output.
+Um model a question about the output. Um there's a lot of caveats that
+go into there's a lot of caveats that go into there's a lot of caveats
+that go into this um which I I can talk about a this um which I I can
+talk about a this um which I I can talk about a little bit, but um here
+I'm just going little bit, but um here I'm just going little bit, but um
+here I'm just going to show a very simple example, which is to show a
+very simple example, which is to show a very simple example, which is uh
+rate the fluency and coherence of uh rate the fluency and coherence of
+uh rate the fluency and coherence of this text on a scale of zero to 10.
+Uh this text on a scale of zero to 10. Uh this text on a scale of zero
+to 10. Uh 10 equals perfect. Only respond with a 10 equals perfect. Only
+respond with a 10 equals perfect. Only respond with a number. Um number.
+Um number. Um So uh I'll do this. I'll give it my API So uh I'll do
+this. I'll give it my API So uh I'll do this. I'll give it my API key um
+key um key um and then generate. Cool. And then um to run the
+evaluation, Cool. And then um to run the evaluation, Cool. And then um
+to run the evaluation, I'll take all the things that I I'll take all the
+things that I I'll take all the things that I generated before and and
+run them to generated before and and run them to generated before and
+and run them to calculate this fluency score in the um calculate this
+fluency score in the um calculate this fluency score in the um in the
+evaluation score. So it's uh evaluating each of these. I didn't uh for
+the purpose of I didn't uh for the purpose of I didn't uh for the
+purpose of simplicity, I didn't speed up my LM simplicity, I didn't
+speed up my LM simplicity, I didn't speed up my LM calls. Like in
+reality, if I did this, calls. Like in reality, if I did this, calls.
+Like in reality, if I did this, I'd uh I'd uh I'd uh I'd use uh I'd use
+uh I'd use uh kind of kind of kind of many calls in parallel, but I
+didn't do many calls in parallel, but I didn't do many calls in
+parallel, but I didn't do that this time. that this time. that this
+time. So this for me throwing this together in this for me throwing this
+together in this for me throwing this together in like a few minutes, I
+think the results like a few minutes, I think the results like a few
+minutes, I think the results actually were were pretty interesting um
+actually were were pretty interesting um actually were were pretty
+interesting um which was uh we measured fluency of the which was uh we
+measured fluency of the which was uh we measured fluency of the greedy
+decoded text and the fluency of greedy decoded text and the fluency of
+greedy decoded text and the fluency of the greedy decoded text got a
+score of the greedy decoded text got a score of the greedy decoded text
+got a score of 5.3, which I think is uh 5.3, which I think is uh 5.3,
+which I think is uh is not that bad. is not that bad. is not that bad.
+Um but the diversity was relatively low Um but the diversity was
+relatively low Um but the diversity was relatively low because basically
+um it uh because basically um it uh because basically um it uh it all
+all done were the same. And then it all all done were the same. And then
+it all all done were the same. And then uh the diversity uh got higher
+and uh the diversity uh got higher and uh the diversity uh got higher
+and higher as we had more uh more and more higher as we had more uh more
+and more higher as we had more uh more and more outputs, but the fluency
+went down. outputs, but the fluency went down. outputs, but the fluency
+went down. So this is a very uh common issue, which So this is a very uh
+common issue, which So this is a very uh common issue, which is like as
+you sample more diverse is like as you sample more diverse is like as
+you sample more diverse things, um things, um things, um the the quality
+goes down. the the quality goes down. the the quality goes down. And
+temperature sampling is particularly And temperature sampling is
+particularly And temperature sampling is particularly well known for
+this. There's a lot of well known for this. There's a lot of well known
+for this. There's a lot of other methods uh that we're going to other
+methods uh that we're going to other methods uh that we're going to talk
+about next class that are talk about next class that are talk about next
+class that are kind of Pareto optimal with respect to kind of Pareto
+optimal with respect to kind of Pareto optimal with respect to diversity
+and quality. So you can get diversity and quality. So you can get
+diversity and quality. So you can get like better diversity and better
+like better diversity and better like better diversity and better
+quality. Um quality. Um quality. Um better diversity and better quality
+than better diversity and better quality than better diversity and
+better quality than temperature sampling. Cool. Cool. Cool. Um any any
+questions here? Okay. Um one caveat I'd like to give Okay. Um one caveat
+I'd like to give Okay. Um one caveat I'd like to give about language
+models as judges is don't about language models as judges is don't about
+language models as judges is don't trust them blindly. Um trust them
+blindly. Um trust them blindly. Um Language models are very bad judges
+for Language models are very bad judges for Language models are very bad
+judges for a lot of things and they're particularly a lot of things and
+they're particularly a lot of things and they're particularly bad at
+things bad at things bad at things judging things where they themselves
+are judging things where they themselves are judging things where they
+themselves are not good at them. So if a language model not good at
+them. So if a language model not good at them. So if a language model is
+not good at solving math problems, is not good at solving math problems,
+is not good at solving math problems, it'll also be a bad generally be a
+bad it'll also be a bad generally be a bad it'll also be a bad generally
+be a bad judge judge judge for math problems. And another thing that
+people have And another thing that people have And another thing that
+people have reported is language model judges like reported is language
+model judges like reported is language model judges like like their own
+generations more than like their own generations more than like their
+own generations more than they like other language models. So they like
+other language models. So they like other language models. So Claude
+will like really like Claude, GPT Claude will like really like Claude,
+GPT Claude will like really like Claude, GPT will really like GPT. Um
+this is not will really like GPT. Um this is not will really like GPT.
+Um this is not a a a hard and fast rule. It's not true all hard and fast
+rule. It's not true all hard and fast rule. It's not true all the time,
+but it is true some of the the time, but it is true some of the the
+time, but it is true some of the time. So be aware of that. Cool. Cool.
+Cool. Um Um Um So the final thing I'd like to talk So the final thing
+I'd like to talk So the final thing I'd like to talk about is meta
+generation algorithm. So about is meta generation algorithm. So about is
+meta generation algorithm. So this is going to be a big theme of the
+this is going to be a big theme of the this is going to be a big theme
+of the class and this is the simplest possible class and this is the
+simplest possible class and this is the simplest possible meta
+generation algorithm again, meta generation algorithm again, meta
+generation algorithm again, which is re-ranking. And so what I want
+which is re-ranking. And so what I want which is re-ranking. And so what
+I want to do to do to do is I want to re-rank is I want to re-rank is I
+want to re-rank um um um I want to re-rank the output of GPT I want to
+re-rank the output of GPT I want to re-rank the output of GPT 2 small
+with GPT 2 medium. 2 small with GPT 2 medium. 2 small with GPT 2 medium.
+And so we have a bigger and stronger And so we have a bigger and
+stronger And so we have a bigger and stronger model and then model and
+then model and then the smaller model that generates. the smaller model
+that generates. the smaller model that generates. Um Um Um So yeah, this
+is just the the code to So yeah, this is just the the code to So yeah,
+this is just the the code to generate generate generate to calculate the
+probability. Actually to calculate the probability. Actually to
+calculate the probability. Actually here um here um here um this is the
+important code if you want this is the important code if you want this
+is the important code if you want to run like a GPU or or MPS, but to
+run like a GPU or or MPS, but to run like a GPU or or MPS, but hopefully
+like people have done this hopefully like people have done this
+hopefully like people have done this done this before. I'm sure like
+done this before. I'm sure like done this before. I'm sure like
+everybody's run on GPUs, but like if everybody's run on GPUs, but like
+if everybody's run on GPUs, but like if you're running just on your Mac,
+like you're running just on your Mac, like you're running just on your
+Mac, like definitely do this because this will definitely do this
+because this will definitely do this because this will speed it up by a
+lot for free and like speed it up by a lot for free and like speed it up
+by a lot for free and like the smaller models you can actually run the
+smaller models you can actually run the smaller models you can actually
+run on your on your own computer. on your on your own computer. on your
+on your own computer. Um I'm getting an error. Why am I getting an
+error? Okay, maybe I just didn't run that. Cool. Cool. Cool. And so we
+can we can generate some And so we can we can generate some And so we
+can we can generate some outputs and calculate the log outputs and
+calculate the log outputs and calculate the log probabilities between
+them. So while while we're waiting for this to So while while we're
+waiting for this to So while while we're waiting for this to finish,
+this is actually finish, this is actually finish, this is actually a a a
+commonly used method in inference where commonly used method in
+inference where commonly used method in inference where you use a small
+model to you use a small model to you use a small model to generate an
+output and then a larger generate an output and then a larger generate
+an output and then a larger model to like calculate the probability
+model to like calculate the probability model to like calculate the
+probability of the output. Does anyone know what uh of the output. Does
+anyone know what uh of the output. Does anyone know what uh the name for
+this is? It's not exactly the name for this is? It's not exactly the
+name for this is? It's not exactly what we're doing here, yeah. what
+we're doing here, yeah. what we're doing here, yeah. Speculative
+decoding, yes. So typically Speculative decoding, yes. So typically
+Speculative decoding, yes. So typically in speculative decoding, what
+you do is in speculative decoding, what you do is in speculative
+decoding, what you do is you generate you use a small model to you
+generate you use a small model to you generate you use a small model to
+generate like generate like generate like five tokens or 10 tokens or
+whatever and five tokens or 10 tokens or whatever and five tokens or 10
+tokens or whatever and then you use the large model and then you use the
+large model and then you use the large model and uh uh uh until you get
+to a point where the small until you get to a point where the small
+until you get to a point where the small model is wrong. model is wrong.
+model is wrong. And the reason why this is good is And the reason why
+this is good is And the reason why this is good is because like
+calculating tokens in because like calculating tokens in because like
+calculating tokens in batches is much faster on GPUs. So you batches is
+much faster on GPUs. So you batches is much faster on GPUs. So you can
+save a lot of time doing this, but can save a lot of time doing this,
+but can save a lot of time doing this, but we'll talk about that later
+also. we'll talk about that later also. we'll talk about that later
+also. So anyway, um So anyway, um So anyway, um this is the the output
+and the this is the the output and the this is the the output and the
+likelihood. So we have the future of likelihood. So we have the future
+of likelihood. So we have the future of artificial intelligence is
+bright and artificial intelligence is bright and artificial intelligence
+is bright and promising. Um the future of artificial promising. Um the
+future of artificial promising. Um the future of artificial intelligence
+is banana purple elephant intelligence is banana purple elephant
+intelligence is banana purple elephant and artificial intelligence will
+and artificial intelligence will and artificial intelligence will
+transform many industries. And in this transform many industries. And in
+this transform many industries. And in this case, I guess the small
+model always case, I guess the small model always case, I guess the
+small model always gave a worse gave a worse gave a worse um always gave
+a worse probability than um always gave a worse probability than um
+always gave a worse probability than the large one. So that's not like
+the large one. So that's not like the large one. So that's not like
+super exciting. super exciting. super exciting. But the more interesting
+thing is when But the more interesting thing is when But the more
+interesting thing is when we actually like use it for re-ranking. And so
+you get to see which outputs a you get to see which outputs a you get to
+see which outputs a particular model prefers. particular model prefers.
+particular model prefers. And in the case of a smaller model and a And
+in the case of a smaller model and a And in the case of a smaller model
+and a larger model from the same model family, larger model from the
+same model family, larger model from the same model family, it's
+actually pretty clear. It's pretty it's actually pretty clear. It's
+pretty it's actually pretty clear. It's pretty pretty fun. So here
+here's the small model So here here's the small model So here here's the
+small model here's the text that the small model here's the text that
+the small model here's the text that the small model prefers versus the
+text that the large prefers versus the text that the large prefers
+versus the text that the large model prefers. model prefers. model
+prefers. And And And because I generated from the small because I
+generated from the small because I generated from the small model, it
+will make a lot of sense that model, it will make a lot of sense that
+model, it will make a lot of sense that the small model will prefer most
+of the small model will prefer most of the small model will prefer most
+of these. So it's actually more interesting these. So it's actually more
+interesting these. So it's actually more interesting to look at the ones
+where the medium to look at the ones where the medium to look at the
+ones where the medium model prefers it. model prefers it. model prefers
+it. Um so let's let's look here. Okay. Okay. Okay. So um So um So um
+Actually there's only one. That's kind Actually there's only one. That's
+kind Actually there's only one. That's kind of boring. of boring. of
+boring. This is this is randomly sampled, so I This is this is randomly
+sampled, so I This is this is randomly sampled, so I get a different
+result every time. When get a different result every time. When get a
+different result every time. When I did it like earlier, I got three,
+but I did it like earlier, I got three, but I did it like earlier, I got
+three, but um here here's here's the one. The um here here's here's the
+one. The um here here's here's the one. The future of artificial
+intelligence is future of artificial intelligence is future of
+artificial intelligence is shaping up in very interesting ways. In
+shaping up in very interesting ways. In shaping up in very interesting
+ways. In our next issue, we examine whether our next issue, we examine
+whether our next issue, we examine whether machine learning might be
+able to machine learning might be able to machine learning might be able
+to produce complex tasks. produce complex tasks. produce complex tasks.
+Um and here the medium model preferred Um and here the medium model
+preferred Um and here the medium model preferred it. Um it. Um it. Um
+Does anybody notice anything about the Does anybody notice anything
+about the Does anybody notice anything about the difference between that
+difference between that difference between that and um and um and um and
+this? Yeah, it's really like actually Yeah, it's really like actually
+Yeah, it's really like actually unfortunately I'm cutting these off
+unfortunately I'm cutting these off unfortunately I'm cutting these off
+here, so here, so here, so that's it that's not it. Oh, I forgot to
+that's it that's not it. Oh, I forgot to that's it that's not it. Oh, I
+forgot to mention one other thing. So this is not mention one other
+thing. So this is not mention one other thing. So this is not the log
+probability. This is the per per the log probability. This is the per
+per the log probability. This is the per per token log probability. And
+the reason token log probability. And the reason token log probability.
+And the reason why I did the per token log probability why I did the per
+token log probability why I did the per token log probability is is is
+that makes it easier to compare longer that makes it easier to compare
+longer that makes it easier to compare longer and shorter things on the
+same footing. and shorter things on the same footing. and shorter things
+on the same footing. Um let me let me see if I can cut off Um let me let
+me see if I can cut off Um let me let me see if I can cut off this this
+this like stop the stop to dot dot dot dot like stop the stop to dot dot
+dot dot like stop the stop to dot dot dot dot stuff. Too many dot dot
+dots. Um yes, I will. One one second, okay. Um yes, I will. One one
+second, okay. Um yes, I will. One one second, okay. Yeah. Yeah. Yeah.
+And actually let me generate let me And actually let me generate let me
+And actually let me generate let me generate again so we don't um
+generate again so we don't um generate again so we don't um so you can
+get some like additional so you can get some like additional so you can
+get some like additional samples. samples. samples. Um but Um but Um but
+what I meant by the by which part? Oh, the per token log probability. So
+Oh, the per token log probability. So Oh, the per token log probability.
+So what we saw before when we generated what we saw before when we
+generated what we saw before when we generated from Claude on Tuesday
+was like the from Claude on Tuesday was like the from Claude on Tuesday
+was like the longer ones tended to have a longer ones tended to have a
+longer ones tended to have a like a lower probability. They had a like a
+lower probability. They had a like a lower probability. They had a
+larger absolute value of their log larger absolute value of their log
+larger absolute value of their log probability. probability.
+probability. And And And so like let's say we wanted to find the so like
+let's say we wanted to find the so like let's say we wanted to find the
+output where the medium model preferred output where the medium model
+preferred output where the medium model preferred it it it more more
+more than the small model by the largest than the small model by the
+largest than the small model by the largest margin. margin. margin. So
+like what So like what So like what actually hopefully I can do that if
+we actually hopefully I can do that if we actually hopefully I can do
+that if we get more than one. Let let me let me see get more than one.
+Let let me let me see get more than one. Let let me let me see if this
+works. Yeah, okay. So here what I did is I I Yeah, okay. So here what I
+did is I I Yeah, okay. So here what I did is I I wanted to find the one
+where the the wanted to find the one where the the wanted to find the
+one where the the medium model preferred it by the like medium model
+preferred it by the like medium model preferred it by the like most.
+most. most. And And And when I do this, when I do this, when I do this,
+um um um I I I would like to would like to would like to have that be
+relatively independent of have that be relatively independent of have
+that be relatively independent of how long the actual output is how long
+the actual output is how long the actual output is because if the output
+is really long, because if the output is really long, because if the
+output is really long, the difference is going to be larger the
+difference is going to be larger the difference is going to be larger
+just because the magnitude the overall just because the magnitude the
+overall just because the magnitude the overall magnitude is larger. And
+so by dividing magnitude is larger. And so by dividing magnitude is
+larger. And so by dividing by the number of tokens, we can like by the
+number of tokens, we can like by the number of tokens, we can like
+normalize for the length. So Uh Uh Uh yeah, sequence level log
+probability yeah, sequence level log probability yeah, sequence level
+log probability normalized by by length. Yeah. normalized by by length.
+Yeah. normalized by by length. Yeah. So here's a few more examples. So
+the So here's a few more examples. So the So here's a few more examples.
+So the future of artificial intelligence is now future of artificial
+intelligence is now future of artificial intelligence is now back on the
+forefront of technology back on the forefront of technology back on the
+forefront of technology believing AI will deny us an advantage believing
+AI will deny us an advantage believing AI will deny us an advantage over
+humans for modeling and over humans for modeling and over humans for
+modeling and understanding the human mind. understanding the human mind.
+understanding the human mind. Uh Uh Uh a little bit weird. Um the future
+of a little bit weird. Um the future of a little bit weird. Um the
+future of artificial intelligence is at stake, he artificial
+intelligence is at stake, he artificial intelligence is at stake, he
+warned. Might there be a tipping point warned. Might there be a tipping
+point warned. Might there be a tipping point coming? coming? coming? But
+will championship golf can fulfill But will championship golf can
+fulfill But will championship golf can fulfill American dream? American
+dream? American dream? Uh Uh Uh In interesting. I I In interesting. I I
+In interesting. I I kind of want to read this article, but kind of want
+to read this article, but kind of want to read this article, but um um
+um Uh so like do people Uh so like do people Uh so like do people notice
+any difference between this notice any difference between this notice
+any difference between this and the ones that I had up here? and the
+ones that I had up here? and the ones that I had up here? Um like still
+in its infancy, the full Um like still in its infancy, the full Um like
+still in its infancy, the full attention of expert scientific attention
+of expert scientific attention of expert scientific communities depends
+on an intelligent communities depends on an intelligent communities
+depends on an intelligent machines driven both by the goals that
+machines driven both by the goals that machines driven both by the goals
+that saw the current scientific literature saw the current scientific
+literature saw the current scientific literature become obsolete and by
+priorities that become obsolete and by priorities that become obsolete
+and by priorities that reflect redistributive objectives for reflect
+redistributive objectives for reflect redistributive objectives for
+higher education. higher education. higher education. So maybe not as
+clear as I was hoping, So maybe not as clear as I was hoping, So maybe
+not as clear as I was hoping, but any any ideas? No. Simpler simpler
+sentences overall, yeah, Simpler simpler sentences overall, yeah,
+Simpler simpler sentences overall, yeah, maybe. What I would say is they
+have more What I would say is they have more What I would say is they
+have more surprising vocabulary, like more surprising vocabulary, like
+more surprising vocabulary, like more surprising vocabulary choices
+while surprising vocabulary choices while surprising vocabulary choices
+while still being mostly fluent. Like the the still being mostly fluent.
+Like the the still being mostly fluent. Like the the golf kind of threw
+me for a loop, but golf kind of threw me for a loop, but golf kind of
+threw me for a loop, but and like my general and like my general and
+like my general um my general um my general um my general overall
+overall overall impression of like stronger models impression of like
+stronger models impression of like stronger models and larger models are
+typically stronger and larger models are typically stronger and larger
+models are typically stronger models is that they're models is that
+they're models is that they're they give a higher probability or they
+give a higher probability or they give a higher probability or they're
+more likely to generate they're more likely to generate they're more
+likely to generate sentences that are kind of like sentences that are
+kind of like sentences that are kind of like interesting and surprising
+while still interesting and surprising while still interesting and
+surprising while still not being too like off the wall. not being too
+like off the wall. not being too like off the wall. Um Um Um And like
+just to give an example of And like just to give an example of And like
+just to give an example of this, this, this, I was I was I was trying to
+test whether Deep Seek or trying to test whether Deep Seek or trying to
+test whether Deep Seek or GPT-5 wrote better essays. GPT-5 wrote better
+essays. GPT-5 wrote better essays. Um and like I I tried several of them
+Um and like I I tried several of them Um and like I I tried several of
+them and Deep Seek would always write a great and Deep Seek would always
+write a great and Deep Seek would always write a great essay. essay.
+essay. Um, it was just kind of like generic and Um, it was just kind of
+like generic and Um, it was just kind of like generic and boring. Um,
+boring. Um, boring. Um, whereas if I used GPT-5, it would write whereas
+if I used GPT-5, it would write whereas if I used GPT-5, it would write
+like an actually like somewhat like an actually like somewhat like an
+actually like somewhat interesting essay. Um, and that's the interesting
+essay. Um, and that's the interesting essay. Um, and that's the level
+we're talking about with our level we're talking about with our level
+we're talking about with our strongest models now. And so, you know,
+strongest models now. And so, you know, strongest models now. And so,
+you know, the um the weaker models will uh like the um the weaker models
+will uh like the um the weaker models will uh like GPT-2 will GPT-2 will
+GPT-2 will not be uh not be at that level, but they not be uh not be at
+that level, but they not be uh not be at that level, but they uh uh uh
+still the same general principle. Like still the same general principle.
+Like still the same general principle. Like they're better at modeling
+low they're better at modeling low they're better at modeling low
+vocabulary items, low frequency, you vocabulary items, low frequency,
+you vocabulary items, low frequency, you know, um phenomena and other
+stuff like know, um phenomena and other stuff like know, um phenomena
+and other stuff like that. that. that. Um, Um, Um, cool. Uh yeah, that's
+all I had for cool. Uh yeah, that's all I had for cool. Uh yeah, that's
+all I had for today. Are there um things that people today. Are there um
+things that people today. Are there um things that people like to
+discuss around this? like to discuss around this? like to discuss around
+this? Yeah. Oh, what what's the objective of what? Oh, what what's the
+objective of what? Oh, what what's the objective of what? Sorry, could
+you speak up? Um, the downstream use case of meta Um, the downstream use
+case of meta Um, the downstream use case of meta generation is to
+improve quality, generation is to improve quality, generation is to
+improve quality, improve overall quality. So, improve overall quality.
+So, improve overall quality. So, um um um let let's give an example.
+Like you have let let's give an example. Like you have let let's give an
+example. Like you have a re-ranker that's a really strong model a re-
+ranker that's a really strong model a re-ranker that's a really strong
+model that you cannot generate, you know, you that you cannot generate,
+you know, you that you cannot generate, you know, you cannot generate
+from efficiently. Um, cannot generate from efficiently. Um, cannot
+generate from efficiently. Um, let's say it's an agent that goes out to
+let's say it's an agent that goes out to let's say it's an agent that
+goes out to um um um it's an agent that goes out and confirms it's an
+agent that goes out and confirms it's an agent that goes out and
+confirms information or something like that. So, information or
+something like that. So, information or something like that. So, um
+we'll also be talking about like tool um we'll also be talking about
+like tool um we'll also be talking about like tool use in the loop of
+generation and other use in the loop of generation and other use in the
+loop of generation and other stuff. If that's the case, you stuff. If
+that's the case, you stuff. If that's the case, you might not want to
+run that at generation might not want to run that at generation might
+not want to run that at generation time, but you might be willing to do
+time, but you might be willing to do time, but you might be willing to
+do that to confirm that there's no that to confirm that there's no that
+to confirm that there's no hallucinations in your text or hallucinations
+in your text or hallucinations in your text or something. Um, something.
+Um, something. Um, and then do that over like five and then do that over
+like five and then do that over like five different tasks. Um, another
+thing is uh different tasks. Um, another thing is uh different tasks.
+Um, another thing is uh self-consistency is also a variety of self-
+consistency is also a variety of self-consistency is also a variety of
+meta generation um where you generate meta generation um where you
+generate meta generation um where you generate multiple outputs and then
+you do multiple outputs and then you do multiple outputs and then you do
+majority over them. So, like there's a majority over them. So, like
+there's a majority over them. So, like there's a lot of different uh
+varieties of this lot of different uh varieties of this lot of different
+uh varieties of this too. too. too. Cool. Cool. Cool. Any other things?
+Any other things? Any other things? Yeah. You think the difference that
+you Yeah. You think the difference that you Yeah. You think the
+difference that you saw between Deep Seek and GPT-5 is more saw between
+Deep Seek and GPT-5 is more saw between Deep Seek and GPT-5 is more on
+the training side or on the inference on the training side or on the
+inference on the training side or on the inference side of things? Um,
+the difference side of things? Um, the difference side of things? Um,
+the difference between Deep Seek and GPT-5 uh I think between Deep Seek
+and GPT-5 uh I think between Deep Seek and GPT-5 uh I think it was
+they're both reasoning models and it was they're both reasoning models
+and it was they're both reasoning models and I let them both reason. So,
+I think it's I let them both reason. So, I think it's I let them both
+reason. So, I think it's probably more on the training side probably
+more on the training side probably more on the training side there. Um,
+there. Um, there. Um, but yeah, I but yeah, I but yeah, I GPT-5 we're
+not 100% sure what they're GPT-5 we're not 100% sure what they're GPT-5
+we're not 100% sure what they're doing for inference. Um, cool. Okay.
+Thanks everyone. Happy Um, cool. Okay. Thanks everyone. Happy Um, cool.
+Okay. Thanks everyone. Happy to do this. Thank you. to do this. Thank
+you. to do this. Thank you. Cool. Cool.

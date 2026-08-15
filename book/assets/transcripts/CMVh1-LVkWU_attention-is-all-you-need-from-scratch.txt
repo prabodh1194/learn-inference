@@ -1,0 +1,464 @@
+# attention-is-all-you-need-from-scratch
+# video: https://www.youtube.com/watch?v=CMVh1-LVkWU
+
+Let's break down the core idea behind
+this paper. Attention is all you need.
+Vasuani and seven co-authors. Google
+2017. 9 years old. And still the thing
+your model is running on today at full
+depth. Every matrix, every constant,
+every shape.
+9 years. Hundreds of papers written
+specifically to replace this one. Linear
+attention. State space models. Every
+attention is not all you need. rebuttal
+on the internet. And the model you
+talked to this morning is still
+underneath this. So, this isn't an
+introduction. You know what attention
+is. This is the autopsy where we derive
+every design decision from scratch and
+work out why each one refused to die. By
+the end, you should be able to write a
+transformer block from memory. The exact
+matrices, the exact shapes, the mask,
+the constants, and the reason there's a
+square root in a denominator. We take
+the equation term by term, run it on
+real numbers, write the pseudo code, and
+be honest about the one line the paper
+got wrong. Punch line first. This thing
+didn't win by being smarter than
+recurrence. It won because it was shaped
+like the hardware. Start with what they
+were actually fighting. A recurrent
+network computes hidden state HD as a
+function of HT minus one and the input
+at position T. Read that as a hardware
+engineer, not a mathematician. It isn't
+expensive. It's a data dependency. You
+cannot begin step five until step four
+has finished. And no amount of GPU
+changes that. A 40 token sentence is 40
+strictly ordered steps. While the chip
+underneath is built to do tens of
+thousands of multiplications in one
+clock cycle, sitting idle, waiting its
+turn. There's a second cost, and it's
+the one that hurts quality. For token
+one to influence token 40, the signal
+survives 40 transformations forward and
+40 coming back. a 40-step relay for a
+gradient. And here's what people forget.
+Attention already existed in 2017,
+bolted onto exactly this chain. The
+radical act wasn't inventing attention.
+It was deleting the chain. So delete the
+recurrence and every position has to
+fetch what it needs from every other
+position directly. Start with your token
+representations. A matrix X n rows for n
+tokens 512 columns because D model is
+512. Now three learn projections each
+512 x 64 WQ W K WV Multiply X by each
+and you get three matrices all N by 64 Q
+the queries each token asking what am I
+looking for K the keys each token
+advertising here's what I am V the
+values what a token hands over if you
+decide to look at it same input three
+learned views of it and the loadbearing
+property Computing the query for
+position 40 needs nothing from position
+39. Every projection is an independent
+row of one matrix multiply. The sequence
+stopped being a chain the moment we
+wrote it that way. Now the equation
+attention of Q. K and V equals soft max
+of QRPOS over root DK * V. Build it left
+to right and watch the shapes. Q is N by
+64. Kranspose is 64 by N. Multiply them
+and you get S an N byN matrix. The
+object the entire next decade fights
+about. Entry J is the dotproduct of
+query I with key J. How well tokenized?
+Question matches token J's
+advertisement. Row I is token I's
+complete opinion of the sequence. Next
+divide every entry by root DK roo
+64 which is 8. Park that we derive it in
+3 minutes. Then soft max along each row
+independently. So every row becomes a
+probability distribution summing to one.
+That's p still n by n. Finally multiply
+p by v n by 64 and the output comes out
+n by 64. Again row i a weighted average
+of every value vector weighted by how
+much token I cared. Two matrix
+multiplies and a rowise soft max. That's
+the whole mechanism. Let's run it on
+real numbers because shapes can lie and
+arithmetic can't. Four tokens that cat
+sat down and a toy head width of four.
+So DK is four. The query vector for SAT
+is 2 0 2 0. The four keys the is 0 1 0
+1. Cat is 2 0 1 0. SAT is 1 1 0 0. Down
+is 0 0 1 1. But the query against each
+against the every term is zero against
+cat 2 * 2 is 4 + 2 * 1 is 2 6 against
+sat 2 against down two raw score row 0 6
+2 divide by root dk roo 4 is 2
+giving 0 3 1 1 exponentiate 1 20.09 09
+2.72
+2.72 sum 26.52
+divide through and the attention row is
+0.04
+0.76
+0.10
+0 0.10
+sums to one checks out. Now say cat
+carries the value vector 0 2 0. The
+output for sat is that weighted average
+0.04 04 1.51 0.10
+0.10
+76% of it is cat one row of attention
+end to end by hand. Now that square root
+derived because almost nobody can tell
+you where it comes from. Assume the
+components of Q and K are independent
+mean zero variance one. The dotproduct
+is a sum of DK products qy * ki each
+with mean zero and variance 1.
+Independent things add their variances.
+So the dotproduct has variance dk square
+rooted. The standard deviation of a raw
+score is root dk. At 64 that's 8. So
+loget swing plus or minus 8 not plus or
+minus one. And the gap between best and
+worst score in a row is routinely 16.
+push 16 through a soft max. E to the 16
+is 9 million to one. You don't get a
+distribution. You get a spike. And a
+spiked soft max has no gradient. The
+jacobian is pi * the quantity delta
+minus pj. So when every p is pinned at
+zero or one, every derivative is zero.
+The layer stops learning where to look.
+Divide by root decay and the variance is
+back to exactly one at any head width.
+That's why it's the square root and not
+decay. itself. You're rescaling a
+standard deviation, not a variance. In
+our toy example, it moved the top weight
+from 96% to 76 at 64 dimensions. That's
+attention versus an argmax.
+And the justification for the most
+copied symbol in deep learning is
+delightfully a hedge.
+One head produces one weighted average
+per token, and an average is a blur. If
+the word it has to track its antecedent,
+the verb it governs and the bracket it
+has to close, one soft max smears across
+all three and you get mush. So split the
+width. D model is 512, H is 8 and DK=
+DV= D model over H 64. Each head gets
+its own three projections. 512x 64 runs
+the whole scaled.product product routine
+in its own subspace and returns an nx 64
+output. Eight of those in parallel
+concatenated 8 * 64 is 512. So you're
+back to n by 512. One final projection
+wo mixes the heads together. Now the
+accounting which is the sly part. A
+single full width head costs n ^2 * 512.
+Eight heads cost 8 * n ^2 * 64 which is
+n ^2 * 512 identical. And in real code,
+you don't run eight maples. You do 1 512
+x 512 projection and reshape into eight
+heads. Eight sharp relationships for the
+price of one blurry one. Now the piece
+that makes generation possible at all.
+The decoder is auto reggressive
+predicting token 5. It may only have
+seen tokens 1 through 4, but S is a full
+N byN grid. And row five happily
+contains scores against six, 7, and 40,
+the answer key sitting in the input. So
+you mask before the soft max, every
+illegal entry, every J greater than I,
+the whole upper triangle is set to minus
+infinity. Then E to the minus infinity
+is exactly zero. So those positions get
+exactly zero weight. And here's the bit
+people get wrong. The denominator only
+sums the legal columns. So each row
+still normalizes to one across the
+visible prefix. Zero the weights after
+the soft max instead. And the rows sum
+to less than one and need renormalizing.
+In practice, it's an additive mask.
+Zer's below the diagonal, a large
+negative above. Minus infinity is fine
+in float 32. Use minus 10 to the 9th and
+half precision. And that mask is what
+lets you train on a whole target
+sentence in one parallel pass. None of
+the positions peing. Encoder self
+attention gets no causal mask and
+neither does cross attention. The
+decoder sees the whole source. They say
+it in one line. And notice where they
+put it.
+Let's write it out. 10 lines. And this
+is genuinely the whole thing. Line one,
+the signature X, the token matrix N by
+512, the four weight matrices, the headc
+count H, and a mask. Line two, pull N
+and D from the shape, set DK to D over
+H, 64. Lines 3, 4, 5. Project X * WQ,
+reshape to N by H by 64. Transpose, so
+heads come first. Same for K. Same for
+V. Line six, the scores Q * K transposed
+on the last two axis over root DK giving
+H by N by N. Line seven and paint this
+one green mast fill wherever the mask
+says illegal right minus infinity. Line
+eight soft max along the last axis. Line
+nine multiply by V. Transpose the heads
+back reshape to N by 512. The
+concatenation done as a memory view
+rather than a copy. Line 10. The output
+projection and return. Multi-head
+attention complete with causal masking.
+Every line of it derived. That's the
+attention block rebuilt from nothing.
+The math, the numbers, the mask, the
+code. If that's your idea of a good
+time, like, subscribe, and send this to
+the friend who keeps saying attention
+got replaced last month because now we
+do the parts nobody quotes.
+Deleting recurrence deleted something we
+haven't paid for. Order attention is
+permutation and variant. Shuffle the
+tokens and every dot product is
+identical. The cat ate the fish and the
+fish ate the cat are the same bag. So
+position gets injected by hand. For each
+dimension pair I position POS gets sign
+of POS over 10,000 to the^ 2 I over D
+model in the even slot and cosine of the
+same thing in the odd slot. Read that
+exponent. As I climbs, the divisor grows
+geometrically. So wavelengths run from 2
+pi up to 10,000* 2 pi about 63,000. A
+clock face with 256 hands. Fast ones
+separate neighbors. Slow ones say where
+in the document you are. And why sign
+and cosine? By the angle addition
+formula, shifting by a fixed offset is a
+fixed rotation of each s cosine pair. So
+look, three tokens back is a linear map
+learned once instead of memorized per
+position. Two honest footnotes. It's
+added to the embeddings, not
+concatenated. Content and position share
+the same 512 dimensions and learn
+position embeddings scored nearly
+identically. Sinosoids were chosen for
+one reason, the hope of extrapolating
+past training length. That hope didn't
+survive contact with reality and fixing
+it properly came later with rotary
+embeddings rope. Half of every block
+isn't attention at all. After the
+attention sub layer comes a
+position-wise feed forward network max
+of zero and xw1 + b1 * w2 + b2. A real
+sandwich 512 in48
+in the middle 512 out for times wider
+inside. applied identically at every
+position. Equivalently, two convolutions
+with kernel size one. So, the division
+of labor is sharp. Attention is the only
+place positions talk to each other. The
+feed forward is where a token sits alone
+and thinks about what it just heard.
+Follow the parameters. The feed forward
+is about 2 million per layer. All four
+attention projections about 1 million.
+2/3 of the model is the part nobody
+draws. Two details to match the paper.
+The input embedding, the output
+embedding and the presoftmax linear
+share one weight matrix and embeddings
+get multiplied by root D model before
+the positional encoding is added. Now
+assemble the block and meet the line the
+paper got slightly wrong. Every sub
+layer is wrapped identically. The output
+is layer norm of X plus sub layer of X.
+The ad is a residual, so a sub layer
+contributes an edit instead of replacing
+its input, which is why the width is a
+constant 512 everywhere, embeddings
+included. You can only add things of the
+same shape. That constant width channel
+is what we now call the residual stream.
+A shared bus every head reads from and
+writes back to stack six for the
+encoder, six for the decoder, which has
+three sub layers, inserting cross
+attention between its masked self
+attention and its feed forward. Now the
+honest part. Look where the norm sits
+after the ad on the residual path
+itself. That's postnorm. And it means
+the gradient going back to layer 1
+crosses a layer norm at every block.
+Precisely why this model needed 4,000
+steps of warm-up or it would diverge.
+Within 2 years, everyone moved the norm
+inside the branch x plus sub layer of
+layer norm of x. Porm. The residual path
+becomes a clean wire and warm-up stops
+being mandatory. the most changed line
+in the architecture. The one thing here
+that didn't survive the training recipe
+because half these constants are still
+in your config file. Atom beta 1 0.9
+beta 2 0.98
+lower than the usual 0.999
+a shorter memory for the second moment.
+So it reacts faster while the gradient
+scale is moving. The learning rate is a
+formula not a constant. D model to the
+minus one/2 times the minimum of step to
+the minus one/2 and step times warm-up
+to the minus one and a half. Two regimes
+glued together. For the first 4,000
+steps, the rate climbs linearly from
+zero. After that, it decays as 1 / root
+step. Peak about 7 * 10us 4. Then drop
+out at 0.1 on every sub layer output
+applied before it's added back and
+normalized. and label smoothing at 0.1.
+The fun one, it deliberately makes the
+model less certain, so perplexity gets
+worse and BLU gets better. Base model
+100,000 steps, 12 hours on 8 P100s. Big
+model, 300,000 steps, 3 and 1/2 days.
+Table one, and they were completely
+honest about it. Per layer, self
+attention costs order n ^ 2 * d. A
+recurrent layer costs order n * d ^2. So
+the whole comparison collapses to n
+versus d. In 2017, ascendance was 40
+tokens and d was 512, which makes
+attention roughly 13 times cheaper per
+layer. Not a sacrifice, a bargain. But
+the column that decided the argument is
+the next sequential operations. self
+attention order one recurrent order n
+and the third maximum path length
+between any two positions one hop versus
+n they spent a quadratic in sequence
+length to buy a constant in depth and a
+constant in distance in 2017 that was
+free money at 64,000 tokens and overd is
+128 the other way and it is very much
+not free the design didn't age badly the
+input got a thousand times longer and
+look at the last row of their own table
+restricted self attention order are
+times n * d path length n over r they
+wrote down sliding window attention in
+2017 and left it as future work the
+numbers that bought all this the benefit
+of the doubt English to German the big
+model hits 28.4 and 4 BLU more than two
+points clear of the best previously
+reported result. Ensembles included an
+enormous margin in translation. English
+to French 41.8 8 a new single model
+record after 3 and 1/2 days on 8 P100s
+and the base model 12 hours 65 million
+parameters beat everything published
+before it at about 3.3 * 10 to the 18
+operations against 10 the 20 for the
+prior state-of-the-art roughly a 100th
+of the compute straight from the
+abstract
+table three is where anyone
+reimplementing this should spend their
+time because it prices every knob. Heads
+drop to a single head at the full 512
+dimensions and you lose 9/10 of a BU
+point. But push to 32 heads of 16
+dimensions and it gets worse again.
+There's a real optimum and it's about
+each head being wide enough to hold a
+relationship. Row B is the underrated
+one. Shrink the key dimension alone and
+quality drops which says the dot product
+is a crude way to decide compatibility.
+The paper admits it, and every attention
+variant since has poked at exactly that.
+Depth and width behave as you'd hope.
+Two layers is a disaster, and widening
+the feed forward to 4,96 buys most of
+what a bigger model buys. And my
+favorite row, turn label smoothing off,
+and perplexity improves while BLU gets
+worse. The metric you optimize and the
+metric you care about openly disagree,
+and they published it anyway. So here's
+the whole recipe in the order you'd
+build it. One, delete recurrence because
+the dependency chain, not the
+arithmetic, was the bottleneck. Two,
+three, learn projections, queries, keys,
+values, and one equation. Soft max of
+qkranspose over root dk * v. Three,
+that's square root because a dotproduct
+over dk dimensions has standard
+deviation root dk. And a soft max fed
+eights has no gradient left. Four, eight
+heads of 64 because one averages a blur
+and eight cost what one wide one did.
+Five, a triangular minus infinity mask
+before the soft max which makes parallel
+training and generation the same
+computation. Six sinosoids at the bottom
+because attention cannot see order.
+Seven, a residual stream with a norm on
+every sub layer and a fat feed forward
+carrying twothirds of the parameters.
+Now the verdict, nine years of
+challengers, linear attention, state
+space models, RWKV, every sparse and
+local variant attacked exactly one term
+on that list, the N squared. Everything
+that stuck kept the skeleton, and the
+two pieces that genuinely got replaced
+weren't the famous ones. The norm moved
+inside the branch and the sinosoids
+became rotations. The core equation
+hasn't changed a symbol. The oneline
+version every decision in this paper was
+bought with parallelism. Delete the
+sequential dependency. So the whole
+sequence resolves in a single matrix
+multiply and everything else exists to
+keep that shape trainable. Which leaves
+the question the whole attention war
+turns on. that N squared is the only
+real complaint anyone has ever had about
+this design. So, is it a bug we
+eventually delete? Or is looking at
+everything the thing that makes it work?
+9 years of very smart people removing it
+have mostly produced models that are
+cheaper and slightly worse. That's my
+read. Tell me yours. Until next time.

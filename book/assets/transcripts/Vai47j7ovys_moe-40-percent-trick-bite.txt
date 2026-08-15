@@ -1,0 +1,98 @@
+# moe-40-percent-trick-bite
+# video: https://www.youtube.com/watch?v=Vai47j7ovys
+
+Let's break down the core idea behind
+this paper. DeepSeek MOE, DeepSeek's
+blueprint for experts that actually
+specialize.
+Here's a 16 billion parameter model
+keeping pace with a 7 billion Lama while
+doing about 40% of the math. The trick
+isn't a bigger brain. It's carving that
+brain into experts that each truly know
+their one thing. Let's see how.
+Normal mixture of experts looks clever.
+Instead of one dense layer, a room of
+experts, and each token wakes just a
+couple. But with only a handful of big
+experts, two bad habits creep in. One
+expert gets handed poetry and Python and
+biology, a jack of all trades, master of
+none. That's knowledge hybridity. And
+because every expert sees the boring
+common stuff, they all waste parameters
+relearning it. That's redundancy. Your
+experts aren't experts.
+DeepSeek's first move, stop using big
+experts. Slice each one in two, say four
+thin slivers. And to keep the compute
+bill identical, wake four times as many.
+Same parameters, same cost. But look
+what happens to the choices. Pick two
+out of 16, and there are 120 ways to do
+it. Slice to 64 and pick eight, and
+there are 4.4 billion. Knowledge can now
+split into exactly the right narrow
+bins. And the finer you slice, the
+further this scaling axis pushes.
+The number's real, straight from the
+paper.
+Second move, and it's the elegant one.
+Peel off a couple of experts and leave
+them always on for every token. Let
+those soak up the common everyday
+knowledge. Now the routed experts don't
+have to keep a copy of it. They're free
+to go deep on the rare, distinctive
+stuff. Shared experts hold the basics.
+Specialists hold the edge.
+One risk with letting the router learn
+freely, it plays favorites, always
+calling the same few experts while the
+rest starve. So DeepSeek adds a gentle
+balance penalty. Nudge the load even
+across experts and across GPUs. Just
+enough that everyone gets trained, not
+so much that it overrides good routing.
+If watching a model get carved into
+specialists is your kind of thing, like,
+subscribe, and pass it to the friend who
+thinks scaling is only ever make it
+bigger.
+Does it actually work? Here's the tell.
+Switch off a model's top routed and
+watch the score fall. DeepSeek MoE face
+plants far harder than a conventional
+MoE, which sounds bad, but means the
+opposite. Its experts aren't
+interchangeable. Each is carrying
+knowledge no one else has. And the
+shared expert? You can't remove it at
+all. The specialization is real.
+So the latter, 2 billion parameters
+matches a GShard nearly half again its
+size and brushes the dense ceiling, the
+theoretical best a MoE can hope for.
+Scale to 16 billion and you get LLaMA, 2
+7 billion quality for about 40% of the
+compute. Push a preliminary 145 billion
+and it rivals a dense 67 billion model
+at under a third of the cost.
+In their words,
+the whole recipe. Take a room of big
+generalist experts, slice them into fine
+slivers so knowledge sorts precisely.
+Set a few aside as always on for the
+common stuff. Keep the load balanced and
+you get experts that genuinely
+specialize at a fraction of the compute.
+One line. Make the experts small and
+many and give the basics their own room.
+So every parameter is either a
+specialist or a shared foundation, never
+a wasted generalist.
+Which leaves a question worth sitting
+with. If specialization keeps paying off
+the finer you slice, where does it stop?
+One neuron per expert? That's my read.
+Tell me yours. Until next time.
