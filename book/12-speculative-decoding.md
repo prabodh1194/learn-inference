@@ -75,24 +75,73 @@ production.
 
 ### Where drafts come from
 
-**Draft model**: a small model (0.5B guessing for 70B). Good acceptance, but you
-run and maintain a second model.
+Four ways to produce the guess, differing along two axes that decide everything:
+**where the draft comes from** (a separate model, the target's own weights, or
+the text itself) and **how much machinery it costs** to train and serve. In
+roughly increasing order of setup:
 
-**Medusa**: extra heads on the target model predicting several positions ahead.
-No separate model, but requires training. DeepSeek-V3's **MTP** (multi-token
-prediction) is the production form of this — the model drafts its own next
-tokens, and its self-speculation accepts ~85–90% of drafts, ~1.8 tokens per
-step.
+**Draft model — a separate, smaller model.** The original approach (Leviathan
+et al.). You keep a small model (say 0.5B) alongside the target (70B). Each
+step it decodes a few tokens on its own — cheap, because decoding 0.5B
+re-reads ~140× fewer weight bytes than 70B (`0.5B × 2 B = 1 GB` against
+`70B × 2 B = 140 GB`), so it can grind out several drafts in the time the
+target would spend on one verify. Then the target verifies them all in one
+pass.
 
-**EAGLE**: predicts at the *feature* level rather than the token level, using
-hidden states (the model's internal numbers for a token as it moves through the
-layers, before they are turned into a word choice). Higher acceptance than
-Medusa; the current default when you can train heads.
+Its strengths: any off-the-shelf small model, no training. Its costs are the
+two you'd expect. You serve and maintain a *second* model — its weights live in
+VRAM permanently, competing with the KV cache. And its drafts are only as good
+as its *agreement* with the target: two models trained on different data drift
+apart, and where they disagree you get rejections. That draft-target gap is the
+entire quality lever, which is why DeepSeek's **DSpec** (distillation for
+speculative decoding) trains the draft model to mimic the target's own outputs —
+acceptance rises sharply, because you're closing the exact gap the other
+approaches only work around.
 
-**N-gram / prompt lookup**: no model at all. Build an n-gram map from the prompt
-and the text so far; if the recent suffix appeared before, propose whatever
-followed it. **This is what you'll implement**, because it needs no training and
-the entire draft/verify/accept loop is visible in a few dozen lines.
+Note the drafting step itself is *still sequential*: the small model generates
+token by token, and each of its tokens costs a small-model forward pass. The win
+is that those passes are so much cheaper than the target's that you can afford
+several per verify.
+
+**Medusa — extra heads on the target, all at once.** Instead of a second model,
+add a few extra heads to the target itself, each trained to predict the token
+*i* positions ahead. The decisive difference is that all heads read the *same*
+final hidden state from a single forward pass, so **drafting costs no extra
+forwards**: one pass produces the drafts and, after verification, the accepted
+tokens together. The cost is training the heads (a lightweight, target-specific
+fine-tune). There is a ceiling: the head for position t+2 must guess from only
+position t's information, so accuracy falls the further ahead you reach.
+DeepSeek-V3's **MTP** (multi-token prediction) is the production form of this —
+a shared lightweight block predicting the next tokens — accepting ~85–90% of
+drafts, ~1.8 tokens per step.
+
+**EAGLE — draft at the feature level.** Medusa guesses *tokens*; EAGLE guesses
+the *hidden states* the tokens will produce, then runs the target's own LM head
+on the guessed features to turn them into tokens. A hidden state carries far
+more information than a token id — it already encodes the context and syntax the
+next choice needs — so the drafts land much closer to what the target would say.
+Higher acceptance than Medusa, and currently the practical default when you can
+train heads. The trade: it's a trained addition to the model, and drafting still
+runs a small network per position, so it isn't as free as Medusa's single-
+forward drafting.
+
+**N-gram / prompt lookup — no model at all.** The degenerate case, and the one
+this lecture makes you build. Keep an n-gram index of the prompt and everything
+generated so far; if the recent suffix has appeared before, propose whatever
+followed it. Drafting is a dictionary lookup — no model, no training, no second
+set of weights. It wins exactly where output *echoes* input: code completion
+(the answer reuses the question's syntax), retrieval, boilerplate. And it
+collapses where the text is novel: prose has no matching n-gram, acceptance near
+zero, and you've added overhead for nothing. That failure is not a bug — it's
+the sharpest demonstration of "the workload decides" in the lecture.
+
+| | Draft model | Medusa / MTP | EAGLE | N-gram |
+|---|---|---|---|---|
+| Extra weights | a second model | heads on the target | trained module | none |
+| Training | no | yes | yes | no |
+| Draft mechanism | sequential small decode | one forward, parallel heads | per-position feature net | dictionary lookup |
+| Acceptance | model-dependent | good | **best** | code high, prose ~0 |
+| When it wins | no training allowed | target is fine-tunable | acceptance is the goal | output echoes input |
 
 ### The metric that matters
 
@@ -103,10 +152,33 @@ it alongside tok/s, always. Without it you can't tell these apart:
 - Fast despite low acceptance → you got lucky on batch size
 - Slow despite high acceptance → verification overhead is eating the gain
 
-More speculation is *not* more speed. Rejected drafts cost real compute, and past
-a point you lose. From the [field notes](field-notes.md), an operator running
-2×3090 found the documented 3 draft tokens beaten by 5, measured via mean
-acceptance length, and above 5, performance got measurably **worse**.
+Acceptance rate is not a nicety to report — it *is* the speedup, and you can
+prove it. Under exact speculative decoding with γ drafts and per-token
+acceptance probability α, the expected tokens per verify pass is:
+
+```
+E[tokens] = 1 + α + α² + … + α^γ  =  (1 − α^(γ+1)) / (1 − α)
+```
+
+Derivation: accept *k* drafts then a rejection yields *k* + 1 tokens (the drafts
+plus the correction token) with probability `α^k(1 − α)`; accept all γ and you
+get γ + 1 (the bonus token) with probability `α^γ`. Summing:
+
+```
+E = Σ_{k=0}^{γ−1} (k+1)·α^k·(1−α)  +  (γ+1)·α^γ  =  1 + α + α² + … + α^γ
+```
+
+At `α = 0.8, γ = 4`: `1 + 0.8 + 0.64 + 0.512 + 0.4096 = 3.36` tokens per verify
+— a 3.36× wall-clock win over one token per pass. At `α = 0.2`, the same drafts
+buy `1.25×`: barely above doing nothing. That gap is the entire lecture, and
+it's why this is one of the few techniques that moves *per-user* latency, which
+batching (Lecture 07) cannot touch.
+
+γ is not free either — a rejected draft is wasted work — so the peak sits at
+moderate γ. From the [field notes](field-notes.md), an operator running 2×3090
+found the documented 3 draft tokens beaten by 5, and above 5, performance got
+measurably **worse**: past the peak you're paying to verify tokens that get
+thrown away.
 
 ### The workload decides everything
 
@@ -233,6 +305,9 @@ verify tokens that get thrown away.
 - **[EAGLE](https://arxiv.org/abs/2401.15077)**: feature-level drafting, the
   current practical default.
 - **[Medusa](https://arxiv.org/abs/2401.10774)**: multiple decoding heads.
+- **[DSpec](https://arxiv.org/abs/2406.14846)** (Zhou et al., 2024): distillation
+  for speculative decoding — train the draft model to mimic the target and
+  acceptance goes up. DeepSeek's contribution to the draft-model line.
 - **Kiely §5.2–5.2.4** (p.129–136), all four approaches compared, including the
   n-gram/lookahead variant you built.
 - **[Field notes](field-notes.md)**: docs said 3 draft tokens, measurement said 5,
