@@ -324,7 +324,37 @@ verify tokens that get thrown away.
 5. Your acceptance is 65% on code and 15% on prose. What single number would you
    quote to someone asking "how much does speculative decoding help?"
 
-That last one has no honest single answer, which is the point.
+??? question "Done? Tap to check — three clicks to the full answer"
+    ??? question "Still stuck? Show a hint for each"
+        1. Decode leaves arithmetic idle; verification fills that idle headroom.
+        2. The model's own prediction is a real token by definition.
+        3. Overhead, not acceptance — and there are two other cases worth naming.
+        4. Idle capacity, not context decay: speculation is a latency play.
+        5. There is no single number, which is the point.
+
+        ??? question "Show the answers"
+            1. Verifying 5 candidates does 5× the arithmetic on the same
+               840 MiB weight load. Decode runs at 0.79 ops:byte against a
+               ridge of 76 — ~96× arithmetic headroom — so the extra math hides
+               in time the chip was already waiting on bytes. The pass still
+               ends when the bytes arrive.
+            2. When draft *i* is wrong, the model's prediction at that position
+               is, by definition, what the model would have generated. Keep it:
+               drop it and a full rejection produces nothing, which makes
+               speculation *slower* than not speculating.
+            3. High acceptance with flat tok/s means the verify/draft overhead
+               is eating the gain. Use the three-way test: fast + high
+               acceptance = real win; fast + low acceptance = lucky batch size;
+               slow + high acceptance = overhead.
+            4. Not context decay. Speculation consumes *spare arithmetic*. At
+               batch 1 the decode's compute units sit idle, so verification
+               rides along nearly free. At batch 64 the machine is already
+               busy, there's no idle capacity left, and the extra verification
+               work costs more than it saves — the latency-vs-throughput
+               tradeoff pulling against itself.
+            5. No honest single number. Acceptance is 65% on code and 15% on
+               prose, so the win is workload-dependent — quote both numbers
+               with the workload, or don't quote one at all.
 
 ---
 
