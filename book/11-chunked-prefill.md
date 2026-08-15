@@ -115,41 +115,84 @@ chunked.
 
 ## The code
 
+`schedule()` returns `(prefill, decode)`: which sequences take a *prefill chunk*
+this step, and which take their one-token *decode*. Three conventions make the
+arithmetic work, and each is easy to miss:
+
+- **A decode is exactly one token.** Every running sequence produces one token
+  per step, so the *number of decoding sequences* equals the *number of decode
+  tokens*. That's why `budget = max_batched_tokens - len(decode)`.
+- **A prefill is a chunk.** A prefilling sequence consumes up to `chunk_size`
+  tokens this step (fewer if that's all that's left of its prompt, or all the
+  budget allows).
+- **One step, one forward pass over everything.** Decodes and prefill chunks
+  share one pass, capped by `max_batched_tokens`. The runner reads each
+  sequence's `chunk_size_this_step` to know how many prompt tokens to feed it.
+
 ```python
 def schedule(self):
     # 1. retire finished sequences (Lecture 08)
     ...
 
-    # 2. running sequences decode -- they get the budget first
+    # 2. running sequences decode -- they get the budget first.
+    #    Each decode is exactly 1 token, so sequence count == token count.
     decode = [s for s in self.running if s.is_prefill_done]
     budget = self.max_batched_tokens - len(decode)
 
-    # 3. continue any in-flight partial prefills BEFORE admitting new work
+    # 3. continue in-flight partial prefills BEFORE admitting new work.
     prefill = []
     for seq in self.running:
         if seq.is_prefill_done or budget <= 0:
             continue
         remaining = len(seq.prompt_ids) - seq.num_prefilled
+        chunk = min(remaining, budget, self.chunk_size)   # 3-way min
+        seq.chunk_size_this_step = chunk
+        seq.num_prefilled += chunk
+        budget -= chunk
+        prefill.append(seq)
+
+    # 4. only then admit new sequences into what's left -- they also start
+    #    prefilling, chunked exactly like everyone else.
+    while (self.waiting and len(self.running) < self.max_batch_size
+           and budget > 0):
+        seq = self.waiting.popleft()
+        self.running.append(seq)
+        remaining = len(seq.prompt_ids)
         chunk = min(remaining, budget, self.chunk_size)
         seq.chunk_size_this_step = chunk
         seq.num_prefilled += chunk
         budget -= chunk
         prefill.append(seq)
 
-    # 4. only then admit new sequences into what's left
-    while self.waiting and len(self.running) < self.max_batch_size and budget > 0:
-        ...
-
     return prefill, decode
 ```
 
+The three-way min is the whole idea:
+
+```
+chunk = min(remaining, budget, chunk_size)
+```
+
+- `remaining` — can't over-prefill the prompt.
+- `budget` — can't blow `max_batched_tokens` minus the decodes.
+- `chunk_size` — the dial you're tuning: how many tokens one sequence may add
+  to a step.
+
 **Finish in-flight prefills before admitting new ones.** Otherwise you accumulate
 half-prefilled sequences that each hold KV memory while producing nothing,
-memory pressure with no output, and every request's TTFT gets worse.
+memory pressure with no output, and every request's TTFT gets worse. The tests
+encode this exact ordering (`test_in_flight_prefill_finishes_before_new_admission`).
 
-One caveat: the *last* chunk of a prefill produces the first token, so that step
-is both a prefill and a decode for that sequence. Getting this boundary wrong
-gives you a duplicated or missing first token, check it explicitly.
+**The boundary that bites.** The *last* chunk of a prefill produces the first
+token. Once it runs, `num_prefilled == len(prompt_ids)` so `is_prefill_done`
+turns true, and the sequence appears in `decode` on the *next* step. If the
+runner treats "prefilled a chunk this step" and "decoding this step" as the same
+thing, you get a duplicated or missing first token — the off-by-one
+`test_final_chunk_transitions_to_decode` exists to catch.
+
+The runner's half, for one sequence: feed the next `chunk_size_this_step` prompt
+tokens to the model, let the KV cache grow by that many, and if the chunk was the
+last one, the final position's logits are the first output token.
 
 ---
 
