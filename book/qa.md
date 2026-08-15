@@ -614,3 +614,203 @@ continuous strip entirely: cut a sequence into fixed pieces (blocks), scatter
 them anywhere, and keep a little table (block table) that says which piece is
 where. The pieces need not be next to each other, so nothing has to be copied
 when the conversation grows: you just add one more piece.
+
+---
+
+## Why can't decode just run the whole answer in one pass, like prefill runs the whole prompt?
+
+**Lecture:** [01. The two phases](01-the-two-phases.md)
+
+Because prefill and decode have different inputs. When you hit enter, the whole
+prompt exists at once: every token is on disk or in memory the moment the
+request starts, so all of them can be processed in parallel. Decode's input is
+the model's own previous output. Token 2 does not exist until token 1 has been
+chosen, token 3 until token 2 exists, and so on down the line. Each step is a
+prerequisite for the next, so the steps cannot overlap.
+
+Reading is like scanning a page you already hold. Generating is like speaking:
+you cannot say word three until word two has left your mouth.
+
+Note what batching does and does not change. Batching parallelizes *across*
+sequences (many conversations share one step), never *along* one sequence. No
+batching trick makes one conversation's next token computable before the last
+one.
+
+---
+
+## But padding is wasted compute. Why not run each sequence on its own and waste nothing?
+
+**Lecture:** [07. Static batching](07-static-batching.md)
+
+Because the expensive waste is not the padding, it is the **memory traffic**.
+The weights are 840 MiB, and decode must re-read all of them for every
+generated token, for every sequence. Run 32 sequences one at a time and the
+weights make 32 separate journeys from memory each step. Batch them and one
+journey serves all 32: Lecture 01's batching table shows a batch of 32 moves
+the same bytes as a batch of 1 and does 32x the arithmetic on them.
+
+Padding burns arithmetic on positions the mask makes harmless. Decode is
+memory-bound, so it has arithmetic to spare: wasting compute on pads costs far
+less than repeating weight reads. The attention mask exists to keep padding
+from changing the *result*; it is not there to save the *compute*.
+
+---
+
+## How can two blocks hold identical token ids but different histories?
+
+**Lecture:** [10. Prefix caching](10-prefix-caching.md)
+
+The same 16 token ids can appear at different positions in two different
+prompts. A token's K/V record is computed from everything the model had seen
+before that token: causal attention, Lecture 01. The record stored for
+position 2,000 includes 2,000 tokens of context that position 0 never had.
+Same tokens, different numbers.
+
+The parent hash is what tells these two cases apart. It fingerprints the
+preceding block, so the chain is part of the block's identity: block "abc"
+after history X is not the same block as "abc" after history Y. Two stores
+with identical ids only merge if their entire histories match.
+
+---
+
+## But kernel launches are asynchronous: can't the CPU just run ahead and hide all this?
+
+**Lecture:** [13. CUDA graphs](13-cuda-graphs.md)
+
+Asynchronous means the CPU submits a kernel and does not wait for it to
+finish, not that submitting is free. Each submission still costs the CPU its
+own microseconds, 5-10 on this machine, to build and hand over the command.
+Small-batch kernels execute in a few microseconds on the chip. When the
+per-call CPU cost exceeds the per-kernel chip time, the CPU falls behind: the
+chip drains the queue of commands and then sits idle waiting for the next
+order.
+
+That is the gap Nsight shows between kernels: the chip is empty because the
+CPU is still writing out the next command. CUDA graphs remove the per-call
+overhead by binding a whole sequence of kernels into one submission, so the
+CPU stops falling behind in the first place.
+
+---
+
+## Why doesn't eager PyTorch fuse these three ops itself?
+
+**Lecture:** [16. Triton basics](16-triton-basics.md)
+
+Because eager PyTorch runs each operation as its own kernel, and nothing tells
+it the intermediate result can stay on-chip instead of being written out to
+memory. In eager mode, the matmul writes its output to HBM, the broadcast
+reads it back, and so on: three kernels, three round-trips between registers
+and memory.
+
+Fusion is a *decision* a compiler must make, and Triton lets you make it
+explicitly, by writing one kernel instead of three. Lecture 13's
+`torch.compile` automates exactly this decision at graph level; Triton is the
+manual, in-kernel version. That is why the two techniques compound: one fuses
+across operators, the other fuses *within* a single operator.
+
+---
+
+## How can two orderings of floating-point math both be "exact"?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+"Exact" here means no approximation: every score, every weight, every sum is
+computed in full, once, in floating point. Nothing is truncated, sampled, or
+skipped, the way quantization (Lecture 19) or a genuine approximation would
+be. It does not mean bit-for-bit equality with a different arrangement of the
+same arithmetic.
+
+FlashAttention computes softmax in row pieces and rescales, which merely
+reorders the additions. Floating-point addition is not perfectly associative,
+so the last bits of the rounding differ from standard attention, which is why
+the test tolerance is around 1e-2 rather than exact match. There is no error
+beyond that rounding: the difference is the same kind of noise as running the
+same math in a different order by hand.
+
+---
+
+## Wait: "block" here is a thread block, not the KV block from Lecture 09?
+
+**Lecture:** [18. Paged attention kernel](18-paged-attention-kernel.md)
+
+Both words are in play, and they mean different things.
+
+The **KV block** is a fixed-size chunk of cached data, 16 tokens, from Lecture
+09: an allocation unit. You allocate it, fill it, free it.
+
+The **thread block** is a group of threads that run together on one SM (one
+of the chip's work groups, each with its own fast private memory): an
+execution unit. Splitting the context across thread blocks means different
+groups of threads each handle a slice of the sequence.
+
+Same word, unrelated meanings. The sentence around it tells you which is
+meant: blocks you allocate and free are KV blocks, blocks of threads that
+execute are thread blocks.
+
+---
+
+## Why can't the API server just be a thread in the same process?
+
+**Lecture:** [24. Serving](24-serving.md)
+
+Python threads share the GIL, so they do not run in parallel: the HTTP thread
+and the engine thread would take turns inside the same interpreter. The HTTP
+work would still execute *between* engine steps, and every request on the wire
+would wait for the engine's chunk boundary.
+
+A separate process gets its own interpreter and its own event loop, which run
+truly at the same time as the engine. The engine's only contact with the
+outside world is the two queues it already has: requests in, responses out.
+That is the whole point of the decoupled design: neither side waits on the
+other's clock.
+
+---
+
+## Arrivals average 20 req/s and the server keeps up on average. Why does a queue ever form?
+
+**Lecture:** [25. Load testing](25-load-testing.md)
+
+Because "on average" describes no particular moment. A Poisson process with a
+mean gap of 50 ms still produces bursts: several arrivals within a few
+milliseconds, then a lull. During the burst, arrivals can outpace the server
+for a few hundred milliseconds, and a queue forms.
+
+The queue only drains when a quiet gap arrives, and only if the long-run
+arrival rate stays below capacity. Past the knee, arrival rate sits at or
+above capacity, so the bursts never fully drain: the queue grows without
+bound. Average traffic keeps up; momentary traffic decides the latency tail.
+
+---
+
+## If round-robin throws away the cache, why would anyone use it?
+
+**Lecture:** [27. Routing and disaggregation](27-routing-and-disaggregation.md)
+
+Round-robin is stateless. It needs no coordination between replicas, no
+telemetry, no shared bookkeeping, and it balances load exactly: request N
+goes to replica N mod R, always. Those properties matter.
+
+On traffic with little repetition, the cache-aware alternative pays
+bookkeeping costs (hash computation, coordination, redirects) while the cache
+itself saves almost nothing, because each prompt is new. Cache-aware routing
+wins in exactly the regime where prefixes repeat. Which one serves you is a
+tuning decision, and the lecture's point is that the cache-aware costs only
+earn their keep when they touch a real hit rate.
+
+---
+
+## How can the GPU report 95% busy and be nearly idle at the same time?
+
+**Lecture:** [28. Autoscaling and cost](28-autoscaling-and-cost.md)
+
+`nvidia-smi` counts "busy" as time with at least one kernel running. Decode is
+memory-bound: the kernel runs the whole time, so the GPU is 100% "busy" while
+the compute units wait on memory to deliver the next bytes. Busyness measures
+whether anything is executing, not whether it is making progress.
+
+The two metrics answer different questions. Utilization says: is the chip ever
+completely empty? Queue depth says: is work waiting for a free slot? Under
+memory-bound decode you can have the first high and the second low
+simultaneously, and the queue is the one that tells you whether to scale.
+
+---

@@ -18,6 +18,10 @@ Now fix it.
 
 ## The idea
 
+Think of the cache as a scratchpad the engine keeps beside the model: one
+entry per token seen so far, holding that token's keys and values, the notes
+later tokens use to look back at it.
+
 The fix follows from one property of causal attention:
 
 > Token 5's key and value never depend on token 6.
@@ -28,11 +32,12 @@ They don't change at step 6, or 400. Recomputing them is pure waste.
 
 ??? question "Wait, I thought K, Q, V were pre-calculated, and we only load them during inference?"
     Only the **weight matrices** are pre-calculated (trained once, fixed). The
-    K/V *vectors* are activations, computed at runtime per token by multiplying
-    the token's hidden state against those weights: `K = X·W_K`. The cache
-    stores each token's K/V the first time it's computed; after that it's a
-    load, but something has to compute them once. If they were only loaded,
-    prefill would have nothing to fill the cache with.
+    K/V *vectors* are activations (the intermediate values a model produces as
+    data flows through it), computed at runtime per token by multiplying the
+    token's hidden state against those weights: `K = X·W_K`. The cache stores
+    each token's K/V the first time it's computed; after that it's a load, but
+    something has to compute them once. If they were only loaded, prefill would
+    have nothing to fill the cache with.
 
     [Full answer in the Q&A](qa.md#arent-q-k-and-v-pre-calculated-arent-we-just-loading-them-during-inference)
 

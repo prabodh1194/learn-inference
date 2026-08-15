@@ -19,8 +19,9 @@ intensity = 62 ops:byte     (vs. an H100's ridge of 295)
 Memory-bound by nearly 5× on an H100, though on the 3090 you're actually
 renting (ridge 76) it's memory-bound by only 1.2× (`76 / 62.4 = 1.22`), so
 temper your speedup expectations accordingly. And the `N²` terms dominate:
-that's the score matrix `S = QK^T`, written to HBM and immediately read back,
-twice:
+that's the score matrix `S = QK^T`, written to **HBM**, the GPU's large slow
+memory, the fridge the chef walks to in Lecture 02's kitchen, and immediately
+read back, twice:
 
 ```
 1. S = QK^T          write S    (4096×4096 fp16 = 32 MiB)
@@ -28,24 +29,43 @@ twice:
 3. O = PV            read P
 ```
 
+(fp16: half-precision numbers, 2 bytes each.) `S` is the grid of dot products
+between every query and every key: "how much should this token listen to that
+one", the whole per-head attention decision. It is written out in full, then
+read back in full, then written out again as `P`, then read back again.
+
 Four touches of the 32 MiB matrix, one per step of the bullet list: write S,
 read S, write P, read P: **128 MiB of round-tripping to compute one attention
-head**, on data that is never needed again (and the same 8N² the Lecture 02
-formula counts). It exists only because the algorithm was written as three
-separate matrix operations.
+head** (one head: one parallel slice of the attention computation, the model
+runs 16 of these side by side), on data that is never needed again (and the
+same 8N² the Lecture 02 formula counts). It exists only because the algorithm
+was written as three separate matrix operations.
 
-Worse, memory is **quadratic** in sequence length. Doubling context quadruples the
-scratch space, which is what makes long context expensive.
+Worse, memory is **quadratic** in sequence length. Doubling the context
+doubles N, but the score matrix is N², so it quadruples. Check it on the
+numbers:
+
+```
+N = 4096:   S is  4096² × 2 bytes  =  33,554,432 B  =   32 MiB
+N = 8192:   S is  8192² × 2 bytes  =  134,217,728 B  =  128 MiB    4× the memory
+```
+
+and four touches of it, 4 × 128 MiB = **512 MiB of round-tripping per head at
+N=8192**. That is what makes long context expensive: the scratch space, not the
+math.
 
 ---
 
 ## The idea
 
-FlashAttention (Dao et al., 2022) never materializes `S`.
+FlashAttention (Dao et al., 2022) never materializes `S`. To materialize is to
+write the whole thing out to memory, and the previous section's problem exists
+only because standard attention insists on materializing both `S` and `P`.
 
 The obstacle is softmax: it needs a sum over the whole row, so you seemingly can't
-process K/V in pieces. The trick is that you can, if you're willing to **fix up
-your answer as you go**.
+process K/V in pieces. The pieces are **tiles**: rectangular slices of a matrix,
+small enough to fit in the chip's on-chip memory. The trick is that you *can*
+process tiles, if you're willing to **fix up your answer as you go**.
 
 ### Online softmax
 
@@ -74,9 +94,21 @@ by `l`.
 attention, computed in a different order. That's what makes FlashAttention safe to
 use everywhere.
 
+??? question "How can two orderings of floating-point math both be 'exact'?"
+    "Exact" here means no approximation: every score, every weight, every sum
+    is computed, in full, once. Nothing is truncated, sampled, or skipped, the
+    way quantization (Lecture 19) or a genuine approximation would. Working
+    row-in-pieces merely reorders the additions, and floating-point addition
+    is not perfectly associative, so the last bits of rounding differ from
+    standard attention, which is why the test tolerance is ~1e-2 rather than
+    bit-for-bit equality. But there is no error beyond that rounding: the
+    answer is as close as the same numbers in a different order can be.
+    [Full answer](qa.md#how-can-two-orderings-of-floating-point-math-both-be-exact)
+
 ### Why it's faster
 
-Q, K, and V tiles are loaded into **SRAM** (on-chip, ~100× faster than HBM), the
+Q, K, and V tiles are loaded into **SRAM**, the chip's on-chip scratchpad,
+about 6 MB total on the 3090, roughly 100× faster to access than HBM, the
 whole tile's work happens there, and only the final output goes back to HBM.
 
 ```
@@ -171,7 +203,10 @@ matters more than the speed: it's what makes long context feasible at all.
 **Higher measured arithmetic intensity**: you moved right along the roofline.
 
 **You will probably not beat the official FlashAttention.** It's hand-tuned per
-architecture with warp specialization and careful pipelining. Getting within 2× of
+architecture with warp specialization (different warps, the chip's fixed 32-thread
+groups, specialise on different jobs: some fetch the next tile while others
+compute) and careful pipelining (fetching the next tile overlaps with the
+arithmetic of the current one, so the memory never idles). Getting within 2× of
 it in ~100 lines of Triton is a genuinely good result, and knowing *why* the gap
 exists is the point.
 

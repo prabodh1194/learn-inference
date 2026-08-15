@@ -9,7 +9,8 @@
 ## The problem
 
 You've built continuous batching, paged attention, prefix caching, chunked
-prefill, speculative decoding, and custom kernels.
+prefill, speculative decoding, and custom kernels: functions that run on the
+GPU, from Lecture 15 onward.
 
 So: how do you compare to the real thing?
 
@@ -25,25 +26,39 @@ built something fast by accident.
 
 ## Run a fair comparison
 
-Most published comparisons are wrong in ways that flatter the author. Control for
+A benchmark is an argument: "this difference is caused by the engines." Every
+uncontrolled variable is a competing explanation you can't rule out, and most
+published comparisons are wrong in ways that flatter the author. Control for
 all of these:
 
-**Same hardware.** Same GPU, same box, no other tenants. On rented hardware, check
-you're not sharing.
+**Same hardware.** Same GPU, same box, no other tenants, nothing else sharing
+the card's memory or bandwidth. On rented hardware, check you're not sharing.
 
-**Same model, same precision.** FP16 vs FP16. If vLLM defaults to something else,
-pin it explicitly.
+**Same model, same precision.** FP16 vs FP16. Precision is the number format
+the weights are stored in: FP16, 16-bit floats, is the unquantized default, and
+quantized formats run faster at a small quality cost (Lecture 19). If vLLM
+defaults to something else, pin it explicitly.
 
 **Same workload.** Identical prompts, identical output lengths, identical arrival
-pattern. Use your `bench/workloads.py` for both.
+pattern: the timing of requests rather than just their content, and a burst and
+a steady stream stress a server very differently. Use your `bench/workloads.py`
+for both.
 
-**Same measurement point.** Client-observed, through HTTP, both sides. Comparing
-your in-process function call against vLLM's HTTP endpoint is not a comparison.
+**Same measurement point.** Client-observed, through HTTP, both sides. Timing
+inside the process measures a library call; timing over HTTP measures what a
+user actually experiences, network, serialization, and queueing included.
+Comparing your in-process function call against vLLM's HTTP endpoint is not a
+comparison.
 
-**Warmup, then steady state.** Both engines. Discard the first N requests.
+**Warmup, then steady state.** Both engines. Discard the first N requests:
+warmup is when the engine pays its one-time costs, CUDA context setup, kernel
+autotuning, lazy loading (Lecture 04), and the steady state is what comes
+after, when every number reflects steady operation.
 
-**Same sampling.** Greedy for both, or identical parameters. Speculative decoding
-on one side and not the other is a different experiment.
+**Same sampling.** Greedy for both (always pick the most likely next token,
+Lecture 06), or identical random parameters. Speculative decoding (drafting
+cheap predicted tokens and verifying them together, Lecture 12) on one side and
+not the other is a different experiment.
 
 **Report the config.** Both command lines, verbatim, in your notes. A benchmark
 whose configuration isn't stated can't be reproduced or trusted.
@@ -59,11 +74,13 @@ vllm serve Qwen/Qwen3-0.6B --dtype float16 --max-model-len 4096 \
 
 For both engines, on identical workloads:
 
-1. **Single-stream latency**, TTFT and TPOT at batch 1. Tests raw per-step
-   efficiency: kernels and launch overhead.
-2. **Throughput at saturation**, max sustained tokens/sec. Tests scheduling and
-   memory efficiency.
-3. **The knee**, from Lecture 25. Tests everything together.
+1. **Single-stream latency**, TTFT and TPOT at batch 1: one request alone on
+   the engine, the best case any user can get. Tests raw per-step
+   efficiency, kernels and launch overhead.
+2. **Throughput at saturation**, max sustained tokens/sec: the engine's queue
+   permanently full, the regime where scheduling and memory efficiency show.
+3. **The knee**, from Lecture 25: the offered load past which latency stops
+   behaving. Tests everything together.
 
 Then run the workloads that isolate specific features: `shared_prefix` for prefix
 caching, `long_prefill` for chunked prefill, `code_completion` for speculative
@@ -79,25 +96,30 @@ profiler**, do not speculate.
 
 Common causes, roughly in order of size:
 
-**Kernels.** vLLM uses FlashAttention/FlashInfer, hand-tuned per architecture.
-Your Triton is likely 1.5–3× behind. Profile both; compare kernel times directly.
+**Kernels.** vLLM uses FlashAttention/FlashInfer, attention kernels hand-tuned
+per GPU architecture. Your Triton is likely 1.5–3× behind. Profile both; compare
+kernel times directly.
 
-**Python overhead.** vLLM's hot path is heavily optimized, with much of the
-scheduler's work batched or moved off the critical path. Look at CPU time per step
-(Lecture 15's first question).
+**Python overhead.** The hot path is the code that runs on every single step,
+and vLLM's is heavily optimized, with much of the scheduler's work batched or
+moved off the critical path. Look at CPU time per step (Lecture 15's first
+question).
 
-**CUDA graphs.** If you skipped Lecture 13 or capture fewer shapes, you pay launch
-overhead they don't.
+**CUDA graphs.** CUDA graphs record a launch sequence and replay it as one
+operation (Lecture 13). If you skipped Lecture 13 or capture fewer shapes, you
+pay the per-launch overhead they don't.
 
 **Scheduling sophistication.** Better packing, smarter preemption, tuned defaults
 that took years of production feedback.
 
-**Memory efficiency.** More blocks available means bigger batches means better
-intensity (Lecture 01). Check `gpu_memory_utilization` and your own block count.
+**Memory efficiency.** More KV blocks available (Lecture 09's fixed-size chunks)
+means bigger batches, which means better arithmetic intensity (Lecture 01).
+Check `gpu_memory_utilization`, the fraction of VRAM vLLM is allowed to turn
+into its block pool, and your own block count.
 
 For each: **cite a measurement.** "Our attention kernel is 2.1× slower, 340µs vs
-162µs per step at 2k context, from `ncu`" is an explanation. "Their kernels are
-better" is a guess.
+162µs per step at 2k context, from `ncu`" is an explanation (`ncu` is Nsight
+Compute, NVIDIA's per-kernel profiler). "Their kernels are better" is a guess.
 
 ---
 

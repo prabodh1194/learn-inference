@@ -25,6 +25,16 @@ Firing 100 requests simultaneously measures a burst. Real arrivals are random wi
 some average rate, which means occasional clumps, and clumps are what create
 queues, and queues are what create tail latency.
 
+"Poisson arrivals" is the statistician's name for traffic like that: a fixed
+average rate, but every gap between arrivals is random, so requests bunch up
+instead of arriving like clockwork. At 20 req/s the gaps average out to
+`1/20 = 0.05 s`, 50 ms, but individual gaps swing from a few milliseconds to a
+few hundred, and where several short gaps land in a row, requests pile on top of
+each other. That clump is real load, and a test with fixed spacing never
+produces one. The `exponentially-distributed gaps` in the code below are exactly
+this: each wait is drawn at random from a distribution whose average is the
+1/rate you asked for.
+
 `bench/workloads.py::poisson_arrivals` stamps exponentially-distributed gaps onto
 any workload:
 
@@ -36,23 +46,50 @@ load = poisson_arrivals(mixed_length(n=1000), rate=20.0)   # 20 req/s
 Using a fixed inter-arrival time hides queueing entirely and makes your service
 look far more predictable than it is.
 
+??? question "Arrivals average 20 req/s and the server keeps up on average. Why does a queue ever form?"
+    Because "on average" describes no particular moment. The 50 ms mean gap
+    hides bursts: several requests can land within milliseconds of each other,
+    while the server can only chew through so many per instant. The burst
+    exceeds that instant's capacity, so some requests wait, and the queue drains
+    only when a quiet gap arrives. The closer average arrival sits to capacity,
+    the longer and deeper those lines get, and past the knee they never drain,
+    which is exactly what the open-loop test is built to expose.
+    [Full answer](qa.md#arrivals-average-20-reqs-and-the-server-keeps-up-on-average-why-does-a-queue-ever-form)
+
 ### Open vs. closed loop
 
-A distinction that changes what you're measuring:
+A distinction that changes what you're measuring. Think of a restaurant door:
+
+```
+closed loop:  client -> request -> server -> response -> next request
+              nobody sends a new request while an old one is in flight
+
+open loop:    --- requests arrive on schedule, come what may ---
+              the next request is sent on time whether or not the
+              previous response has come back
+```
 
 **Closed loop**: N clients, each waits for its response before sending again.
-Load *self-limits*: if the server slows down, offered load drops. This is what
-most naive load tests do, and it cannot show you overload.
+That's the maitre d' who only admits a new table when someone leaves: if the
+kitchen slows down, tables free up more slowly, fewer people get let in, and the
+pressure on the kitchen drops by itself. Load *self-limits*: if the server slows
+down, offered load drops. This is what most naive load tests do, and it cannot
+show you overload, because the test supplies less and less pressure the worse
+the server copes.
 
 **Open loop**: requests arrive at a fixed rate regardless of how the server is
-doing. If service is slower than arrival, the queue grows without bound.
+doing, the entrance that admits strangers on a schedule no matter how the crowd
+inside is going. If service is slower than arrival, the queue grows without
+bound, and the test keeps pouring arrivals in until you stop it.
 
 **You want open loop.** It's what real traffic does, and it's the only way to find
 where your service falls over.
 
 ### The knee
 
-Sweep arrival rate and plot latency against throughput:
+Sweep arrival rate and plot latency against throughput. **Offered load** is the
+rate at which you push requests at the server, whether or not it can keep up;
+it goes on the horizontal axis:
 
 ```
 throughput ^
@@ -83,11 +120,16 @@ marketing.
 
 ### What to report
 
-Per load level: offered rate, achieved throughput, TTFT p50/p90/p99, TPOT
-p50/p90/p99, end-to-end p50/p90/p99, and **queue depth over time**.
+Per load level: offered rate (what you pushed), achieved throughput (what
+actually completed), and the Lecture 24 metrics as percentiles: TTFT, TPOT
+(seconds per generated token, the stream speed after the first token, from
+Lecture 04), and end-to-end latency, each as p50/p90/p99, the latencies that 50,
+90, and 99% of requests finished within. Plus **queue depth over time**: how
+many requests are waiting at each instant, sampled continuously.
 
 Queue depth is the diagnostic. Growing monotonically means you're past the knee,
-and it tells you *before* the latency numbers do.
+and it tells you *before* the latency numbers do: a queue can be climbing while
+percentiles are still averaging the damage away.
 
 ### Percentiles need samples
 

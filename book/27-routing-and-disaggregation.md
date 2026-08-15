@@ -8,12 +8,18 @@
 
 ## The problem
 
-One replica has a ceiling, you found it in Lecture 25. Past that you add
-replicas, and two new problems appear that don't exist on a single box.
+A **replica** is a full copy of your service: its own machine, its own GPU, its
+own copy of the model, and its own scratchpad. One replica has a ceiling, you
+found it in Lecture 25. Past that you add replicas, and two new problems appear
+that don't exist on a single box.
 
-**Your prefix cache fragments.** Each replica has its own. Round-robin sends a
-user's follow-up to a replica that has never seen their conversation, and every
-turn is a cache miss. Lecture 10's win evaporates precisely when you scale.
+**Your prefix cache fragments.** The scratchpad is the KV cache from Lecture 05,
+the running notes the model keeps about each conversation, and each replica
+keeps a private copy. **Round-robin** means taking requests in turn: replica 1,
+2, 3, 1, 2, 3. It balances load perfectly but treats every request as a
+stranger. It sends a user's follow-up to a replica that has never seen their
+conversation, and every turn is a cache miss. Lecture 10's win evaporates
+precisely when you scale.
 
 **Prefill and decode still interfere.** Chunked prefill (Lecture 11) softened this,
 but they remain fundamentally different workloads, compute-bound versus
@@ -30,7 +36,12 @@ round-robin:   user's turn 2 -> replica 3 (cold)   -> full prefill
 cache-aware:   user's turn 2 -> replica 1 (warm)   -> prefix hit
 ```
 
-Route by **where the prefix already lives**:
+Route by **where the prefix already lives**. The **prefix hash** is a
+fingerprint of the conversation's tokens, the same identity Lecture 10's block
+hashes used; a replica keeps a list of the fingerprints it holds, so "have you
+seen this conversation?" becomes a dictionary lookup. **Load** is how much work
+a replica has right now, in-flight requests, queue depth, whichever simple
+proxy you trust:
 
 ```python
 def route(request, replicas):
@@ -42,15 +53,27 @@ def route(request, replicas):
 ```
 
 The tension is immediate and unavoidable: **the replica with your cache may be the
-busy one.** Route purely by cache affinity and you create hotspots; route purely by
+busy one.** Route purely by cache affinity and you create hotspots, one replica
+drowning while the others idle; route purely by
 load and you lose the cache. Every production router blends them, and the blend is
 a tuning decision, not a solved problem.
 
+??? question "If round-robin throws away the cache, why would anyone use it?"
+    Because it is stateless and perfect at the one thing it does: it needs no
+    coordination, no cache telemetry, and it balances load exactly. On traffic
+    with little repetition, or with few replicas, the bookkeeping behind
+    cache-aware routing can cost more than the cache saves. The point of this
+    lecture is that on multi-turn chat the balance flips, which is exactly why
+    the blend is a tuning decision rather than a solved problem.
+    [Full answer](qa.md#if-round-robin-throws-away-the-cache-why-would-anyone-use-it)
+
 Cheap approximations that work well:
-- **Session affinity**: hash the conversation id. Trivial, and captures most of
-  the win for chat.
-- **Prefix-hash routing**: hash the first N tokens; consistent hashing keeps it
-  stable as replicas come and go.
+- **Session affinity**: hash the conversation id, so the same conversation
+  always lands on the same replica. Trivial, no coordination, and captures most
+  of the win for chat.
+- **Prefix-hash routing**: hash the first N tokens; **consistent hashing** (a
+  scheme where adding or removing a replica moves only a slice of the keys
+  instead of reshuffling everything) keeps it stable as replicas come and go.
 - **Global KV store**: a shared cache tier so any replica can fetch a computed
   prefix. Kiely §5.3.3 (p.140) covers this; it's the G4 tier from §5.3.2.
 
@@ -60,8 +83,11 @@ Cheap approximations that work well:
 
 The bigger structural idea, and it follows directly from Lecture 01.
 
-Prefill is compute-bound. Decode is memory-bound. On one GPU they compete, and
-tuning for one hurts the other. So **run them on different machines**:
+Prefill does the reading: it consumes the whole prompt at once, writes the KV
+cache, and produces the first token. Decode does the talking: one token per
+step, each depending on the last. Reading is compute-bound, talking is
+memory-bound (Lecture 01). On one GPU they compete, and tuning for one hurts the
+other. So **run them on different machines**:
 
 ```
 request -> [PREFILL worker]  computes KV cache, first token
@@ -81,13 +107,28 @@ Each side can then be optimized independently, and that's the actual payoff:
 | Parallelism | TP for latency | more replicas for throughput |
 
 You can even use **different GPUs** for each, compute-dense cards for prefill,
-bandwidth-dense ones for decode.
+bandwidth-dense ones for decode. (**TP** is tensor parallelism, splitting one
+model across GPUs so a single request goes faster, Lecture 22.)
 
 ### The cost
 
-**Transferring the KV cache.** For a long prompt this is gigabytes over the
-interconnect. Whether disaggregation wins depends entirely on whether the transfer
-costs less than the interference it removes.
+**Transferring the KV cache.** The **interconnect** is the data link between
+machines: PCIe or NVLink inside one server, InfiniBand or ethernet across a
+rack, all far slower than the memory inside a single GPU. For a long prompt the
+payload is huge. Lecture 09's arithmetic, unchanged:
+
+```
+32,768 tokens × 112 KiB per token  =  3,670,016 KiB  =  3.5 GiB
+    128 tokens × 112 KiB per token  =     14,336 KiB  =  14 MiB
+```
+
+A long document's cache is gigabytes, big enough that the transfer takes real
+time. A short chat's cache is 14 MiB, pocket change by size, yet it pays the
+same fixed costs to cross the interconnect: a round-trip, a handshake, the
+receiving worker's setup. Those fixed costs don't shrink with the payload,
+which is why short prompts lose proportionally the most. Whether disaggregation
+wins depends entirely on whether the transfer costs less than the interference
+it removes.
 
 **It wins when:** prompts are long, load is high, prefill and decode genuinely
 contend, and you have fast interconnect.

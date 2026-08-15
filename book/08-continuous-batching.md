@@ -28,10 +28,23 @@ The batch stops being a fixed group and becomes a *sliding window* over a queue.
 Idle slots are refilled instead of held. This is **continuous batching**
 (sometimes "in-flight batching"), introduced in the Orca paper.
 
+```
+step:       1    2    3    4    5    6
+slot 1:     A    A    A    C    C    C
+slot 2:     B    B    B    B    B    D
+
+A finishes at step 3, its slot is handed to waiting request C at step 4.
+B finishes at step 5, its slot goes to D at step 6. No slot waits for a
+batch to "complete", there is no batch to complete.
+```
+
 The insight it rests on is one you already proved in Lecture 01: **decode steps
 are memory-bound**, so adding a sequence to an in-flight batch is nearly free.
-The weights were being loaded anyway. An empty slot isn't saving you anything,
-it's pure waste.
+The chip waits on bytes, not math: per step the weights (840 MiB) must cross
+the memory link regardless of how many sequences are in the batch, and the
+arithmetic one more sequence asks for is small enough to fit in the idle time.
+From Lecture 01's batching table, a batch of 32 moves the same bytes as a batch
+of 1. An empty slot isn't saving you anything, it's pure waste.
 
 ### The architectural consequence
 
@@ -83,15 +96,19 @@ Each step, three questions:
 Two budgets bound the answer:
 
 - **`max_batch_size`**: concurrent sequences.
-- **`max_batched_tokens`**: total tokens per step. A prefill of 4,000 tokens is
-  much more work than 32 decode steps, so counting sequences alone underestimates
-  a step's cost badly.
+- **`max_batched_tokens`**: total tokens per step. Every token, prefill or
+  decode, costs one full pass over the weights, so the work in a step is
+  proportional to its token count. A prefill of 4,000 tokens is 4,000 passes'
+  worth, against a decode part of 32, and 4,000 / 32 = 125× more work than
+  the decode alone. Counting sequences alone underestimates a step's cost
+  badly.
 
 ### The prefill/decode conflict
 
 Here's the tension that Lecture 11 exists to resolve. Admitting a new request
-means running its prefill, which is expensive and *compute-bound*. Meanwhile
-every running sequence wants a cheap *memory-bound* decode step.
+means running its prefill, which is expensive and *compute-bound* (Lecture 02:
+its arithmetic is the limit, so it runs as fast as the chip can do math).
+Meanwhile every running sequence wants a cheap *memory-bound* decode step.
 
 Mix them and prefill dominates the step, every decoding user stalls. This is why
 naive continuous batching improves throughput while making **p99 latency worse**.

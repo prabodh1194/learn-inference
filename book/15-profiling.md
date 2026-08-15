@@ -10,15 +10,28 @@
 
 ## The problem
 
-Part III is about making kernels faster. Before writing a single one, you need to
-know **which** kernel, because the honest answer is usually not the one you'd
-guess.
+Part III is about making kernels faster. A **kernel** is a small program the
+chip runs: one step of the model's math, one matmul, one normalization, one
+add. The forward pass is dozens of them, and they run one after another, so
+the total time is the sum of their individual times. Before writing a single
+one, you need to know **which** kernel, because the honest answer is usually
+not the one you'd guess.
 
 Optimizing without profiling is how people spend a weekend on a kernel that
-accounts for 3% of runtime and report a "12% improvement" that's 0.4%.
+accounts for 3% of runtime and report a "12% improvement" that's 0.4%. Here is
+that arithmetic, because it is the whole lesson. The 12% applies only to the
+kernel's own slice of the step, not to the step:
 
-Amdahl's law, stated as a rule: **you cannot make something faster than the time
-you didn't spend in it.**
+```
+0.03  ×  0.12  =  0.0036  =  0.36%  ≈  0.4%    of the step overall
+```
+
+Twelve percent of the kernel is a third of a percent of the step. Nobody sees
+the step get faster, and a weekend is gone.
+
+Amdahl's law, stated as a rule: **you cannot make something faster than the
+time you didn't spend in it.** A kernel can only speed up its own slice; the
+other 97% of the step runs at its old speed, untouched, forever.
 
 ---
 
@@ -70,8 +83,9 @@ nsys profile -o timeline python bench_decode.py
 
 - **Nsight Systems (`nsys`)**: timeline. Gaps, overlap, CPU/GPU interaction.
   Answers "what is the machine doing?"
-- **Nsight Compute (`ncu`)**: per-kernel. Occupancy, memory throughput, achieved
-  vs. peak. Answers "is this kernel good?"
+- **Nsight Compute (`ncu`)**: per-kernel. Occupancy (how many warps, the chip's
+  fixed 32-thread groups, it can keep resident and ready at once), memory
+  throughput, achieved vs. peak. Answers "is this kernel good?"
 
 The number to look for is **achieved memory bandwidth as a fraction of peak**.
 Lecture 02 said decode is memory-bound; a well-written decode kernel should be at
@@ -96,13 +110,22 @@ The discipline that makes profiling useful rather than a hobby:
    `bench/` results aren't wins.
 7. **Re-profile.** The bottleneck moved. Start again.
 
-Step 6 is the one people skip. A kernel 2× faster that was 4% of runtime buys you
-2%, which is inside your measurement noise. **Only end-to-end numbers count.**
+Step 6 is the one people skip. A kernel 2× faster that was 4% of runtime buys
+you 2%, which is inside your measurement noise. Every term in that claim:
+
+```
+old step   =  96% (everything else)   +  4% (the kernel)        =  100%
+new step   =  96%                     +  4% / 2  (kernel halved) =  98%
+speedup    =  100 / 98                =  1.0204                  ≈  +2%
+```
+
+**Only end-to-end numbers count.**
 
 ### Warmups and steady state
 
 Same trap as Lecture 04, one level down. First iterations include CUDA context
-setup, autotuning, and lazy initialization. Always discard warmup iterations, and
+setup (the GPU-side bookkeeping that only comes into being on first use),
+autotuning, and lazy initialization. Always discard warmup iterations, and
 profile a **steady-state** decode loop rather than a cold start: that's what your
 server actually spends its life doing.
 

@@ -11,12 +11,18 @@
 Everything so far has moved bytes more cleverly. Quantization asks a blunter
 question: **why are the bytes so big?**
 
-Decode is memory-bound (Lecture 02, 0.79 ops:byte). Time is proportional to bytes
-loaded. So halve the bytes and you nearly halve the time, no algorithmic
-cleverness required.
+Every weight is currently stored as a 16-bit float (FP16, 2 bytes). Decode is
+memory-bound (Lecture 02, 0.79 ops:byte), which means the GPU is mostly waiting
+for bytes to arrive, not computing. Time is proportional to bytes loaded, for
+a simple reason: on a memory-bound kernel, the bytes *are* the work. So halve
+the bytes and you nearly halve the time, no algorithmic cleverness required.
+The arithmetic is the same either way; only the size of the luggage changes.
 
-FP16 → INT8 is 2× fewer bytes. INT4 is 4×. That's a bigger decode win than
-anything in Lectures 16–18.
+FP16 → INT8 is 2× fewer bytes (2 bytes per weight becomes 1). INT4 is 4×
+(half a byte). That's a bigger decode win than anything in Lectures 16–18,
+which all saved bytes too, but only in the narrow attention stage; quantization
+saves bytes on the *weights*, which are the biggest single traffic item in
+every decode step (880.8 MB of the 1,115.7 MB from Lecture 02).
 
 There is a catch, and it's the whole reason this lecture is structured the way it
 is: **quantization is the only optimization in this book that can make your model
@@ -27,18 +33,34 @@ quality for speed, and the trade is invisible unless you go looking.
 
 ## The idea
 
-Store weights in fewer bits, dequantize on the fly:
+Store weights in fewer bits, **dequantize** on the fly: convert each small
+integer back to the float it stands for, right as the kernel loads it, so the
+matmul itself runs unchanged. The conversion is one multiply and one subtract:
 
 ```
 w_fp16 ≈ scale × (w_int8 - zero_point)
 ```
 
+Two names worth saying plainly. **scale** is how much one unit of the integer
+range is worth, one step on the number line. **zero_point** is an offset: a
+shift so that an integer 0 can stand for a non-zero float, and so the float 0
+can be represented exactly, which matters because padding and masking sprinkle
+zeros through the model. Store the tiny integer matrix and a few numbers per
+group, reconstruct each weight when it is loaded, do the math as if nothing
+happened.
+
 The interesting question is what `scale` covers.
 
 **Per-tensor**: one scale for the whole matrix. Smallest metadata, worst accuracy:
 a single outlier stretches the range and crushes precision for everything else.
+The picture: one number to describe every weight in the matrix, so a single
+huge value spreads the integer grid over a wider span, and the weights that
+matter are all squeezed into a coarse corner of it.
 
-**Per-channel**: one scale per output channel. Standard, and much better.
+**Per-channel**: one scale per output channel. Standard, and much better. A
+channel, for a weight matrix, is one output neuron's row of incoming weights;
+giving each row its own number line means a row with small weights gets a fine
+grid, regardless of what other rows contain.
 
 **Per-group**: one scale per group of 64–128 weights. Best accuracy, most
 metadata. What INT4 methods use, because 4 bits can't absorb any range waste.
@@ -47,13 +69,18 @@ metadata. What INT4 methods use, because 4 bits can't absorb any range waste.
 
 Three separate decisions, often confused:
 
-**Weight-only (W8A16, W4A16)**: quantize weights, compute in FP16. Dominant for
-inference. Decode is bound by *weight* traffic, so this attacks the bottleneck
+**Weight-only (W8A16, W4A16)**: quantize weights, compute in FP16. The notation
+is a pair: the weight precision, then the activation precision. W8A16 means
+8-bit weights, 16-bit activations; W4A16 the same with 4-bit weights. Dominant
+for inference. Decode is bound by *weight* traffic, so this attacks the bottleneck
 directly, and activations stay accurate. Dequantization happens in-kernel.
 
 **Weight + activation (W8A8)**: both quantized, so the matmul runs on INT8 tensor
-cores. Faster in principle, but activations have outliers that make them much
-harder to quantize than weights.
+cores, the chip's specialist matrix-multiply hardware. Faster in principle, but
+activations have outliers that make them much harder to quantize than weights.
+Weights are fixed at training time and can be studied, measured, and adjusted
+once. Activations change with every token, so the ranges they need are only
+known in hindsight.
 
 **KV cache quantization**: a different axis entirely. From Lecture 05 the cache can
 exceed the model's size; from Lecture 09 its capacity caps your batch size.
@@ -74,6 +101,16 @@ AWQ's premise is worth stating because it generalizes: **not all weights matter
 equally.** A small fraction of channels carry disproportionate influence, and
 keeping those at higher precision recovers most of the quality.
 
+Two table entries read as magic; unpack them. GPTQ's "second-order information"
+is the shape of the error surface, measured by running a few batches of data
+through the layer (a **calibration** pass). It lets GPTQ round each weight in a
+way that compensates for the damage the previous rounding just did, rather than
+rounding every weight in isolation. SmoothQuant's "shift" means multiplying the
+outlier-prone activations down and the weights up, paired per channel, so the
+hard quantization job moves from the activations (where it cannot be done
+well) into the weights (where it can be measured and compensated). Both are
+efforts to make rounding hurt less, not new math.
+
 ### Hardware decides your format
 
 The [field notes](field-notes.md) record an operator choosing a quant specifically
@@ -92,7 +129,9 @@ is rarely the actual operation; mixed precision across layer types is normal.
 
 This is the part people skip, and it's the reason this lecture exists.
 
-**Perplexity is necessary and not sufficient.** It's an average over next-token
+**Perplexity is necessary and not sufficient.** Perplexity is one number: how
+surprised, on average, the model is by each next token in a corpus, lower is
+better. It's an average over next-token
 predictions; a small delta can hide a specific broken capability. A model can hold
 perplexity nearly constant while losing the ability to follow a multi-step format.
 
@@ -143,7 +182,10 @@ your measurement match, and if not, what else is now the bottleneck?
 **Memory roughly halves at INT8.** Predictable.
 
 **Speedup below 2×.** You quantized weights, not everything, activations, KV
-cache, and overhead are unchanged. Amdahl again.
+cache, and overhead are unchanged. This is Amdahl's law in miniature: the total
+speedup of a change is capped by the share of the time the change actually
+touches. Weights are the biggest share of decode traffic, so you get most of
+the win, but everything unquantized still takes the same time it always did.
 
 **INT8 quality nearly indistinguishable** on most tasks. This is why W8A16 is
 close to a default.

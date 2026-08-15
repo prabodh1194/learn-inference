@@ -72,8 +72,10 @@ fixed 64-token prompt contributes a large linear term at these lengths.)
 
 ## The idea
 
-Autoregressive generation means each token depends on all previous ones. The
-naive loop is the direct translation of that sentence:
+Generating one token from all the ones before it, which is what the loop below
+does, is called **autoregressive** generation (autós, self: the text generates
+itself, one token feeding the next). It means each token depends on all
+previous ones. The naive loop is the direct translation of that sentence:
 
 ```python
 tokens = tokenizer(prompt, return_tensors="pt").input_ids
@@ -86,10 +88,13 @@ for _ in range(max_tokens):
 
 Correct, and wasteful in a specific way. On step `n` the model computes keys and
 values for all `n` tokens, but tokens `0..n-2` haven't changed since last step,
-and neither have their K/V. Attention is causal: token 5's key never depends on
-token 6. Recomputing it is pure waste.
+and neither have their K/V. Attention is **causal** (later tokens never influence
+earlier ones): token 5's key never depends on token 6. Recomputing it is pure
+waste.
 
-Only `logits[:, -1]` is used. Everything else is discarded.
+**Logits** are the model's raw scores, one per token of the **vocabulary**,
+the fixed set of tokens the model can output; the largest one wins under greedy
+decoding. Only `logits[:, -1]` is used. Everything else is discarded.
 
 So step `n` costs O(n), and generating N tokens costs **O(N²)**.
 
@@ -98,7 +103,9 @@ So step `n` costs O(n), and generating N tokens costs **O(N²)**.
 - **`logits[:, -1]`**: the last position's prediction. Off-by-one here is the
   most common bug, and it produces plausible-but-wrong text rather than a crash.
 - **`torch.no_grad()`**: no backward pass; gradients would waste memory.
-- **`model.eval()`**: turns off dropout. Non-deterministic output otherwise.
+- **`model.eval()`**: turns off **dropout** (a training-time randomizer that
+  switches off random parts of the network; left on at inference it would make
+  output wobble). Non-deterministic output otherwise.
 - **`on_token()`**: call once per generated token so the benchmark harness can
   timestamp it. The test checks the count exactly; if it's wrong, every tok/s
   number in the course is off by the same factor and nothing else would catch it.
@@ -118,9 +125,10 @@ def load(model_id=MODEL_ID, device=None, dtype=None):
     return model, AutoTokenizer.from_pretrained(model_id)
 ```
 
-Use **float32 on MPS** to start. fp16 on Apple silicon has accuracy quirks that
-will make the correctness test fail for reasons that have nothing to do with your
-loop, fight one battle at a time.
+Use **float32 on MPS** to start (MPS, Metal Performance Shaders, is Apple's
+GPU platform: the way PyTorch reaches your laptop's chip). fp16 on Apple silicon
+has accuracy quirks that will make the correctness test fail for reasons that
+have nothing to do with your loop, fight one battle at a time.
 
 **2. Implement `engine/generate.py::generate_naive`** using the sketch above.
 
@@ -163,7 +171,8 @@ Per-token time climbing with position, roughly linearly.
 If it looks **flat at short lengths**, that's not a contradiction: it's fixed
 overhead (Python, kernel launches) dominating while sequences are short. The
 quadratic term wins eventually. Note where the bend happens; that crossover point
-is itself informative, and it's what Lecture 13 (CUDA graphs) attacks.
+is itself informative, and it's what Lecture 13 (CUDA graphs, CUDA being
+NVIDIA's platform for running code on its GPUs) attacks.
 
 Save the plot. Lecture 05 overlays the cached version on it.
 

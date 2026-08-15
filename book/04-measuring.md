@@ -48,9 +48,12 @@ elapsed = time.perf_counter() - start
 harness rather than hand-rolling `time.perf_counter()`**: this is the single
 most common way to fool yourself, and it fools you in the flattering direction.
 
-A related trap: **the first call is always slow.** CUDA context setup, kernel
-autotuning, lazy module init. Always run a few warmup iterations and discard
-them, or you're benchmarking initialization.
+A related trap: **the first call is always slow.** Three one-time costs pile
+up behind it: CUDA context setup (initializing the card, allocating its
+resources for your process), kernel autotuning (the runtime trying several
+ways to run each kernel and keeping the fastest), and lazy module init
+(PyTorch deferring setup until a module is first used). Always run a few
+warmup iterations and discard them, or you're benchmarking initialization.
 
 ### The four numbers
 

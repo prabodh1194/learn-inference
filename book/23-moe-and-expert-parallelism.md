@@ -22,7 +22,9 @@ GPT-OSS). Understanding them is no longer optional for inference work.
 ## The idea
 
 Replace each MLP block with **many** MLPs ("experts") plus a **router** that
-activates only a few per token:
+activates only a few per token. The router is a small scoring layer: it gives
+every expert a score for the current token, and activates the few with the
+highest scores (**top-k**; top-2 means the two best, top-1 the single best):
 
 ```
 dense:  token -> MLP (all params)              -> output
@@ -30,16 +32,35 @@ MoE:    token -> router -> pick top-2 of 128   -> output
 ```
 
 With 128 experts and top-2 routing you get the *capacity* of 128 MLPs at roughly
-the *compute* of 2: `2 / 128 = 1.6%` of dense compute per token, at 100% of the
-memory (you must store all 128 expert weight matrices).
+the *compute* of 2:
+
+```
+2 / 128  =  0.0156  =  1.56%  of dense compute per token
+```
+
+That 0.0156 rounds to 0.016, which is the 1.6% you'll see quoted. Now read
+the memory side of the same sentence: you still store all 128 expert weight
+matrices, so the *memory* is unchanged, 100% of the dense model's. Compute
+falls to ~1.6%, memory stays at 100%. That asymmetry is the whole story of
+this lecture, and the next section names its two halves.
 
 The vocabulary that follows from this, and which trips people up:
 
 - **Total parameters**: everything stored. Determines memory.
 - **Active parameters**: what runs per token. Determines compute.
 
-DeepSeek-V3 is 671B total, 37B active. **You must hold all 671B in memory even
+DeepSeek-V3 is 671B total, 37B active. With the book's standing convention of
+2 bytes per weight (the same arithmetic Lecture 22 used for its 70B example):
+
+```
+total :  671B × 2 B  =  1,342 GB  ≈  1.34 TB    must be resident, always
+active:   37B × 2 B  =     74 GB                read per token, at most
+```
+
+**You must hold all 671B in memory even
 though each token touches 37B**, because the router might select any expert.
+The 1.34 TB is what you buy; the 74 GB is what you actually use per token, an
+18.1× buffer (`1,342 / 74 = 18.1`, the same ratio as `671 / 37`).
 
 That mismatch is the entire inference story for MoE.
 
@@ -53,11 +74,32 @@ Go back to Lecture 02 and re-derive it.
 
 **Memory *bandwidth* per token falls**, you only read the active experts.
 
-Note what this does **not** say. Arithmetic intensity is roughly *unchanged*,
-compute and bytes both fall by the same active/total factor, so you haven't moved
-along the roofline. What falls is the **absolute** bytes per token, and decode
-latency is made of absolute bytes. MoE buys capacity at nearly fixed decode cost;
-it does not buy you a better roofline position.
+Now the re-derivation, with the DeepSeek-V3 numbers, using the book's simple
+model of one forward pass (2 FLOPs per parameter per token, 2 bytes per
+weight, from Lecture 02). Compare the MoE to a hypothetical **dense** model of
+the same 671B total size:
+
+```
+                  dense twin (671B)          MoE (671B stored, 37B active)
+bytes/token:      671B × 2 B  = 1,342 GB      37B × 2 B  =  74 GB
+compute/token:    2 × 671B    = 1,342 GFLOP   2 × 37B    =  74 GFLOP
+intensity:        1,342/1,342 = 1 op:byte     74/74      =  1 op:byte
+```
+
+The sink of it: the MoE moves **18.1× fewer bytes** (`1,342 GB / 74 GB`) and
+does 18.1× less compute, so the *ratio* of compute to bytes barely moves.
+Arithmetic intensity is roughly *unchanged*: compute and bytes both fall by the
+same active/total factor (37/671, about 5.5%), so you haven't moved along the
+roofline. What falls is the **absolute** bytes per token, and decode latency is
+made of absolute bytes: the MoE's 74 GB per token is why a 671B-parameter model
+can decode like a 37B one. MoE buys capacity at nearly fixed decode cost; it
+does not buy you a better roofline position.
+
+(One honesty note on that table: it counts weights only, the dominant term.
+Both models also read the same KV cache bytes per token, identical in the two
+columns, and that shared term is exactly what makes the change "roughly"
+rather than exactly zero: with a 2048-token context it nudges the MoE's
+intensity from 1.000 to about 0.997, still essentially 1.)
 
 But a new cost appears: **routing is dynamic and unbalanced.** Which experts a
 token needs isn't known until the router runs, and different tokens in a batch
@@ -73,6 +115,12 @@ TP:  every GPU holds a slice of every expert   -> all-reduce per layer
 EP:  each GPU holds complete experts           -> route tokens to the right GPU
 ```
 
+Under EP the tokens themselves travel. An **all-to-all** is the other classic
+collective (the family Lecture 21 named): every GPU hands every other GPU the
+tokens that chose its experts, all in one coordinated exchange. Unlike the
+all-reduce, where each GPU ends with a copy of a shared total, here each GPU
+ends with *different* data: the tokens it must process.
+
 The tradeoff, and it's a clean one:
 
 | | TP | EP |
@@ -82,9 +130,15 @@ The tradeoff, and it's a clean one:
 | Optimizes | **latency** | **throughput** |
 | Scales to | within a node | across nodes |
 
-EP moves less data (routed tokens are smaller than full activations) which is
-why it survives lower-bandwidth interconnects and scales multi-node where TP
-doesn't.
+Why the volume column differs: TP's all-reduce carries a full-sized
+activation, the whole hidden dimension, at *every* layer, every token, every
+step, in both directions. EP's all-to-all carries only the tokens that happen
+to switch GPUs, and each carries no more than one hidden vector. Most tokens in
+a batch are usually routed to experts on their own GPU and never travel at all;
+only the minority cross the interconnect. Fewer bytes, less often: that's why
+EP survives lower-bandwidth interconnects and scales multi-node where TP
+doesn't, and why its cost is a *throughput* question (how many tokens can the
+layers keep flowing) rather than a per-token latency one.
 
 **Production deployments mix them**: TP for attention (which isn't expert-sharded)
 and EP for the MoE layers. Kiely's Fig 5.15 (p.146) diagrams exactly this.
@@ -92,13 +146,20 @@ and EP for the MoE layers. Kiely's Fig 5.15 (p.146) diagrams exactly this.
 ### Load imbalance is the operational problem
 
 Nothing guarantees experts get equal traffic. Some are popular; their GPU becomes
-the bottleneck while others idle.
+the bottleneck while others idle. An expert is a GPU's local workload, after
+all: a hot expert saturates its GPU while a cold one leaves its GPU mostly
+empty, and the empties cannot help the busy one.
 
 Mitigations you'll see in the wild:
 
-- **Capacity factor**: cap tokens per expert; drop or reroute the overflow.
-- **Auxiliary load-balancing loss**: a training-time nudge toward uniformity.
-- **Expert replication**: duplicate hot experts across GPUs.
+- **Capacity factor**: a cap on how many tokens one expert will accept in a
+  single step, quoted as a multiple of its fair share (each expert getting
+  `1/n_experts` of the batch). Tokens past the cap are dropped or rerouted.
+- **Auxiliary load-balancing loss**: a training-time nudge toward uniformity; a
+  small penalty term added when routing gets lopsided, so the router learns to
+  share work before serving ever sees it.
+- **Expert replication**: duplicate hot experts across GPUs, buying the
+  popular ones extra attention at the cost of memory.
 
 This is an inference-time reality even though its main lever is at training time,
 and it's why MoE serving has more variance than dense serving.

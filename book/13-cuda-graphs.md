@@ -11,16 +11,57 @@
 
 ## The problem
 
-Every optimization so far assumed **the GPU** is the bottleneck. For small batches
-during decode, it often isn't.
+Every optimization so far assumed **the GPU** is the bottleneck, the chip that
+does the math. For small batches during decode, it often isn't. The **CPU**, the
+processor that runs your Python and organizes the work, is the one running out
+of time instead. The two machines cooperate, and both must be paid.
 
-A single decode step launches hundreds of kernels, one or more per layer, times
-28 layers, plus normalization, RoPE, attention, MLP, sampling. Each launch is a
-CPU-side call costing roughly **5–10 microseconds**.
+One decode step is hundreds of small jobs. Each job is a **kernel**: a small
+program the chip runs, one step of the model's math, like "multiply these two
+matrices" or "add these two vectors". A single decode step launches hundreds of
+kernels, one or more per layer, times 28 layers, plus the attention math
+(scores, softmax, output), the MLP, the two normalizations, the RoPE step (the
+rotation that tells the model where each token sits in the sequence), and
+sampling at the end. For a typical engine the honest count comes to about 400:
 
-Do the arithmetic. 400 kernels × 7µs ≈ **2.8ms of pure launch overhead**, before
-the GPU computes anything. If your decode step's actual compute is 3ms, you're
-spending nearly half your time on submission.
+```
+400 kernels  ÷  28 layers  ≈  14 kernels per layer
+```
+
+Now the part that is easy to miss. Before the chip runs any of that work, the
+CPU must tell the chip to run it, one call per kernel. Each call is **launch
+overhead**: the fixed cost of telling the chip to run a program, roughly
+**5–10 microseconds** of CPU time, spent on paperwork, not arithmetic. Draw
+the step as a time line:
+
+```
+one decode step
+
+CPU runs Python:   submit   submit   submit                   submit
+(kernel calls)     kernel 1 kernel 2 kernel 3     ...         kernel 400
+                     v        v        v                          v
+GPU (the chip):   [kernel 1][gap][kernel 2][gap][kernel 3][gap]  [kernel 400]
+                     ^ work,   ^ the chip has nothing to do: the next
+                       a few µs   order is still being written by the CPU
+```
+
+The chip executes kernels back to back only while the CPU keeps new orders
+coming. When the CPU falls behind, the chip sits idle between kernels, and that
+idle time is real time you pay for. Do the arithmetic. Four hundred kernels at
+7µs each:
+
+```
+400 × 7 µs  =  2,800 µs  =  2.8 ms        of pure launch overhead
+```
+
+If the decode step's actual compute is 3ms, then of every step:
+
+```
+2.8 ms / (2.8 ms + 3.0 ms)  =  2.8 / 5.8  =  0.48
+```
+
+you're spending **nearly half your time on submission**, just ordering the
+work, before and between the times the GPU computes anything.
 
 The signature is unmistakable once you know it: **the GPU has visible gaps in its
 timeline, the step is slow, and making the GPU faster changes nothing.** You are
@@ -32,12 +73,27 @@ CPU-bound in a program that appears to be about GPUs.
 > work. What you want is Nsight Systems showing idle stretches between kernels
 > (Lecture 15), which is a direct observation rather than a summary statistic.
 
+??? question "But kernel launches are asynchronous: can't the CPU just run ahead and hide all this?"
+    Launching is asynchronous, but it still costs the CPU its own time. The CPU
+    submits a kernel and moves on to the next call without waiting for the chip
+    to finish, so the CPU does get ahead, until it falls behind. Each call
+    costs the CPU 5–10µs of its own; a small-batch kernel executes in a few
+    microseconds. When the per-call CPU cost exceeds the per-kernel chip time,
+    the queue runs dry: the chip finishes what it has and waits for the next
+    order, which is exactly the gap Nsight shows between kernels. CUDA graphs
+    remove the per-call cost, so the CPU stops falling behind in the first
+    place.
+    [Full answer](qa.md#but-kernel-launches-are-asynchronous-cant-the-cpu-just-run-ahead-and-hide-all-this)
+
 ---
 
 ## The idea
 
 Decode steps are **identical in shape**, every single time. Same kernels, same
-order, same tensor shapes, only the values in the tensors change.
+order, same tensor shapes, only the values in the tensors change. A **tensor**
+is a grid of numbers, here the activations flowing through the model; its
+shape is its dimensions. "Same shape, different values" means every step is
+structurally the same work, only the numbers differ.
 
 So record the launch sequence once and replay it:
 
@@ -67,7 +123,11 @@ capture several graphs (1, 2, 4, 8, 16, 32…) and pad up to the nearest. That
 padding is real waste, traded against launch savings.
 
 **Static memory.** Inputs must be copied into the same buffers each time. You
-cannot pass fresh tensors.
+cannot pass fresh tensors. A captured graph records addresses, not values: a
+fresh tensor lives at a new address, and replaying the graph would silently
+read whatever is in the old one. That is why the code above writes
+`static_input.copy_(new_tokens)` before every replay, a copy into the recorded
+slot.
 
 > This constraint is why `StaticCache` exists (Lecture 05). A `DynamicCache`
 > grows by concatenation, so its tensors move, new addresses every step, which a
@@ -133,8 +193,10 @@ matters less proportionally.
 
 **Nothing for prefill.** Expected: it's compute-bound.
 
-**Higher memory use.** Each captured graph holds its static buffers. Capturing
-many batch sizes costs real VRAM, which competes with your KV cache.
+**Higher memory use.** Each captured graph holds its static buffers, the
+reserved input, output, and scratch slots it replays into, one set per batch
+size. Capturing many batch sizes costs real VRAM, which competes with your KV
+cache.
 
 That last point is worth sitting with: this optimization *takes* memory from
 Lecture 09's budget. Every engine makes this trade, and it's a genuine trade

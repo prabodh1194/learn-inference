@@ -22,7 +22,8 @@ None of that is engine work. All of it determines whether the engine is usable.
 
 ### Speak OpenAI's API
 
-Not because it's well-designed, but because it's the de facto standard. Implement
+Not because it's well-designed, but because it's the de facto standard: the
+format every existing client and tool already speaks. Implement
 `/v1/chat/completions` and every existing client works unmodified: that's real
 leverage for free.
 
@@ -40,9 +41,14 @@ POST /v1/chat/completions
 ### Streaming is the point
 
 Lecture 01's TTFT only matters if the user *sees* the first token. Buffer the whole
-response and you've thrown away every latency optimization in this book.
+response and you've thrown away every latency optimization in this book: the user
+waits for the entire generation and receives it all at once, so a fast engine
+feels like a slow one.
 
-Server-Sent Events, one chunk per token:
+**Server-Sent Events (SSE)** is a plain-text protocol: the server opens one HTTP
+connection and pushes lines of `data:` text as each one becomes ready. Each token
+is a line, so the client renders it the moment the GPU produces it. One chunk per
+token:
 
 ```
 data: {"choices":[{"delta":{"content":"Because"}}]}
@@ -57,10 +63,24 @@ data: [DONE]
 The architectural point of this lecture, and the reason vLLM runs the API server
 in a **separate process**.
 
-Your engine loop is synchronous and GPU-bound; it must run steps back to back with
-no gaps. HTTP handling is async and I/O-bound. Put them in one event loop and
-request parsing, JSON serialization, and SSE writes all steal time from the
-scheduler:
+An **event loop** is a single thread that handles every event a program receives,
+one at a time: one request arriving, then another socket becoming readable, then
+a timer. Everything that happens in that thread happens in sequence, so any
+unrelated work it does delays everything else. Two very different kinds of work
+are competing for one thread:
+
+- The **engine loop** is synchronous and GPU-bound: one step at a time, back to
+  back, with no gaps. It should never wait on a socket, because a socket has
+  nothing to do with the GPU's work.
+- **HTTP handling** is async and I/O-bound: parsing a request, serializing JSON,
+  and writing to a slow client each involve waiting, on a network, on a client
+  halfway around the world, for data that hasn't arrived yet.
+
+Put them in one event loop and request parsing, JSON serialization, and SSE
+writes all steal time from the scheduler. Picture a chef who also answers the
+phone: every call that comes in while the stove is on makes the stove wait too,
+because there's only one person. The fix is a second process with its own event
+loop, connected by queues, the serving equivalent of a waiter taking orders:
 
 ```
 BAD:   [async HTTP] ---- shares event loop ---- [engine.step()]
@@ -70,16 +90,30 @@ GOOD:  [API server] --queue--> [engine loop] --queue--> [API server]
        the engine never waits on a socket
 ```
 
-Tokenization is the sneaky one: it's pure CPU and it's on the request path. At
-high request rates it will eat your scheduler's time if it shares the loop.
+Tokenization is the sneaky one: it's pure CPU, it's cheap per call, and it sits
+on the **request path**, the stretch of work between "request arrives" and
+"first token streams". At high request rates it will eat your scheduler's time
+if it shares the loop.
+
+??? question "Why can't the API server just be a thread in the same process?"
+    Python threads share one interpreter lock (the GIL), so their code never
+    runs at the same time as the engine loop's: every byte of HTTP work would
+    still execute between engine steps, just as if it were the same thread. A
+    separate process has its own interpreter and its own event loop, so HTTP
+    work and engine steps genuinely run in parallel, and the engine's only
+    contact with the outside world is the queues.
+    [Full answer](qa.md#why-cant-the-api-server-just-be-a-thread-in-the-same-process)
 
 ### Cancellation
 
 Clients disconnect, closed tabs, timeouts, abandoned agent runs. If you don't
 detect it you keep generating tokens nobody will read, burning GPU on nothing.
+It's the phone call where the other person hung up minutes ago and nobody
+mentioned it to you.
 
 Under load this is not a rounding error. Check for disconnection each step and
-free the sequence, releasing its blocks (Lecture 09) back to the pool.
+free the sequence (one request's in-flight generation), releasing its blocks
+(Lecture 09) back to the pool.
 
 ### The whole path, and where time goes
 
@@ -87,10 +121,16 @@ free the sequence, releasing its blocks (Lecture 09) back to the pool.
 tokenize -> queue -> schedule -> prefill -> decode xN -> detokenize -> SSE
 ```
 
-Kiely §7.5.1 (p.205) makes a point worth taking seriously: **client-side overhead
-can dominate**. A 20ms TTFT is invisible behind a 200ms TLS handshake, a slow
-tokenizer, or a client that buffers. Measure end to end, from the client, or
-you're optimizing a number nobody experiences.
+The arrows are handoffs between components. The queue is where requests wait;
+prefill and decode are the engine steps from Lecture 01; detokenize is the
+reverse of tokenization, turning token IDs back into text; and the SSE stream is
+what the client actually sees.
+
+Kiely §7.5.1 (p.205) makes a point worth taking seriously: **client-side
+overhead can dominate**. A 20ms TTFT is invisible behind a 200ms TLS handshake
+(the encrypted negotiation every HTTPS connection performs before the first byte
+flows), a slow tokenizer, or a client that buffers. Measure end to end, from the
+client, or you're optimizing a number nobody experiences.
 
 ---
 

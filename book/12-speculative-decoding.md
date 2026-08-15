@@ -11,9 +11,13 @@
 Every optimization so far has attacked *waste*: recomputation, padding, idle
 slots, fragmentation, stalls. Decode is now efficient.
 
-It's still **sequential**. Token N+1 needs token N. One token per forward pass,
-and each pass drags all 840 MiB of weights through memory to produce ~2 bytes of
-output.
+It's still **sequential**. Token N+1 needs token N: the model has to finish its
+own N-th word before it can start on the next one. There is nothing inside one
+user's stream to do in parallel, so each token costs one full **forward pass**
+(one complete run of the model, first layer to last). From Lecture 01 each pass
+re-reads all 840 MiB of weights to produce one token id, roughly 2 bytes of
+output, and the weights alone are about 9 bytes of every 10 moved (215,040 of
+the 232,960 MiB across a generation, 92.3%).
 
 Batching fixed this for *aggregate* throughput, but a single user still waits one
 full forward pass per token. If you want that one user to go faster, batching
@@ -27,14 +31,39 @@ The observation that makes this possible:
 
 > Verifying N tokens costs **the same forward pass** as generating 1.
 
-The model is memory-bound. Feed it 5 candidate tokens instead of 1 and it does 5×
-the arithmetic on the *same* weight load, nearly free, exactly like batching.
+The model is memory-bound: the chip waits on bytes, and its arithmetic units sit
+mostly idle. From Lecture 02, one decode step at 2k context runs at 0.79
+ops:byte against a ridge of 76 on the 3090, about a percent of the machine's
+available arithmetic (0.79 / 76 = 1.04%), less on bigger cards. Feed it 5
+candidate tokens instead of 1 and it does 5× the arithmetic on the *same*
+weight load, exactly like batching:
+
+```
+decode, 1 token:        0.79 ops:byte        <- 76 / 0.79 = 96× arithmetic
+                                                   to spare
+decode, 5 candidates:   5 × 0.79 = 3.95      <- 76 / 3.95 = 19× to spare
+```
+
+Still far below the ridge, so the pass ends when the bytes arrive, not when the
+math finishes. The extra four tokens were nearly free.
 
 So:
 
 1. **Draft**, cheaply guess the next few tokens.
 2. **Verify**, run the real model once over all of them.
 3. **Accept** the longest correct prefix; discard the rest.
+
+Concretely, for one generation step:
+
+```
+draft (cheap guess):      "def"   "foo"   "("   "bar"
+one real forward pass:     ok      ok      ok   model wants "baz"
+accepted output:          "def"   "foo"   "("   "baz"
+                                3 kept + 1 corrected = 4 tokens from one pass
+
+if all drafts had matched, the pass's last position is itself a real
+prediction, so you get a 5th token, free.
+```
 
 Guess 5 and get 4 right, and you produced 4 tokens for one forward pass. Guess
 badly and you produced 1: the same as before, plus the drafting cost.
@@ -53,8 +82,9 @@ run and maintain a second model.
 No separate model, but requires training.
 
 **EAGLE**: predicts at the *feature* level rather than the token level, using
-hidden states. Higher acceptance than Medusa; the current default when you can
-train heads.
+hidden states (the model's internal numbers for a token as it moves through the
+layers, before they are turned into a word choice). Higher acceptance than
+Medusa; the current default when you can train heads.
 
 **N-gram / prompt lookup**: no model at all. Build an n-gram map from the prompt
 and the text so far; if the recent suffix appeared before, propose whatever

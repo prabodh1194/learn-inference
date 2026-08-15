@@ -7,12 +7,20 @@
 
 ## The problem
 
-Triton has been generating your kernels. It picks thread mappings, handles memory
-coalescing, manages shared memory, and schedules loads.
+Recall what Triton has been doing for you (Lecture 16): you described what one
+**block** does, a block being a group of threads that run together on one SM,
+one of the chip's work groups, each with its own fast private memory. Triton
+filled in the rest. It picks thread mappings (which thread handles which piece
+of data), handles memory coalescing (arranging those reads so the hardware
+does them efficiently), manages shared memory (the SM's private fast memory,
+which you never touched in Triton), and schedules loads (deciding when bytes
+are fetched so no one waits).
 
 That's a lot of decisions you haven't made, which means a lot you can't reason
-about when a kernel underperforms. This lecture drops one level so those decisions
-become visible.
+about when a kernel underperforms. When a Triton kernel is slow, you cannot
+point at a decision and say: this one is wrong. The options are invisible. This
+lecture drops one level so those decisions become visible. You write them
+yourself, even badly, and the badness teaches you what they were for.
 
 **Set expectations honestly: you will probably not beat Triton.** It has years of
 tuning behind its scheduling. The goal is understanding what it was doing on your
@@ -34,22 +42,58 @@ CUDA's model is one level finer than Triton's:
 
 ### The four things that determine performance
 
-**Coalescing.** Threads in a warp (32 threads) should read *consecutive* addresses,
-so the hardware merges them into one transaction. Strided access can cost 32
+Before the list of four, the situation to keep in your head: a GPU
+runs many threads at once, and they all need data. The memory that holds the
+data (HBM, the GPU's main RAM) is far away and slow compared to the chip's own
+work area. Almost every performance question reduces to one of two things: how
+many separate trips to that slow memory your access pattern forces, and how
+much of the chip stays busy while trips are in flight. The four entries below
+are those two questions in their technical dress.
+
+**Coalescing.** Threads in a warp (32 threads that execute the same instruction
+together, in lockstep) should read *consecutive* addresses,
+so the hardware merges them into one transaction, a single exchange with the
+memory chips. Strided access can cost 32
 transactions instead of 1, a 32× bandwidth penalty from an indexing choice that
-looks innocent.
+looks innocent. Draw it:
 
-**Shared memory.** ~100× faster than HBM, ~100KB per SM, explicitly managed. This
+```
+coalesced:  thread  0   1    2   ...  31
+            reads   0   1    2   ...  31      one transaction: the chips hand
+            (a row of an array)                over one long run of bytes
+
+strided:    thread  0   1    2   ...  31
+            reads   0  1024 2048 ... 31744    32 transactions: each thread
+            (a column, or every 1024th)        needs its own separate visit
+```
+
+Both loops are just `data[tid * stride]` versus `data[tid]`. The innocent
+expression is the strided one. The tell: your indexing expression jumps, the
+hardware pays per jump.
+
+**Shared memory.** The fast private memory attached to each SM, ~100× faster than
+HBM, ~100KB per SM, explicitly managed. This
 is the resource FlashAttention's tiling exists to exploit; in Triton it was
-implicit, here you allocate it yourself.
+implicit, here you allocate it yourself. It exists to let the threads of one
+block hand data to each other and to hold a working set close, both without
+going to the slow main memory.
 
-**Occupancy.** How many warps are resident per SM. Higher occupancy hides memory
-latency by giving the scheduler other work. Registers and shared memory per block
+**Occupancy.** How many warps are resident per SM, parked and ready. Higher
+occupancy hides memory
+latency by giving the scheduler other work. The mechanism is ordinary
+concurrency: a warp that asks for data must wait for it, and during the wait
+its SM is capable of doing nothing. If other warps are ready, the SM runs them
+instead, and the wait costs nothing. Few resident warps, nothing to run while
+the first waits, the pipeline drains. Registers and shared memory per block
 bound it, use too much of either and occupancy collapses.
 
-**Warp primitives.** `__shfl_down_sync` exchanges registers between threads in a
-warp with no shared memory and no barrier. Reductions built this way are much
-faster than the naive shared-memory version.
+**Warp primitives.** `__shfl_down_sync` lets one thread pick a value straight
+out of another thread's private registers, no shared memory and no barrier (a
+barrier being a point where every thread must arrive before any thread may
+leave). A **reduction** is combining many numbers into one, a sum over a
+sequence, the classic parallel exercise. Reductions built with shuffles are
+much faster than the naive shared-memory version, because the data never
+touches memory at all.
 
 ### A reduction, three ways
 
@@ -75,6 +119,22 @@ for (int offset = 16; offset > 0; offset /= 2)
 
 Version 1 to version 3 is often several×. Every step is a memory-access or
 divergence insight, not an arithmetic one, which by now should sound familiar.
+
+Two words in those comments are jargon worth unpacking. **Bank conflicts**:
+shared memory is built from 32 parallel banks, one per lane; when two threads
+in a warp touch the same bank at once, the hardware serves them one at a time,
+quietly turning one access into two or more. **Divergence**: threads in a warp
+execute the same instruction together, so when some threads take a branch and
+others don't, both sides run, with half the threads idle. `if (tid % (2*s) == 0)`
+and `if (tid < s)` are the same arithmetic; only the first one divides the warp
+into interleaved camps, and adds veiled idleness on top of the bank conflicts.
+
+Read the three versions as a sequence of errors being removed. Version 1 makes
+every-thread-but-one share the same red-hot banks and has the warp branch apart
+each step. Version 2 fixes both by making the threads that act a contiguous
+leading slice, and the active threads all touch distinct banks. Version 3
+notices that the last 32 values all live in registers of threads that are
+already executing together, so they can be merged with no memory at all.
 
 ---
 

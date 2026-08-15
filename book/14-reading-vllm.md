@@ -45,7 +45,9 @@ haven't hit yet.
 | MultiProcExecutor | L22 (preview) |
 
 Read it in one sitting. **Keep a list of every place vLLM does something
-differently than you did**, and don't resolve them yet, just collect.
+differently than you did**, and don't resolve them yet, just collect. (FSM in
+the table is the Lecture 12b technique: a finite state machine that forces the
+generated text to follow a grammar.)
 
 ### 2. nano-vllm: read the source
 
@@ -69,7 +71,9 @@ whether they're handling a case you didn't, or making a different tradeoff.
 ### 3. vLLM itself: targeted, not exhaustive
 
 Do **not** read vLLM top to bottom. It's hundreds of thousands of lines with
-multi-backend support, quantization schemes, and hardware variants. Read these
+multi-backend support (the same layers re-implemented for different chip
+families, CUDA, ROCm, CPU), quantization schemes (weights packed into fewer
+bits, the subject of Lecture 19), and hardware variants. Read these
 four files, each against the lecture that taught it:
 
 | File | Lecture |
@@ -80,7 +84,9 @@ four files, each against the lecture that taught it:
 | `vllm/v1/core/kv_cache_utils.py` | L10, block hashing |
 
 In `kv_cache_utils.py`, look closely at what goes **into** the block hash. LoRA
-adapter id, multimodal inputs, cache salt. Every one of those is a correctness
+adapter id (which fine-tune the request uses, Lecture 12b), multimodal inputs
+(images or audio, which plain text tokens don't describe), cache salt (a fixed
+random string mixed into every hash). Every one of those is a correctness
 bug someone shipped: two requests with identical tokens but different *context*
 must not share blocks. You learned the principle in L10; here's the accumulated
 scar tissue.
@@ -122,9 +128,11 @@ need. Recognizing which is which is the skill this lecture is for.
 ## Optional: SGLang
 
 **[github.com/sgl-project/sglang](https://github.com/sgl-project/sglang)** takes a
-different path on prefix caching, **RadixAttention**, a radix tree rather than a
-flat hash map, so prefixes share *structurally*. Better for branching
-conversation trees where many requests share nested prefixes.
+different path on prefix caching: **RadixAttention**, a **radix tree** rather
+than a flat hash map. A radix tree stores each shared prefix of text once and
+branches where prefixes diverge, the way a filesystem's directory tree shares
+its leading path components, so prefixes share *structurally*. Better for
+branching conversation trees where many requests share nested prefixes.
 
 Read [the RadixAttention paper](https://arxiv.org/abs/2312.07104) §3 and ask why
 you'd choose one over the other. That's a genuine engineering question with no

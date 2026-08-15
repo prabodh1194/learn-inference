@@ -9,7 +9,16 @@
 ## The problem
 
 Lecture 09 bought you a large increase in concurrent sequences, and charged you
-for it. Your PyTorch gather:
+for it. To see the charge, recall the memory layout it left you with. A
+sequence's K/V no longer sits in one contiguous strip; it is scattered in
+fixed-size **blocks**, and a **block table** (a short list, one per sequence
+in flight) records which physical block holds which chunk. That scattered layout
+is exactly what let you pack far more concurrent sequences into the same VRAM.
+
+The catch: attention, as Lecture 17 wrote it, expects K/V as one contiguous
+span. So every single decode step your engine has to undo the paging before
+attention can run. That undo is your PyTorch gather, the three lines that
+reassemble a sequence from its scattered blocks:
 
 ```python
 gathered = cache[blocks]                        # materialize every block
@@ -17,18 +26,50 @@ flat = gathered.reshape(-1, *cache.shape[2:])   # copy again
 return flat[:seq_len]                           # and trim
 ```
 
-That reassembles the entire logical K/V sequence in HBM before attention even
-starts, reintroducing exactly the round-trip Lecture 17 just eliminated. You
-have FlashAttention and paging, and they're fighting each other.
+Concretely it copies every K and V value out of its scattered block, glues them
+into one long strip, and hands that strip to attention. Draw it for a sequence
+of three blocks:
 
-The fix is to teach the kernel to read block tables directly.
+```
+logical sequence 0..37        physical blocks (scattered in VRAM)
+[chunk 0][chunk 1][chunk 2]    block table: [4, 1, 9]
+    ┆       ┆       ┆              ┆    ┆    ┆
+    └───────┴───────┴──────────────┘    ┆    ┆   (copy chunk 0, from block 4)
+                                     └───┴────┘   (copy chunks 1, 2 from 1, 9)
+                                          ↓
+                            one big contiguous strip in HBM
+                                          ↓
+                            attention reads the whole strip
+```
+
+`cache[blocks]` **materializes**: it copies the bytes out of their scattered
+blocks into a brand-new contiguous strip. `reshape` and the slice handle that
+strip again. Attention then reads it once more. Every byte of the
+whole cached sequence is touched multiple times, every step, for every sequence
+in the batch, and the strip you built was only ever a staging area to throw
+away.
+
+That is the **round-trip** Lecture 17 spent all its effort eliminating: bytes
+go out to the big slow memory (**HBM**, the GPU's main RAM, the memory that
+lecture's on-chip SRAM is ~100× faster than) and come back again. Paging
+scattered the data to save memory; FlashAttention assumed contiguous data to
+save traffic. You have both techniques now, working at cross purposes. That's
+the fight the lecture opener promised.
+
+The fix is to teach the kernel to read block tables directly, so the scatter
+never has to be undone.
 
 ---
 
 ## The idea
 
-FlashAttention already loads K/V **in tiles**. Paging stores K/V **in blocks**.
-These are the same shape of thing.
+Two words to settle first, because they name the same thing from two lectures.
+FlashAttention loads K/V **in tiles**: a chunk of the sequence, a few thousand
+tokens wide, that the kernel pulls into fast on-chip memory, works on, and
+never writes back (Lecture 17). Paging stores K/V **in blocks**: fixed-size
+chunks, 16 tokens by default, held in scattered locations (Lecture 09). A tile
+and a block are the same shape of thing, a chunk of K/V handled differently.
+That overlap is the whole trick of this lecture.
 
 > Make the tile loop iterate over *blocks via the block table* instead of over
 > contiguous positions.
@@ -46,27 +87,61 @@ k_tile = tl.load(K_cache + block_id * block_stride + offsets)
 ```
 
 One extra load (the block table lookup) per tile. The block table is tiny and
-stays in cache, so the overhead is small. The gather disappears entirely.
+stays in fast on-chip memory (**SRAM**), so the overhead is small. The gather
+disappears entirely.
+
+Note the asymmetry that makes the lookup cheap and the gather expensive. The
+gather moved *every byte* of the cached sequence: bytes out of their blocks,
+bytes into a duplicate strip, and attention read the duplicate. The block table
+lookup moves a few bytes: the address of the next tile's home. That one
+address steers a much larger load. With `block_size = 16` and each token's K/V
+costing 114,688 bytes (from Lecture 05), one tile holds:
+
+```
+16 tokens × 114,688 B/token  =  1,835,008 B  ≈  1.75 MiB
+```
+
+And the lookup that finds it reads a single 32-bit index, 4 bytes. A 4-byte
+read steering a ~1.75 MiB read is why the indirection costs almost nothing
+while the gather it replaces cost a full extra copy of the sequence (224 MiB
+at the 2048-token context Lecture 02 used). You're spending 4 bytes to save
+megabytes, every tile.
 
 ### Decode is the special case
 
-Prefill attends with many queries. **Decode has exactly one query token** attending
-over the whole cached context. That changes the shape of the problem:
+Prefill attends with many queries, one per prompt token, side by side.
+**Decode has exactly one query token** (the single new token, asking attention
+to look back over everything cached) attending over the whole cached context.
+That changes the shape of the problem:
 
 - No query tiling, one row.
 - No causal masking within the tile: the single query attends to everything
   cached, all of which precedes it.
-- The whole kernel is dominated by **streaming K/V from memory**, which is
-  Lecture 02's memory-bound decode, in kernel form.
+- The whole kernel is dominated by **streaming K/V from memory**: reading each
+  byte exactly once, on its way through, never holding it. That is Lecture
+  02's memory-bound decode, in kernel form.
 
 Because it's pure bandwidth, the metric from Lecture 15 is the right one: measure
 achieved bandwidth against peak. A good decode attention kernel gets close.
+Bandwidth here means bytes per second memory can hand over; on a
+memory-bound kernel, achieved bandwidth close to peak is what "done" looks
+like.
 
 ### Parallelizing over context
 
 With one query, a naive kernel launches one block and leaves the GPU nearly idle
 at small batch sizes. The standard fix is to **split the context across blocks**,
 each computing a partial (max, sum, accumulator), then combine:
+
+??? question "Wait: 'block' here is a thread block, not the KV block from Lecture 09?"
+    Both words are in play, and they mean different things. The **KV block** is
+    a fixed-size chunk of cached data, 16 tokens, something you allocate and
+    free. The **thread block** is a group of threads that run together on one
+    SM (one of the chip's work groups, each with its own fast private memory),
+    a unit of execution. Splitting the context across thread blocks means
+    different groups of threads each handle a slice of the sequence. Same word,
+    unrelated meanings; the sentence around it tells you which is meant.
+    [Full answer](qa.md#wait-block-here-is-a-thread-block-not-the-kv-block-from-lecture-09)
 
 ```
 block 0: tokens    0-1023  -> (m_0, l_0, acc_0)
@@ -77,7 +152,12 @@ block 1: tokens 1024-2047  -> (m_1, l_1, acc_1)
 
 The combination uses the *identical* online-softmax merge from Lecture 17,
 rescale each partial by `exp(m_i - m_global)`, sum, divide. Having built that
-already, this is a small step rather than a new idea.
+already, this is a small step rather than a new idea. In words: each block ran
+softmax with its own local max `m_i`; the block with the largest max, `m_global`,
+had it right, but the others used a max they later learned was too small, so
+their accumulators are inflated by `exp(m_i - m_global)`. Shrink each partial
+back to what a global max would have produced, add the pieces, divide by the
+corrected sum: one attention output, assembled from independent slices.
 
 This is what vLLM calls the "split-KV" or FlashDecoding path, and it's why decode
 attention scales down to batch 1 without wasting the GPU.

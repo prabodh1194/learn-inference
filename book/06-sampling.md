@@ -23,8 +23,13 @@ Short lecture. It's here because the rest of the book depends on it.
 ## The idea
 
 The model gives you **logits**, one unnormalized score per vocabulary token.
-Sampling turns that vector into one chosen token. Four knobs, applied in a
-specific order.
+Sampling turns that vector into one chosen token.
+
+Think of a weighted die. The faces are the **vocabulary**, every token the
+model knows how to output, and each face's chance of coming up is set by its
+logit: likely tokens land more often. Greedy decoding, what you've done so
+far, is "always take the most likely face". Sampling is "roll the die". Four
+knobs reshape the die, applied in a specific order.
 
 ### Temperature
 
@@ -34,9 +39,11 @@ Divide the logits before softmax:
 logits = logits / temperature
 ```
 
-- `T < 1` sharpens the distribution, more confident, more repetitive.
+- `T < 1` sharpens the distribution (the list of chances over the vocabulary,
+  always adding up to 1), more confident, more repetitive.
 - `T > 1` flattens it, more diverse, more likely to be incoherent.
-- `T = 0` is a special case: it means **argmax**, not division by zero. Guard it.
+- `T = 0` is a special case: it means **argmax** (pick the highest score,
+  always), not division by zero. Guard it.
 
 ??? question "Why not just use a very small temperature instead of special-casing 0?"
     Two reasons. First, it's a literal division by zero, logits/T gives NaN.

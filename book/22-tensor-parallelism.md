@@ -17,9 +17,14 @@ Two reasons to use more than one GPU:
 (fp16) = 140 GB`. No single GPU holds it.
 
 **One GPU is too slow for one user.** Decode is memory-bound (Lecture 02), so a
-single user's tokens/sec is capped by *one* GPU's bandwidth. Batching raises
+single user's tokens/sec is capped by *one* GPU's bandwidth: every token moves
+the active weights, and the token can leave no faster than the memory can hand
+those bytes over. Batching raises
 aggregate throughput but never helps that one user. Splitting the weights across
-GPUs multiplies the bandwidth available to a single sequence.
+GPUs multiplies the bandwidth available to a single sequence: each GPU now
+carries a slice of the weights, each slice loaded in parallel, so the bytes the
+sequence must wait for are divided by the number of GPUs. Same memory, more
+taps.
 
 That second reason is why TP is a **latency** optimization, and it's the one people
 miss.
@@ -35,6 +40,13 @@ Three ways to split a model:
 | **Pipeline (PP)** | layers across GPUs | bubbles; poor latency | multi-node, low bandwidth |
 | **Tensor (TP)** | tensors *within* each layer | all-reduce every layer | **default within a node** |
 | **Expert (EP)** | MoE experts across GPUs | token routing | MoE throughput (L23) |
+
+Two phrases to unpack. "Bubbles" are idle stretches: in a pipeline, a layer
+finishes its batch and then waits for work from the layer behind it, and the
+waiting is time the GPUs are paid for and not working. An **all-reduce** is a
+collective (Lecture 21's cooperative operations), specifically a group sum:
+every GPU contributes its partial result, and every GPU ends with the total. It
+is the plumbing of TP, and most of what "TP is expensive" means.
 
 TP is the default for single-node inference because every GPU works on *every*
 token, no pipeline bubbles, and latency genuinely drops.
@@ -53,6 +65,39 @@ Row-parallel (second matmul):    split weights by ROW
     -> all-reduce to combine
 ```
 
+Draw it with real shapes so the arithmetic is visible. Take a hidden dimension
+of `d` and two GPUs. The first matmul's weight matrix `W1` is `d × d` (in, out
+widths). Split it **down the middle of its columns**, each GPU holds a
+`d × d/2` slice:
+
+```
+GPU 0:  x (1×d)  ×  W1[:, 0:d/2]   ->  z_0 (1×d/2)      a half-width hidden state
+GPU 1:  x (1×d)  ×  W1[:, d/2:d]   ->  z_1 (1×d/2)      the other half
+```
+
+A column split needs no communication: each GPU reads the same input row `x`
+but only its own half of the weights, so both sides compute independently and
+their outputs slot side by side into one hidden state.
+
+The second matmul's weight `W2` is `d × d` again. Split it **across its rows**,
+each GPU holds a `d/2 × d` slice. Here is the elegant part: each GPU's second
+matmul consumes only the half of the hidden state that the same GPU computed,
+`z_0` on GPU 0, `z_1` on GPU 1, no gathering in between. It multiplies its half
+against its rows of `W2`, producing a partial sum of the output:
+
+```
+GPU 0:  z_0 (1×d/2)  ×  W2[0:d/2, :] (d/2×d)  ->  out_0 (1×d)   a partial sum
+GPU 1:  z_1 (1×d/2)  ×  W2[d/2:d, :] (d/2×d)  ->  out_1 (1×d)   a partial sum
+                                           all-reduce
+                              out = out_0 + out_1    (1×d)
+```
+
+Multiplication is distributive: `out_0 + out_1` equals the result the full
+`x · W2` would give, algebraically exactly. That's why the all-reduce is
+correct and not an approximation, and why a column-then-row pair needs only
+one all-reduce: the two matmuls hand the split to each other directly, and only
+the final output must be combined.
+
 Column-then-row means **one all-reduce per MLP block**, not two. Attention shards
 the same way, by heads: each GPU owns a subset of heads, then all-reduce after the
 output projection.
@@ -68,16 +113,39 @@ per forward pass. That's the cost, and it's why interconnect matters.
 
 ### Why scaling isn't linear
 
-Compute per GPU divides by N. Communication does not shrink with it, a ring
-all-reduce moves `2(N-1)/N · S` bytes per rank, which *approaches* a constant 2S
-rather than falling like `compute/N`.
+Compute per GPU divides by N. Communication does not shrink with it. The
+standard implementation is a **ring all-reduce**: the GPUs stand in a circle,
+each holds `S/N` of the data (`S` being the total bytes of the tensor being
+summed), each passes its share one step around the ring, then a second lap
+spreads the total back. Every lap has `N−1` hops, so every GPU sends `N−1`
+chunks of `S/N` bytes and receives the same, in both directions:
+
+```
+bytes per rank  =  (N−1 + N−1) × S/N      two laps of N−1 hops each
+                =  2(N−1)/N × S
+```
+
+A ring all-reduce moves `2(N-1)/N · S` bytes per rank, where a rank is one
+GPU's identity in the group, which *approaches* a constant `2S`
+rather than falling like `compute/N`. Plug in the GPU counts:
+
+```
+N = 2:    2 × 1/2 × S  = 1.00 × S
+N = 4:    2 × 3/4 × S  = 1.50 × S
+N = 8:    2 × 7/8 × S  = 1.75 × S
+N = 16:   2 × 15/16 × S = 1.875 × S   ->  approaches 2S, never reaches it
+```
+
+Each doubling of GPUs halves the compute on each GPU, but the all-reduce bytes
+edge merely closer to a floor of `2S`. The gap between the two curves is where
+the scaling stops:
 
 ```
 time = compute/N + communication(N)
 ```
 
 Past some N, communication dominates and adding GPUs stops helping. Where that
-happens depends on interconnect:
+happens depends on interconnect, the wires that connect the GPUs:
 
 | Link | Bandwidth per GPU |
 |---|---|

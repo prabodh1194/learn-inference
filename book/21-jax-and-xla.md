@@ -15,6 +15,15 @@ JAX is the opposite philosophy, and seeing both is the point.
 > collective.
 > **JAX/XLA:** you say *what*, and annotate constraints. The compiler decides how.
 
+Three terms to fix before they appear again. **XLA** is Google's compiler: it
+takes the computation you described and produces GPU code, making the low-level
+decisions that Part III taught you to make by hand. **Sharding** is splitting
+one big array of numbers across several GPUs, each holding its slice. A
+**collective** is an operation that needs the GPUs to cooperate, passing data
+between themselves over their link, such as an all-reduce, which every GPU will
+meet by name in Lecture 22, a sum spread over all of them so each ends with the
+total.
+
 That matters here for one specific reason: **sharding**. In Lecture 22 you'll do
 tensor parallelism twice, once declaratively in JAX, where you annotate a layout
 and XLA inserts the collectives, and once by hand in PyTorch with explicit
@@ -24,7 +33,8 @@ Doing the declarative version first makes the manual version legible. You'll kno
 what the collectives are *for* before you write them, because you'll have seen a
 compiler derive them from a layout.
 
-It also generalizes: this is how TPU serving works, and how large-scale training
+It also generalizes: this is how TPU serving works (TPU, Google's own custom
+AI chip, is JAX-first and sharded by construction), and how large-scale training
 is increasingly expressed.
 
 ---
@@ -44,7 +54,10 @@ def forward(params, tokens, cache):
 
 This feels wasteful and isn't. XLA sees the whole dataflow, so it reuses buffers
 in place when it can prove that's safe. **Functional at the source level, mutating
-at the machine level.**
+at the machine level.** If the compiler can show that nothing reads a buffer
+after one operation writes it, it lets the write happen over the old contents
+instead of allocating fresh memory; you wrote "a new cache", the machine wrote
+in place. Purity is a contract you offer so the compiler can be aggressive.
 
 The relevant consequence for you: a KV cache in JAX is a value threaded through
 the computation, not an object you append to. That's a genuinely different
@@ -58,9 +71,11 @@ def decode_step(params, token, cache):
     return forward(params, token, cache)
 ```
 
-The first call traces the function into an XLA graph and compiles it, fusing
-operations, allocating buffers, eliminating dead code. Later calls run the
-compiled artifact.
+The first call **traces** the function into an XLA graph and compiles it, fusing
+operations, allocating buffers, eliminating dead code. A trace is a rehearsal
+with fake placeholder values: JAX runs your Python function once, but instead
+of computing, every operation writes down what it would have done, building the
+graph. Later calls run the compiled artifact.
 
 Two things follow, and both should feel familiar from Lecture 13:
 
@@ -99,6 +114,8 @@ print(jax.jit(decode_step).lower(params, token, cache).compile()
       .as_text()[:4000])
 ```
 
+**HLO** is XLA's intermediate representation: the compiler's working draft of
+your program, the graph of operations it settled on, in text form.
 You see the actual operations XLA chose, fusions, layout assignments, buffer
 reuse. Compare against a `torch.compile` dump of the same model. **Two compilers,
 same problem, different decisions.** Where they differ is where you learn what
@@ -109,7 +126,9 @@ compilation is actually doing.
 ## Build it
 
 1. Implement Qwen3's forward pass in `jaxlm/model.py`, pure functions, params as
-   a pytree. Load the same weights you've been using.
+   a pytree (JAX's name for a nested data structure, a dict of arrays; the
+   compiler walks it like one object, and a new set of weights is just a new
+   value). Load the same weights you've been using.
 2. **Verify numerically against PyTorch** (`tests/test_21_jax.py`). Same weights,
    same input, same logits within fp32 tolerance. Do this before anything else;
    a silent transcription bug in RoPE or attention will waste hours later.

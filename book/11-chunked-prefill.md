@@ -11,10 +11,22 @@
 Lecture 08 warned you about this, and you should have measured it: continuous
 batching raised throughput and made **p99 latency worse**.
 
-Here's the mechanism. A step containing a 4,000-token prefill is enormous,
-compute-bound, and roughly 125× the work of a decode step (4,000 prefill tokens
-against 32 decode tokens). Every sequence
-decoding alongside it waits for the whole thing to finish.
+Here's the mechanism. A step containing a 4,000-token prefill is enormous.
+Count the arithmetic: every token, prefill or decode, costs one full pass over
+the weights, `2 × 440.4M` flops. So the prefill's addition to the step is 4,000
+passes, against a decode part of 32:
+
+```
+prefill's extra work:   4,000 × 880.8 MFLOP  =  3,523.2 GFLOP
+decode part:               32 × 880.8 MFLOP  =     28.2 GFLOP
+ratio:  3,523.2 / 28.2  =  125×
+```
+
+A 125× step, sitting among normal ones, and there is no spare capacity to
+absorb it: prefill is *compute-bound*, arithmetic is the limit (Lecture 02),
+unlike decode's memory-bound arithmetic, which hides inside the time the chip
+spends waiting on memory anyway. Every sequence decoding alongside it waits for
+the whole thing to finish.
 
 ```
 step 41: [decode ×31] + [prefill 4000 tokens]   <- everyone stalls
@@ -22,11 +34,12 @@ step 42: [decode ×32]                            <- normal
 ```
 
 From the user's side, their token stream just froze for a beat because somebody
-else submitted a long document. Do that at p99 scale and your service feels
-erratic even though its average is fine.
-
-This is a **head-of-line blocking** problem, and it's the reason mean latency is
-a poor way to evaluate a scheduler.
+else submitted a long document. One slow item at the front of a checkout line
+holds up everyone behind it; in scheduling that has a name, **head-of-line
+blocking**, and this is it, inside a single step. Do that at p99 scale and
+your service feels erratic even though its average is fine: most steps are
+healthy, the damage hides in the tail, which is exactly why the mean is a poor
+way to evaluate a scheduler.
 
 ---
 

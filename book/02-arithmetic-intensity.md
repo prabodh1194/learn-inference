@@ -15,14 +15,25 @@ The question you want to answer about any operation: **is the GPU waiting on
 arithmetic, or waiting on memory?** Because if it's waiting on memory, a faster
 kernel buys you nothing.
 
+Think of a kitchen. The chef's knife is the GPU's arithmetic: so many chops
+per second, however fast the blade is. The fridge is the GPU's memory: it
+hands over a fixed number of ingredients per second, no matter what. Every
+dish is fetch ingredients, chop, fetch more, chop, and the question the
+roofline answers is which of the two you spend most of your time waiting on.
+If you're always walking to the fridge, buying a faster knife changes
+nothing.
+
 ---
 
 ## The idea
 
 Two numbers describe a GPU:
 
-- **Peak compute**: floating-point operations per second.
-- **Peak bandwidth**: bytes per second from memory.
+- **Peak compute**: floating-point operations per second. A floating-point
+  operation (FLOP) is one multiply or one add; TFLOPS is trillions of them
+  per second.
+- **Peak bandwidth**: bytes per second from memory. The fridge trip: the
+  ceiling on how much data can arrive, however fast the chips can chew it.
 
 Divide them and you get the **ops:byte ratio**, how much arithmetic the machine
 must do per byte loaded to keep its compute units busy. For an H100: 989 TFLOPS ÷
@@ -32,16 +43,24 @@ operations with it, and you've wasted the trip.
 > **Which FLOPS number?** Spec sheets list several, differing by up to 8×, and
 > picking the wrong one silently corrupts every prediction you make.
 >
-> TechPowerUp lists the RTX 3090 at "FP16 (half) 35.58 TFLOPS **(1:1)**", which is
-> the *shader* rate, where fp16 runs no faster than fp32. Matmuls don't use
-> shaders; they use **tensor cores**, and the 3090's dense fp16 tensor rate is
+> A GPU has two kinds of arithmetic units. **Shaders** are the
+> general-purpose cores that run ordinary code; **tensor cores** are
+> specialized circuits built to multiply grids of numbers, which is most of
+> what machine learning does. TechPowerUp lists the RTX 3090 at "FP16 (half)
+> 35.58 TFLOPS **(1:1)**", which is the *shader* rate: FP16 (half) is the
+> 16-bit number format, and on shaders it runs no faster than fp32, the
+> 32-bit format. Matmuls (grid-of-numbers multiplications) don't use shaders;
+> they use **tensor cores**, and the 3090's dense fp16 tensor rate is
 > ~71 TFLOPS. That's the number in `roofline.py`.
 >
 > Vendors also quote **sparse** rates, which are 2× dense and require 2:4
-> structured sparsity you almost certainly don't have. If a headline number looks
-> suspiciously round and large, check whether it's sparse.
+> structured sparsity: a model whose weights genuinely have half their
+> entries as zero, a pattern you almost certainly don't have. If a headline
+> number looks suspiciously round and large, check whether it's sparse.
 >
-> Rule: **dense tensor-core rate, at the dtype you actually run.**
+> Rule: **dense tensor-core rate, at the dtype you actually run** (dtype is
+> short for "number format": fp32, fp16, bf16, int8, each a different way of
+> packing a number into bits).
 
 Now the same measure for an *algorithm*, called **arithmetic intensity**:
 
@@ -143,7 +162,12 @@ the roofline is what tells you they're all the same idea.
 
 Take unoptimized attention (`S = QK^T`, `P = softmax(S)`, `O = PV`) with
 sequence length `N`, head dim `d`, FP16 (2 bytes/value), per head, batch 1.
-Three matrices get materialized in memory:
+Three matrices get materialized in memory. The jargon here is small, glossed
+once: a **tensor** is a grid of numbers (this book mostly means the same thing
+when it says matrix; the word also covers vectors and higher-dimensional
+grids). **softmax** is the step that turns a list of scores into a probability
+distribution: every score becomes a positive number and they all add up to 1.
+`QK^T` and `PV` are grid multiplications (**matmuls**).
 
 | tensor | shape | values | bytes (fp16) |
 |---|---|---|---|

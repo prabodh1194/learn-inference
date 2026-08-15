@@ -10,17 +10,58 @@
 Generating a response looks like one operation. It is two, and they behave so
 differently that production systems eventually run them on separate machines.
 
-**Prefill** processes your prompt. All of it, at once, in a single forward pass.
-The model computes keys and values for every prompt token in parallel and
-produces the first output token. This determines **time to first token (TTFT)**:
-how long before the cursor starts moving.
+First, the cast. Text reaches the model as **tokens**, short chunks: a word, a
+piece of a word, a punctuation mark. The model reads tokens through its
+**weights**, the fixed grid of numbers it learned during training (about 840 MiB
+for the model in this book), and predicts what comes next. One such read, tokens
+in and prediction out, is a **forward pass**. The choreography matters, not the
+math: a token flows through the model, and along the way the model writes a
+pair of **keys and values** for it, the notes later tokens use to look back at
+it. You don't need to know what those notes contain yet, only that they're one
+per token and they are the reason the two phases cost what they do.
 
-**Decode** generates the rest. One token per forward pass, each depending on the
-one before, so there's nothing to parallelize across. Five hundred output tokens
-means five hundred sequential passes. This determines **tokens per second (TPS)**:
-how fast the text streams.
+**Prefill** is the first forward pass, over your entire prompt at once. Every
+prompt token goes through in parallel, each writing its keys and values, and
+out comes the first output token. That whole pass happens while the cursor
+sits still, which is why its duration shows up as **time to first token
+(TTFT)**: the delay before the cursor starts moving.
 
-Same weights, same kernels. Completely different performance characteristics.
+**Decode** is everything after that first token. Tokens are produced one at a
+time, each depending on the one before, so the model cannot know the third
+until it knows the second. There is nothing to parallelize across; five hundred
+output tokens means five hundred sequential passes, and every pass reads the
+whole weight set again. This phase sets **tokens per second (TPS)**: how fast
+the text streams.
+
+```
+  --+------------------+-------------------------------------------> time
+    |                  |
+    | prefill          | decode
+    | one pass over    | one pass per token,
+    | the whole        | each waiting on
+    | prompt           | the one before
+    |                  |
+    +------------------+
+    ^
+    |
+    +-- TTFT: the cursor sits still until this point.
+        After it, text streams out at TPS.
+```
+
+??? question "Why can't decode just run the whole answer in one pass, like prefill runs the whole prompt?"
+    Because prefill has all its inputs up front: the entire prompt exists the
+    moment you hit enter, so every token can be processed together. Decode's
+    input is the model's own previous output. The second token does not exist
+    until the first one has been chosen, the third until the second exists,
+    and so on. Each step is a prerequisite for the next, so the steps cannot
+    overlap. Reading the prompt is like reading a whole page at once;
+    generating an answer is like speaking: you cannot say word three until
+    word two has left your mouth.
+    [Full answer](qa.md#why-cant-decode-just-run-the-whole-answer-in-one-pass-like-prefill-runs-the-whole-prompt)
+
+Same weights, same **kernels** (the small programs the chip runs for each
+pass: nothing changes between the two phases but how much text goes in).
+Completely different performance characteristics.
 
 ---
 
@@ -39,6 +80,12 @@ Pure arithmetic, no GPU, no model download. Look for three things.
 prefill         451.0 GF          840 MiB      512.00
 decode          225.5 GF       232960 MiB        0.92
 ```
+
+Two units from here on, everywhere: **GF** is billions of arithmetic
+operations (a FLOP is one multiply or one add), and **MiB** is a count of
+bytes (1 MiB = 1,048,576 bytes, 1024²). The last column, **ops:byte**, is
+the ratio of arithmetic to memory traffic; it's the topic of Lecture 02 and
+it is already telling the story: 512 for prefill, 0.92 for decode.
 
 Decode does *half* the compute of prefill and moves **277× more memory**. Both
 claims are two divisions:
@@ -85,7 +132,9 @@ which is a different problem.
 **The shape to remember is `weights × tokens generated`.** Not the number.
 
 ??? note "Sanity-check it against the hardware"
-    One more step, and it becomes a prediction you can falsify:
+    One more step, and it becomes a prediction you can falsify. **Bandwidth**
+    is how many bytes per second the memory can hand over, 936.2 GB/s on a
+    3090. Divide the bytes by the rate and you get the fastest possible time:
 
     ```
     232,960 MiB = 227.5 GiB = 2.44 × 10¹¹ bytes

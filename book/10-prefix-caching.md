@@ -16,9 +16,28 @@ request 2: [400-token system prompt] + "How does prefix caching work?"
 request 3: [400-token system prompt] + "Explain continuous batching."
 ```
 
-You prefill those 400 tokens every time. They're **identical** every time. The
-keys and values are byte-for-byte the same, because attention is causal and those
-tokens have the same predecessors in every request.
+You prefill those 400 tokens every time. They're **identical** every time, and
+identical input produces identical scratchpad entries. Recall the KV cache from
+Lecture 05: while the model reads a prompt it writes a record of every token
+into memory, two entries per token per layer (K and V), the numbers that later
+tokens will attend to. Each token's record is computed from the tokens that
+came before it, and attention is **causal**, each position only ever sees the
+positions to its left, never to its right (Lecture 05). Position 0's record
+depends on nothing but itself, position 1's on tokens 0–1, position 399's on
+tokens 0–399, always the same chain:
+
+```
+request 1:  tok 0 → tok 1 → tok 2 → ... → tok 399 → "What is paged attention?"
+request 2:  tok 0 → tok 1 → tok 2 → ... → tok 399 → "How does prefix caching work?"
+request 3:  tok 0 → tok 1 → tok 2 → ... → tok 399 → "Explain continuous batching."
+
+the first 400 links are one and the same chain, so every request computes
+the same 400 records, three times over.
+```
+
+The keys and values are byte-for-byte the same in all three, and you recompute
+them every time, 400 tokens of arithmetic per request, for results you already
+hold.
 
 Agents, RAG, code assistants, and multi-turn chat all have this shape. In
 production, shared prefixes are the norm rather than a special case.
@@ -31,6 +50,12 @@ Lecture 09 gave you blocks. Blocks can be **shared**.
 
 > If two sequences have identical tokens for a block's worth of positions, they
 > can point at the **same physical block**. Compute it once, use it many times.
+
+```
+sequence 1:  [block 4: system prompt] [block 7: user message]
+sequence 2:  [block 4: system prompt] [block 9: user question]
+                    └─ one physical block, two pointers, computed once ─┘
+```
 
 Requirements: a way to recognize "identical", and a way to know when it's safe to
 free a block that several sequences point at.
@@ -46,8 +71,21 @@ block_hash = hash((parent_hash, tuple(token_ids_in_this_block)))
 
 The **parent hash is essential.** Keys and values at position 400 depend on
 tokens 0–399. Two blocks with identical tokens but different histories produce
-different K/V and must not be shared. Chaining the parent hash into each block's
+different K/V and must not be shared. Concretely: suppose the 16 tokens
+`[11, 22, 33, 44]` appear at the *start* of one prompt and at position 2,000 of
+another. The tokens are the same, but the first block's records were computed
+with nothing before them, the second's with 2,000 tokens of context: different
+numbers, byte for byte. A hash of the block's own tokens alone would call them
+identical and serve the wrong K/V. Chaining the parent hash into each block's
 identity encodes "same tokens *and* same history."
+
+??? question "How can two blocks hold identical token ids but different histories?"
+    The same 16 token ids can appear at different *positions* in two prompts.
+    A token's K/V record is computed from everything the model had seen before
+    that token, so the record at position 2,000 includes 2,000 tokens of
+    context the record at position 0 never had. Same tokens, different numbers.
+    The parent hash exists to tell these two cases apart.
+    [Full answer](qa.md#how-can-two-blocks-hold-identical-token-ids-but-different-histories)
 
 Get this wrong and you produce subtly wrong output on cache hits, which is
 brutal to debug, because it only manifests under specific traffic.
@@ -69,7 +107,9 @@ A block at refcount 0 isn't garbage; it's *cached*. Keep it around in case
 another request wants the same prefix, and only reuse the physical block when you
 need memory.
 
-That makes it an LRU cache over refcount-zero blocks:
+That makes it an LRU cache (least-recently-used: when you must give up memory,
+drop the block that has gone longest without being wanted) over refcount-zero
+blocks:
 
 ```
 allocate:  free list empty?

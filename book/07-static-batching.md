@@ -10,9 +10,15 @@
 
 You can serve one request efficiently. Now serve thirty-two.
 
-The naive approach (one at a time) leaves the GPU almost entirely idle. Lecture
-01 showed why: decode reloads all 840 MiB of weights to generate one token. Those
-same weights could have served 32 sequences for the same memory traffic.
+The naive approach (one at a time) leaves the GPU almost entirely idle. The GPU
+is a machine with two resources: arithmetic and memory, and from Lecture 01
+decode is **memory-bound**: the chip waits on memory, not computing. Why?
+Each decode step reads all 840 MiB of weights (the model's learned numbers, its
+entire knowledge base) out of memory to produce a single token, then throws
+them away and reads them again for the next token. While the bytes travel, the
+arithmetic units have nothing to do. With 32 sequences you could keep them busy
+on the same memory traffic: the weights arrive once, and every sequence uses
+them.
 
 So batch them. It works, and it introduces a new problem that takes the next
 lecture to solve.
@@ -31,7 +37,9 @@ batched:        (32, seq, hidden) ×1  forward pass
 The weights load **once** for all 32. That's the whole win, and from Lecture 02's
 table it's close to linear in batch size while you're memory-bound.
 
-But sequences have different lengths, and a tensor is rectangular. So you pad:
+But sequences have different lengths, and a tensor (a grid of numbers, the
+shape every computation on the model runs on) is rectangular, every row must be
+as wide as the widest one. So you pad:
 
 ```
 "Explain paged attention"     -> [1234, 5678, 910, PAD, PAD, PAD, PAD, PAD]
@@ -49,9 +57,21 @@ Padding waste is the obvious cost. The expensive one is subtler:
 > A static batch runs until its **longest** member finishes. Sequences that
 > complete early hold their slots, doing nothing, until the whole batch retires.
 
-Ask for 8 tokens while someone else asks for 512, and your slot is idle for 504
-steps. It cannot be reused, because the batch is fixed for its lifetime: that's
-what "static" means.
+A slot is a sequence's reserved place in the batch, its own row of the shared
+computation. Ask for 8 tokens while someone else asks for 512, and your slot is
+idle for 504 steps (512 − 8 = 504). It cannot be reused, because the batch is
+fixed for its lifetime: that's what "static" means.
+
+??? question "But padding is wasted compute. Why not run each sequence on its own and waste nothing?"
+    Because the waste that matters is not the padding. Run 32 sequences one at a
+    time and the weights make 32 separate journeys from memory: the chip must
+    re-read all 840 MiB for every sequence, every step. Batch them and the
+    journey happens once per step; from Lecture 01's batching table, a batch of
+    32 moves the same bytes as a batch of 1 and does 32× the arithmetic on them.
+    Padding burns arithmetic, and decode has arithmetic to spare. The mask stops
+    padding from changing the result; it does not stop the GPU from computing
+    the padded positions.
+    [Full answer](qa.md#but-padding-is-wasted-compute-why-not-run-each-sequence-on-its-own-and-waste-nothing)
 
 ---
 
@@ -91,7 +111,7 @@ waste     =  1 - useful / slots
 Totals over all four batches: prefill allocates 16,384 slots for 5,904 useful
 prompt tokens → **64.0%**; decode allocates 14,336 slots for 5,584 useful
 output tokens → **61.0%**. The 2.57× is the same tally as a ratio
-(14,336 / 5,584). Seeded, so it reproduces exactly — and it's a *ceiling*,
+(14,336 / 5,584). Seeded, so it reproduces exactly. And it's a *ceiling*,
 because the real scheduler in Lecture 08 lands under it.
 
 Those two numbers are the same equation, and it's worth writing down because
@@ -118,7 +138,7 @@ Bigger batches do more useful work per weight load **and** waste more slots,
 simultaneously. Static batching cannot escape this; the two move together.
 
 > **Watch it happen.** The same seed-0 `mixed_length` run, animated one decode
-> step per frame — top panel, a finished sequence's slot sits dead until its
+> step per frame: top panel, a finished sequence's slot sits dead until its
 > batch's longest member ends; bottom panel, the same requests stream through 8
 > slots with no idle time:
 
@@ -132,7 +152,7 @@ uv run python book/code/batch_animation.py --full   # asserts the demo's 61.0% /
 ```
 
 > The on-screen run shows the first 16 requests with lengths ÷8 so it fits;
-> its own counter says 63.4% — same counting rule, a smaller cut of the
+> its own counter says 63.4%: same counting rule, a smaller cut of the
 > workload. `--full` replays the untouched 32-request workload and asserts it
 > reproduces the lecture's numbers exactly.
 

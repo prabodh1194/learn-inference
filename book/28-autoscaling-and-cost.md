@@ -11,6 +11,9 @@
 Every optimization in this book has been measured in tokens per second. Nobody
 buys tokens per second. They buy **tokens**, and someone pays for the GPU-hours.
 
+A **GPU-hour** is the billing unit: one GPU rented for one hour, working or
+not. The meter runs while you sleep.
+
 The number that actually matters:
 
 ```
@@ -28,8 +31,8 @@ tokens/sec completely hides.
 
 A note on the word, because it does two jobs in this book. **Fleet utilization**
 (the subject of this section) is the fraction of your paid GPU-hours that do paid
-work. **GPU
-busy-percentage** is what `nvidia-smi` reports for one card, and it's the
+work: of every hour the meter bills you, how much of it serves a user's request.
+**GPU busy-percentage** is what `nvidia-smi` reports for one card, and it's the
 misleading one (see the autoscaling signal section). They are unrelated.
 
 Work an example. A 3090 at $0.25/hour sustaining 2,000 tok/s:
@@ -40,7 +43,10 @@ $0.25 / 7.2M × 1M = $0.035 per million tokens
 ```
 
 Now at 20% utilization, which is what a real service with diurnal traffic looks
-like. Every number above gets multiplied by the utilization:
+like. **Diurnal** traffic follows the day: a peak when users are awake, a
+trough at night. A service that runs flat out for five hours and is quiet the
+rest averages `5/24 ≈ 20.8%`, so the 20% here is a rough sketch, not an
+exaggeration. Every number above gets multiplied by the utilization:
 
 ```
 7.2M × 0.20 = 1.44M tokens/hour
@@ -63,20 +69,40 @@ attention kernel, at roughly 20% of decode runtime (Lecture 15's table), buys
 
 Scale replicas with demand, but scaling is not free.
 
-**Cold starts are brutal.** Provision a GPU node, pull a multi-gigabyte container,
-load weights, warm up CUDA graphs. **Minutes**, not seconds. Scale up reactively
+**Cold starts are brutal.** The **cold start** is the gap between "the
+autoscaler says scale up" and "the new replica is serving a request", and it
+comes in stages: provision a GPU node, pull a multi-gigabyte container, load
+weights (840 MiB for our 0.6B model, hundreds of GiB for Lecture 23's giants),
+and warm up CUDA graphs. **Minutes**, not seconds. Scale up reactively
 and you're always behind the traffic.
 
 Mitigations, roughly in order of usefulness:
-- **Predictive scaling** on known daily patterns
-- **Warm pools**: idle-but-loaded replicas, paying to avoid latency
+- **Predictive scaling**: bring replicas up *before* the traffic arrives, using
+  the daily pattern you already know. Diurnal traffic is predictable.
+- **Warm pools**: idle-but-loaded replicas, paying to avoid latency. This is
+  insurance: the money spent while they idle buys you never making a user wait
+  for a cold start.
 - **Faster loading**: cached images, `safetensors`, streaming weights
-- **Scale to zero** for dev and spiky low-volume workloads only
+- **Scale to zero**: shut everything down when idle and pay nothing, knowing
+  the next request eats the full cold start. For dev and spiky low-volume
+  workloads only.
 
 **Scale on the right signal.** CPU utilization is meaningless here. GPU
-busy-percentage is misleading, a memory-bound decode loop shows high utilization while doing
-little work. Scale on **queue depth** or **concurrent sequences**: queue depth
+busy-percentage is actively misleading: `nvidia-smi` counts a card as busy
+whenever a kernel is running, and a memory-bound decode loop keeps kernels
+running the whole step while its compute units barely do arithmetic (Lecture
+01). Busyness is not progress. Scale on **queue depth** (requests waiting right
+now) or **concurrent sequences** (requests generating right now): queue depth
 growing is the honest saturation signal from Lecture 25.
+
+??? question "How can the GPU report 95% busy and be nearly idle at the same time?"
+    `nvidia-smi` reports the fraction of time at least one kernel was running.
+    During memory-bound decode the kernels run for the whole step; they're just
+    waiting on memory most of that time. "Busy" means the compute units were
+    not idle; it says nothing about how much arithmetic they did. Queue depth
+    tracks actual progress, which is why it, and not busyness, is the scaling
+signal.
+    [Full answer](qa.md#how-can-the-gpu-report-95-busy-and-be-nearly-idle-at-the-same-time)
 
 ### The knee is your capacity number
 
@@ -94,7 +120,7 @@ marginally more throughput and unbounded latency growth.
 | Batch size | more tokens per GPU-hour | 07–09 |
 | Quantization | cheaper GPU, or bigger batches | 19 |
 | Prefix caching | fewer tokens computed at all | 10 |
-| Spot instances | 60–80% cheaper, can vanish |, |
+| Spot instances | 60–80% cheaper, can vanish | |
 | Kernels | real, but smaller than the above | 15–20 |
 
 Sobering and worth sitting with: **prefix caching can beat every kernel
@@ -135,9 +161,10 @@ latency-sensitive production.
 **Autoscaling saving real money on diurnal traffic**: and hurting p99 during
 scale-up events. There's the trade.
 
-**Your cost above hosted APIs at low volume.** They amortize across many customers,
-which is a genuine structural advantage. At high sustained volume the picture can
-reverse.
+**Your cost above hosted APIs at low volume.** They **amortize**, spread one
+fixed cost over many customers' usage, so each customer pays a tiny slice,
+which is a genuine structural advantage a solo operator can't replicate. At
+high sustained volume the picture can reverse.
 
 ---
 

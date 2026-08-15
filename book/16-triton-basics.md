@@ -23,18 +23,50 @@ return weight * x                            # read x, read weight, write out
 ```
 
 Three operations, and `x` crosses memory **three times**. The arithmetic is
-negligible; the traffic is everything. From Lecture 02, this is as memory-bound as
-it gets.
+negligible; the traffic is everything. Count the bytes for one row of 1024
+values, our hidden size, in fp16 (2 bytes per value, so 2 KiB per row):
 
-Fuse them into one kernel and `x` is read once and written once.
+```
+pass 1:  read x                                       2 KiB
+pass 2:  read x,  write x                             2 + 2   =  4 KiB
+pass 3:  read x,  read weight,  write out             2 + 2 + 2  =  6 KiB
+                                                        total     = 12 KiB
+```
+
+(The variance is one value per row, 4 bytes, written then re-read: negligible
+next to the row itself, so it is not counted here.)
+
+Twelve kilobytes of traffic per row, to compute a mean and a scale. From
+Lecture 02, this is as memory-bound as it gets. The one fused kernel reads `x`
+once, reads `weight` once, writes the output once:
+
+```
+fused:   read x,  read weight,  write out             2 + 2 + 2  =  6 KiB
+```
+
+Half the traffic, for the same arithmetic. Fuse them into one kernel and `x` is
+read once and written once.
+
+??? question "Why doesn't eager PyTorch fuse these three ops itself?"
+    Because eager PyTorch runs each operation as its own kernel, written out to
+    memory before the next one starts, and nothing tells it the intermediate
+    can stay on-chip instead. Fusion is a decision a compiler must make, and
+    Triton lets you make it explicitly, by writing one kernel instead of three.
+    (Lecture 13's `torch.compile` automates exactly this decision, which is why
+    the two techniques compound.)
+    [Full answer](qa.md#why-doesnt-eager-pytorch-fuse-these-three-ops-itself)
 
 ---
 
 ## The idea
 
-Triton is a Python DSL that compiles to GPU kernels. You write code describing
-what **one block of threads** does; Triton handles thread indexing, memory
-coalescing, and scheduling.
+Triton is a Python DSL (a miniature programming language built on Python) that
+compiles to GPU kernels, the small programs the chip runs, the same things
+Lecture 15 ranked. You write code describing what **one block of threads**
+does; Triton handles the bookkeeping: thread indexing (which thread reads
+which data element), memory coalescing (making neighbouring threads read
+neighbouring addresses, so the hardware can fetch them in one go), and
+scheduling (deciding which threads run, and when).
 
 The mental model differs from CUDA in one important way:
 
@@ -68,16 +100,22 @@ def rmsnorm_kernel(x_ptr, w_ptr, out_ptr, n_cols,
 
 Four things to internalize:
 
-**`tl.program_id(0)`**: your block's index. Launch a grid of `n_rows` and each
-instance handles one row.
+**`tl.program_id(0)`**: your block's index. Launch a **grid** (all the blocks
+launched for this one call) of `n_rows`, and each block handles one row.
 
-**`BLOCK_SIZE: tl.constexpr`**: known at compile time, so Triton unrolls and
-allocates registers accordingly. A different `BLOCK_SIZE` is a different compiled
-kernel.
+**`BLOCK_SIZE: tl.constexpr`**: known at compile time, so Triton unrolls, lays
+the fixed-size work out as straight-line code, and allocates registers
+accordingly. A different `BLOCK_SIZE` is a different compiled kernel.
 
 **`mask`**: vocabulary sizes aren't powers of two. `BLOCK_SIZE` is. The mask
-suppresses out-of-bounds lanes, and `other=0.0` supplies a neutral value so
-reductions stay correct.
+suppresses out-of-bounds lanes (lane: one slot of the block's parallel work),
+and `other=0.0` supplies a neutral value so reductions stay correct. Draw one
+block over a row of 1000 values, `BLOCK_SIZE = 1024`:
+
+```
+   [  value 0  ...  value 999  ][  lanes 1000–1023  ]
+   \______ real data, read and stored ________/\_ masked, read as 0.0 _/
+```
 
 **One load, one store.** Between them, everything is in registers. That's the
 entire win.
@@ -94,7 +132,9 @@ Won't beat PyTorch (it's already one fused kernel) but it teaches the mechanics.
 ### 2. Fused softmax
 
 The first real one. Numerically stable softmax needs max, subtract, exp, sum,
-divide, four passes over the row in PyTorch, one in Triton.
+divide, four passes over the row in PyTorch, one in Triton. A pass is one full
+read of the row from memory: four passes means the row crosses memory four
+times, for an operation that is one read, one scaling, and one write.
 
 **Subtract the max before exponentiating.** `exp(x - max)` instead of `exp(x)`;
 otherwise large logits overflow to `inf`. This is the same trick that becomes
@@ -124,7 +164,8 @@ your block size or launch grid is wrong.
 
 Triton benchmarks the configurations and caches the winner per `key`. Cheap to
 add, and the optimum genuinely varies by GPU, which is a small lesson in itself
-about portable performance.
+about portable performance. (`num_warps` is how many warps, the chip's fixed
+32-thread groups, the block is split into.)
 
 ---
 
