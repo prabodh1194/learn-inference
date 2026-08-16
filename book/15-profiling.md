@@ -88,19 +88,123 @@ nsys profile -o timeline python bench_decode.py
   throughput, achieved vs. peak. Answers "is this kernel good?"
 
 The number to look for is **achieved memory bandwidth as a fraction of peak**.
-Lecture 02 said decode is memory-bound; a well-written decode kernel should be at
-70–90% of peak bandwidth. At 30%, there's real headroom. At 85%, you are close to
-the roofline and should look elsewhere.
+Before you can read it, you need to know what it's made of: the profiler
+doesn't *measure* it, it computes it from two other numbers.
+
+#### The metric is a division, not a reading
+
+```
+fraction   =   achieved bandwidth   ÷   peak bandwidth
+
+achieved   =   bytes the kernel moved   ÷   seconds it ran
+               (DRAM traffic counter)        (kernel duration)
+
+peak       =   the chip's theoretical maximum — what the DRAM bus can
+               physically deliver:  bus width × transfer rate
+```
+
+The fraction is what `ncu` prints as a percentage. NVIDIA's docs call it
+`pct_of_peak_sustained_elapsed` — "how close a portion of the GPU reached to
+peak rate": every counter has a peak rate in the profiler's chip database, and
+the percentage is the counter divided by it. Your job is to read the
+percentage, know what the division means, and decide whether the answer is
+"done" or "loafing".
+
+#### Worked example: your decode GEMM on a 3090
+
+Decode reads all the weights per token (Lecture 02): 840 MiB = 0.881 GB. The
+profiler clocks the kernel; the division does the rest:
+
+| Kernel duration | Achieved (0.881 GB ÷ time) | Fraction of 936 GB/s peak | Verdict |
+|---|---|---|---|
+| 3.0 ms | 294 GB/s | 31% | **loafing — 3× headroom** |
+| 2.0 ms | 441 GB/s | 47% | mid |
+| 1.1 ms | 801 GB/s | 86% | **near the roofline — stop** |
+| 1.0 ms | 881 GB/s | 94% | physically close to done |
+
+Same kernel, same weights, same GPU. The only thing that changed is the
+duration, which is the only thing you control. That's the whole point of the
+fraction: it converts "how long did it take" into "how close to the physical
+ceiling am I". At 31% the memory system could deliver 3× more bytes — the
+kernel is leaving time on the table. At 86% you're at the roofline; optimizing
+further buys almost nothing.
+
+#### Same kernel, your machine
+
+The M1's unified memory peaks at ~68 GB/s — 14× less than the 3090. Same
+0.881 GB of weights:
+
+```
+best possible:  0.881 GB ÷ 68 GB/s = 13 ms per token   (100%, unreachable in practice)
+```
+
+| Kernel duration | Achieved | Fraction of 68 GB/s peak |
+|---|---|---|
+| 18 ms | 49 GB/s | 72% — fine |
+| 26 ms | 34 GB/s | 50% — headroom |
+| 43 ms | 20 GB/s | 30% — loafing |
+
+The fraction is why "my Mac does 25 tok/s" and "a 3090 does 100 tok/s" can be
+the same kernel at the same distance from their own ceilings — and why you
+can't see the headroom until you divide.
+
+#### What the fraction looks like in real output
+
+Here is an actual `ncu` section for a memory-bound kernel, from the University
+of Wisconsin's profiling guide:
+
+```
+Memory Throughput                 %        43.35
+DRAM Throughput                   %        32.94
+Compute (SM) Throughput           %         4.42
+```
+
+Read it in one line: the kernel is memory-bound (43% memory vs 4.4% compute)
+but only at a third of peak DRAM — so there's headroom, and the cause is
+usually not the DRAM at all but *latency*: the GPU can't keep enough
+transactions in flight. `ncu`'s speed-of-light section says exactly that:
+
+> Achieved compute throughput and/or memory bandwidth below 60.0% of peak
+> typically indicate latency issues.
+
+That's where the book's thresholds come from: 70–90% means the memory system
+is genuinely saturated; below ~60% you're usually latency-bound, and the fix
+is occupancy and parallelism, not "faster math".
+
+#### The same GPU, two access patterns — proof it's the kernel
+
+The cleanest demonstration that the fraction is a kernel property, not a
+hardware spec: measured on the same Jetson GPU, with the peak fixed, the
+access pattern alone moves the achieved number:
+
+| Access pattern | Achieved | Fraction of peak |
+|---|---|---|
+| sequential read | ~65 GB/s | near peak |
+| random (bitonic) | 3–12 GB/s | ~5–18% |
+
+Same chip, same working set, same peak. Random access collapses achieved
+bandwidth 5–25× — DRAM latency, exposed. "Achieved bandwidth" is *earned*,
+not given: the peak is physics, the achieved is your kernel.
+
+#### One trap
+
+DRAM traffic counts bytes that left the chip; cache hits don't count. A
+flash-attention kernel can sit at 20% of peak and be perfect — its data never
+left the SRAM. So the fraction only means "close to done" for kernels that
+*should* be DRAM-bound: exactly decode GEMMs, which re-read all the weights
+every token. That's why the book leans on it here — and why it's only one of
+three checks (with occupancy and the roofline) for anything else.
 
 That's the roofline from Lecture 02, now measured instead of predicted.
 
 ??? question "What does 'achieved bandwidth as a fraction of peak' even mean?"
-    Achieved is derived, not measured: `bytes moved ÷ kernel time`, where
-    bytes are DRAM traffic the profiler counts. The fraction normalizes
-    hardware and is your distance to the roofline. One trap: cache hits don't
-    count as DRAM traffic, so the fraction only means "close to done" for
-    kernels that *should* be DRAM-bound — exactly decode.
-    [Full answer](qa.md#what-does-achieved-memory-bandwidth-as-a-fraction-of-peak-mean)
+    It's a division, not a reading: bytes moved ÷ kernel duration = achieved;
+    achieved ÷ the chip's spec peak = the percentage `ncu` prints. It
+    converts "how long did it take" into "how close to the physical ceiling
+    am I" — 30% = headroom, 85% = done. Trap: cache hits don't count as DRAM
+    traffic, so a low fraction can be fine for kernels that shouldn't be
+    DRAM-bound. Worked numbers above; full answer in
+    [qa.md](qa.md#what-does-achieved-memory-bandwidth-as-a-fraction-of-peak-mean)
 
 ---
 

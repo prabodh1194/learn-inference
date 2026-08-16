@@ -1310,19 +1310,129 @@ before their real max batch.
 **Lecture:** [15. Profiling](15-profiling.md)
 
 **Wrong intuition:** "The profiler measures 'achieved bandwidth' as if it were a
-direct readout like temperature."
+direct readout like temperature, and 'peak' is just the fastest number ever
+recorded."
 
-It's derived, not measured: `achieved = bytes moved ÷ kernel wall time`, where
-"bytes moved" is DRAM traffic counted by the profiler and the time is how long
-the kernel actually ran. The fraction is that number divided by the spec
-sheet's peak (bus width × transfer rate, e.g. 936 GB/s for a 3090) — a
-physical ceiling you can't fully reach (refresh, bank conflicts, granularity),
-which is why 70–90% is "done" and 100% never happens. Its job is to normalize
-hardware and tell you your distance to the roofline: at 30% there's headroom,
-at 85% move on.
+Both parts are wrong, and both are the source of the confusion. The metric is
+a **division of two profiler readings**, and "peak" is a **physical spec**,
+not a measurement:
 
-The trap: DRAM traffic only counts bytes that left the chip, so cache hits
-don't count. A kernel at 20% of peak can be perfect if its data was served
-from SRAM (flash attention). The fraction only means "close to done" for
-kernels that *should* be DRAM-bound — which is exactly what decode is, which
-is why the lectures keep coming back to it.
+```
+achieved   =   bytes the kernel moved   ÷   seconds it ran
+               (DRAM traffic counter)        (kernel duration)
+
+fraction   =   achieved ÷ peak, where peak = bus width × transfer rate
+               (e.g. 3090: 936 GB/s, M1: ~68 GB/s)
+```
+
+NVIDIA calls the result `pct_of_peak_sustained_elapsed` — "how close the GPU
+reached to peak rate" — and prints it as the `Memory Throughput` / `DRAM
+Throughput` percentages in the speed-of-light section. `ncu` even warns
+verbatim: *"Achieved compute throughput and/or memory bandwidth below 60.0%
+of peak typically indicate latency issues."* That's the whole book's 70–90%
+rule: above ~85% you're at the roofline, below ~60% you're usually
+latency-bound.
+
+**Worked example (3090, 936 GB/s peak).** Decode re-reads all weights per
+token — 840 MiB = 0.881 GB. The fraction is just 0.881 GB ÷ (kernel duration)
+÷ 936 GB/s:
+
+| Kernel duration | Achieved | Fraction | Verdict |
+|---|---|---|---|
+| 3.0 ms | 294 GB/s | 31% | headroom — 3× on the table |
+| 1.1 ms | 801 GB/s | 86% | near the roofline — stop |
+
+**Worked example (your M1, ~68 GB/s peak).** The same weights can't arrive
+faster than 0.881 GB ÷ 68 GB/s = 13 ms per token. If your decode kernel takes
+26 ms, you're at 50% of peak — the other 13 ms are yours to find; if it takes
+43 ms, you're at 30%.
+
+**Why the fraction exists:** it normalizes hardware (30% on a Mac and 30% on
+a 3090 are the same amount of slack) and it converts "how long did it take"
+into "how close to the physical ceiling am I". The same GPU can sit at near
+peak with sequential reads and ~5–18% with random access — the peak is
+physics, the achieved is your kernel.
+
+**The trap:** DRAM traffic only counts bytes that left the chip, so cache
+hits don't count. A kernel at 20% of peak can be perfect if its data was
+served from SRAM (flash attention). The fraction only means "close to done"
+for kernels that *should* be DRAM-bound — which is exactly what decode is,
+which is why the lectures keep coming back to it.
+
+## Why would copying weights beat memory-mapping them?
+
+**Lectures:** [14c. Weight residency](14c-weight-residency.md), [26. Versus vLLM](26-versus-vllm.md)
+
+**Wrong intuition:** "mmap is free — the OS loads pages lazily, so what's the
+downside?"
+
+The pages still get loaded, and on a unified-memory GPU the load can happen
+*inside* a Metal kernel, paid as GPU time — a fault you can't reason about
+(page-granular residency, unpredictable timing) instead of a one-time cost
+you chose. An explicit copy is a deliberate, bounded, one-shot cost that
+makes subsequent GPU access direct. h3.c measured mmap beating copy on the M5
+Max and copy beating mmap on the M3 Max — same code, same checkpoint,
+opposite ranking. Residency is a policy with several implementations, and the
+measurements decide per machine.
+
+## Why does fusion have a rounding boundary?
+
+**Lectures:** [14d. Fusion](14d-fusion.md), [16. Triton basics](16-triton-basics.md)
+
+**Wrong intuition:** "Fusing kernels just saves overhead; the math is the
+math."
+
+IEEE rounding is not associative: `(a+b)+c` and `a+(b+c)` can differ in the
+last bit. A fused kernel that accumulates F32 and stores BF16 once can
+produce a different bit pattern than a chain of kernels that stores BF16
+after every step. Neither is "more correct" — but a fused engine must decide
+which boundary it keeps and keep it everywhere. h3.c's rule: accumulate F32,
+round to BF16 once at the store, never in between (`h3_gpu.h:289-290`). That
+single rule is what makes "byte-identical to the reference" a checkable
+claim.
+
+## Why is a GPU sampler with a readback slower than a CPU sampler?
+
+**Lectures:** [14f. CPU/GPU overlap](14f-cpu-gpu-overlap.md), [04. Measuring](04-measuring.md)
+
+**Wrong intuition:** "The GPU is faster at everything, so sampling on the GPU
+must win."
+
+A GPU kernel that writes one value and then gets read back forces a full
+pipeline drain every step — the readback *is* a synchronization point
+(Lecture 04's `synchronize()`, enforced by the hardware). A CPU sampler reads
+the logits tensor once (the same bytes the readback would fetch) and does its
+work while the GPU is already busy with the next step: ordinary traffic
+instead of a stall. h3.c measured the readbacks at 0.1–0.3% of runtime *and*
+136 MB of pinned host state per step, and moved sampling to the CPU.
+
+## What does byte-identical mean, and why demand it?
+
+**Lectures:** [14g. Quantization with receipts](14g-quantization.md), [14d. Fusion](14d-fusion.md)
+
+**Wrong intuition:** "Byte-identical is just 'very close', like a 1e-4
+tolerance."
+
+Byte-identical means the optimized kernel's output is the same bit pattern as
+the reference's, element for element. It's achievable when the rounding rule
+(F32 accumulate, single BF16 store) is invariant under the optimization — the
+change affects *when* bytes are produced, not *which* bytes. It's the
+strongest claim an optimization can make, it's cheap to verify (A/B run +
+compare), and it sets the bar for everything else: if a fusion isn't
+byte-identical, the difference must be explained, not shrugged at.
+
+## What is an oracle, and why does every approximation need one?
+
+**Lectures:** [14h. When optimization changes outputs](14h-aggressive-optimization.md)
+
+**Wrong intuition:** "An oracle is just a test suite that checks outputs
+sometimes."
+
+An oracle is a reference implementation you trust more than the code you're
+testing — for h3.c, the F32 path: slow, correct, always present, compared
+mechanically against every accelerated variant (relative L2, SSIM, byte-
+compare where lossless). Without an oracle, an approximation's claim is "I
+looked at it and it seemed right"; with one, it's a number computed on every
+change — which is exactly how the layer-thinning gate failure and the QKV
+head-interleave layout bug were caught. Your engine's oracle is the same
+shape: the un-optimized path, kept runnable, compared automatically.

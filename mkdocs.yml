@@ -109,6 +109,14 @@ nav:
       - 12b Structured output: 12b-structured-output.md
       - 13 CUDA graphs: 13-cuda-graphs.md
       - 14 Reading vLLM: 14-reading-vllm.md
+  - "Part IIb — h3.c: a Metal engine":
+      - 14b Reading h3.c: 14b-reading-h3.md
+      - 14c Weight residency: 14c-weight-residency.md
+      - 14d Fusion — launch and memory trades: 14d-fusion.md
+      - 14e Activation lifetimes: 14e-activation-lifetimes.md
+      - 14f CPU/GPU overlap: 14f-cpu-gpu-overlap.md
+      - 14g Quantization with receipts: 14g-quantization.md
+      - 14h When optimization changes outputs: 14h-aggressive-optimization.md
   - Part III — Kernels:
       - 15 Profiling: 15-profiling.md
       - 16 Triton basics: 16-triton-basics.md

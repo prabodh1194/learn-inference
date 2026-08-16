@@ -157,6 +157,12 @@ If (4) feels reachable, Part II worked.
 
 ## Next
 
+Before you rent the GPU: **[14b–14h](14b-reading-h3.md) read a second real
+engine** — antirez's h3.c, a Metal video-diffusion engine that runs on your
+Mac. Same lessons as Part II, at kernel depth: weight residency, fusion,
+activation lifetimes, CPU/GPU overlap, quantization, and the approximations
+that change outputs.
+
 **[15. Profiling](15-profiling.md)**: Part III goes down a level, to where the
 time actually goes.
 
