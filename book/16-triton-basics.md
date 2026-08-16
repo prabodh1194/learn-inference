@@ -197,6 +197,75 @@ add_kernel[grid](x, y, out, n_elements, BLOCK_SIZE=1024)
 `n=3000, block=1024` → `3`. Exactly enough blocks to cover the array, no
 overshoot.
 
+#### See it: grid → block → offsets → state
+
+The four concepts land together in a picture. Take `n = 3000`,
+`BLOCK_SIZE = 1024`, so `grid = (3,)` — three blocks.
+
+**The grid splits the array.** Each block owns one contiguous span:
+
+```
+block 0        ┌───────────────────────────────────┐  pid = 0
+               │ indices       0 .. 1023           │  1024 real elements
+               └───────────────────────────────────┘
+block 1        ┌───────────────────────────────────┐  pid = 1
+               │ indices    1024 .. 2047           │  1024 real elements
+               └───────────────────────────────────┘
+block 2        ┌───────────────────────┬───────────┐  pid = 2
+               │ indices   2048 .. 2999│ 3000..3071│  952 real + 72 masked
+               └───────────────────────┴───────────┘
+```
+
+**A block turns `pid` into addresses.** `offsets = pid·BLOCK_SIZE + tl.arange(0,
+BLOCK_SIZE)` — the block's starting point, plus a per-lane counter. Block 1:
+
+```
+                  lane      0      1      2    ...    1023
+  tl.arange        →        0      1      2    ...    1023
+  pid · BLOCK      →     1024   1024   1024    ...    1024
+                            ↓      ↓      ↓             ↓
+  offsets          =    1024   1025   1026    ...     2047
+                      x[1024] x[1025] x[1026]        x[2047]
+```
+
+`tl.arange` is a register vector, not a memory access — it's the compiler's
+way of giving each lane its identity, then the address is `x_ptr + offset`.
+
+**The state transition, lane by lane.** Every lane runs the same four states,
+in lockstep. A few lanes shown, all 1024 do it together:
+
+```
+   state       lane 0       lane 1      lane 2      ...    lane 1023
+   ───────────────────────────────────────────────────────────────────
+   offsets      1024        1025        1026        ...       2047
+   load x      x[1024]     x[1025]     x[1026]      ...     x[2047]
+   load y      y[1024]     y[1025]     y[1026]      ...     y[2047]
+   x + y        each lane adds its two loaded values, in registers
+   store      out[1024]   out[1025]   out[1026]     ...    out[2047]
+```
+
+Loads happen, the add happens, the store happens — and the only thing that
+ever touches memory is the first and last column of the table. The middle
+rows live in registers, which is the whole point.
+
+**The masked tail.** Block 2's span is wider than the array, so its last 72
+lanes are fenced off. The mask is a per-lane bit; `other` is what the fenced
+lanes read so they don't poison the math:
+
+```
+  offsets:    2048  2049  ...  2999 │ 3000  3001  ...  3071
+              mask=1  mask=1 ... mask=1 │ mask=0 mask=0 ... mask=0
+              ─────── 952 real lanes ──┼──── 72 masked lanes ────
+  load x:     read, kept               │ read, discarded
+  store:      out[2048..2999] written  │ lane skipped, nothing written
+```
+
+**Why the loads are cheap.** The block's 1024 lanes hit 1024 *consecutive*
+addresses — one contiguous span in memory — so the hardware serves them as a
+handful of wide transactions instead of 1024 separate round-trips. That is
+the coalescing the compiler arranges for you, and it's the difference between
+a memory-bound kernel at peak bandwidth and one at 20% (Lecture 15).
+
 ### 2. Fused softmax
 
 The first real one, and the point of the lecture: numerically stable softmax
@@ -241,6 +310,28 @@ across the block's warps (shuffles plus shared memory). The scalar then
 **broadcasts** back: `x - m` and `p / l` apply a single value to every lane.
 One reduction down, one broadcast up — that shape is the fingerprint of a
 row-wise kernel, and you'll see it in RMSNorm right now.
+
+The same state-transition view, compressed — a `[BLOCK]` row collapses to a
+scalar, then spreads back:
+
+```
+  lane           0       1       2    ...   1023
+  x        x[1024]  x[1025]  x[1026]  ...  x[2047]
+                    └── tl.max(x, axis=0) ──┘
+                          ▼
+  m              (one scalar: the row's max)
+                    ┌──── broadcasts back ────┐
+  p        e⁰     e⁻¹     e⁻²   ...    e⁻³        exp(x − m), per lane
+                    └── tl.sum(p, axis=0) ───┘
+                          ▼
+  l              (one scalar: the row's sum)
+                    ┌──── broadcasts back ────┐
+  out      p0/l    p1/l    p2/l   ...   p1023/l
+```
+
+The two reductions never materialize anything bigger than the row — the
+collapsed scalars live in registers and spread right back out. No HBM traffic
+between the row and its scalars.
 
 **Why this beats PyTorch.** Four passes over the row in eager mode, one pass
 here. The four rounds of round-tripping become zero — the max, subtract, exp,
