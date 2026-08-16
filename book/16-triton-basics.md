@@ -255,9 +255,21 @@ in lockstep. A few lanes shown, all 1024 do it together:
    store      out[1024]   out[1025]   out[1026]     ...    out[2047]
 ```
 
-Loads happen, the add happens, the store happens — and the only thing that
-ever touches memory is the first and last column of the table. The middle
-rows live in registers, which is the whole point.
+Read the table top to bottom and it's one lane's timeline. Of the five
+states, **three touch memory**: the two loads at the top (the block's inputs
+arriving from HBM) and the store at the bottom (the output leaving for HBM).
+The other two — computing `offsets`, and the add itself — are pure register
+arithmetic: they move data that is already on the chip, and not one byte
+goes to or from memory.
+
+That's the boundary view of the whole kernel. The memory system sees exactly
+three spans from this block — `x[1024..2047]`, `y[1024..2047]`,
+`out[1024..2047]` — a 2 KiB read, a 2 KiB read, a 2 KiB write, 6 KiB total.
+Everything else in the table is invisible to it. Which is the whole point of
+the fused kernel: PyTorch's three separate operations made `x` cross memory
+three times (the 12 KiB at the top of the lecture); this kernel crosses
+once. The middle rows not touching memory is not a detail — it is the
+entire win.
 
 **The masked tail.** Block 2's span is wider than the array, so its last 72
 lanes are fenced off. The mask is a per-lane bit; `other` is what the fenced
