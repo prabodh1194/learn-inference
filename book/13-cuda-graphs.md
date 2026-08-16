@@ -242,6 +242,17 @@ That last point is worth sitting with: this optimization *takes* memory from
 Lecture 09's budget. Every engine makes this trade, and it's a genuine trade
 rather than a free win.
 
+??? question "Why would CUDA graphs cost KV cache? Aren't they unrelated?"
+    Both draw from the same VRAM pool. Each captured graph reserves its static
+    buffers per batch size, so capturing 8 sizes holds 8 sets of buffers
+    nothing else can use — and that VRAM would otherwise grow the KV cache
+    pool, whose capacity sets how many tokens you can serve. The KV cache
+    itself is mandatory (no graphs change that); its *capacity* is what you
+    trade. Launch savings are big at small batches and ~nothing at batch 128,
+    while the memory cost is roughly constant per size — which is why engines
+    capture the small sizes and stop early.
+    [Full answer](qa.md#why-would-cuda-graphs-cost-kv-cache)
+
 ---
 
 ## Go deeper

@@ -1279,3 +1279,28 @@ math happens later, at replay time. That's why:
   address would make replay read stale garbage.
 - Control flow can't exist inside: a command list is a straight line, so any
   branch was already resolved when the recording was made.
+
+## Why would CUDA graphs cost KV cache?
+
+**Lecture:** [13. CUDA graphs](13-cuda-graphs.md)
+
+**Wrong intuition:** "Capturing graphs and KV cache sound unrelated — one is a
+performance trick, the other is memory. The check-yourself question reads as a
+non-sequitur."
+
+They're siblings: both live in the same VRAM pool, and both are held for the
+server's lifetime. Each captured graph reserves its static buffers — input,
+output, and scratch slots per batch size — so capturing 8 batch sizes holds 8
+sets of buffers that nothing else can use. That VRAM would otherwise go to the
+KV cache pool. The KV cache isn't optional — it exists to avoid recomputing
+K/V for every prefix token at every step, with or without graphs — but its
+*capacity* is budgeted from the same pool, and capacity is what serving runs
+on: fewer cached tokens means shorter contexts, smaller batches, or fewer
+concurrent sequences. Every graph you capture is measured in *tokens of
+serving capacity you can't cache*.
+
+So the tradeoff is: launch savings (big at small batches, ~nothing at batch
+128) against lost KV capacity (roughly constant per captured size). The
+decision rule is to capture only the sizes where the win outweighs the cost —
+which is why engines capture small sizes (1, 2, 4, 8, 16, 32…) and stop long
+before their real max batch.
