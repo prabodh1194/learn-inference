@@ -89,13 +89,16 @@ CPU-bound in a program that appears to be about GPUs.
 
 ## The idea
 
-Decode steps are **identical in shape**, every single time. Same kernels, same
-order, same tensor shapes, only the values in the tensors change. A **tensor**
-is a grid of numbers, here the activations flowing through the model; its
-shape is its dimensions. "Same shape, different values" means every step is
-structurally the same work, only the numbers differ.
+The fix starts from a simple observation about decode: **every step is the same
+step.** One decode step is the same list of operations every time — the same
+kernels, in the same order, with the same tensor shapes (a tensor is a grid of
+numbers; its shape is its dimensions). Only the *values* differ: the numbers
+flowing through the model are new for every token. Nothing about the
+choreography changes.
 
-So record the launch sequence once and replay it:
+That is the key. A set of launches is a *script*. If the script is identical
+every step, you only need to write it once — then replay it forever, instead of
+re-issuing 400 commands each step.
 
 ```python
 # capture (once)
@@ -108,26 +111,58 @@ static_input.copy_(new_tokens)   # write into the SAME memory
 g.replay()                        # one launch instead of 400
 ```
 
-Hundreds of individual launches collapse into a single graph launch. The GPU work
-is unchanged; the CPU-side submission cost nearly vanishes.
+**What capture does.** Inside the `with` block the kernels don't actually run.
+PyTorch watches every CUDA call the model makes and writes it into a
+recording: "launch kernel 3 on these addresses", 400 entries long, in order.
+The tensors the model touches live in a private memory pool, so their
+addresses stay reserved for the graph.
+
+**What replay does.** `g.replay()` is one CPU call. It hands the GPU the whole
+recording at once, and the GPU works through it: kernel 1, kernel 2, … kernel
+400, back to back — no waiting for the CPU between kernels, because the whole
+list is already queued. The GPU does exactly the work it would have done; the
+difference is purely on the CPU side, one piece of launch paperwork instead of
+400. The 2.8ms of submission overhead collapses to a few microseconds.
+
+??? question "Wait — the KV cache grows every step. How can the shapes be the same every time?"
+    With a `DynamicCache` they aren't, and that is precisely why the next
+    section exists: static cache, fixed batch, fixed addresses. The "same
+    shapes" claim is the *goal* of the engineering, not a given. Decode is
+    structurally identical — same kernels, same order — and shape stability is
+    what you build around it so the script can exist at all.
+    [Full answer](qa.md#how-can-decode-shapes-be-identical-every-step-when-the-kv-cache-grows)
+
+??? question "What does capture actually record — the values, the Python, what?"
+    Neither. It records *commands*: "launch this kernel, at these addresses",
+    400 times, in order. Capture runs no math; the kernels execute at replay
+    time. Because the recording stores addresses, the tensors' locations must
+    never move afterwards — which is why replay needs the `copy_` into a fixed
+    slot, and why this whole section is about holding addresses still.
+    [Full answer](qa.md#what-does-graph-capture-actually-record)
 
 ### The constraint that shapes everything
 
 > A captured graph replays **exactly** the same operations on **exactly** the same
 > memory addresses.
 
-Consequences, all of which you must design around:
+A recording is a recording. It fixed three things: the shapes, the addresses,
+and the sequence of commands. Replay will repeat exactly those, forever.
+Change any of the three and the replay silently does the wrong thing. Each
+constraint below is one of those three, and what engines do about it:
 
-**Static shapes.** A graph captured for batch 8 works only for batch 8. Engines
-capture several graphs (1, 2, 4, 8, 16, 32…) and pad up to the nearest. That
-padding is real waste, traded against launch savings.
+**Static shapes.** A graph captured for batch 8 replays batch-8 math, always.
+Feed it a batch of 16 and it runs the recorded (8, …) kernels anyway — no
+error, just a wrong-shaped result. So engines capture a *set* of graphs (1, 2,
+4, 8, 16, 32…) and pad the incoming batch up to the nearest captured size: a
+batch of 5 runs as a batch of 8, computing three empty rows. That padding is
+real waste, traded deliberately against the launch savings.
 
-**Static memory.** Inputs must be copied into the same buffers each time. You
-cannot pass fresh tensors. A captured graph records addresses, not values: a
-fresh tensor lives at a new address, and replaying the graph would silently
-read whatever is in the old one. That is why the code above writes
-`static_input.copy_(new_tokens)` before every replay, a copy into the recorded
-slot.
+**Static memory.** The recording stores *addresses*, not values. Replay
+re-runs the commands that touch the recorded addresses; whatever sits there
+now is what gets read. A fresh tensor lives at a new address, so passing new
+tensors to a replayed graph reads whatever happens to occupy the old slots —
+silent garbage. The code above sidesteps this with
+`static_input.copy_(new_tokens)`: the values change, the addresses don't.
 
 > This constraint is why `StaticCache` exists (Lecture 05). A `DynamicCache`
 > grows by concatenation, so its tensors move, new addresses every step, which a
@@ -140,26 +175,31 @@ slot.
 > tables* rather than over contiguous cache tensors. Worth noticing in vLLM's
 > `gpu_model_runner.py`.
 
-**No data-dependent control flow.** `if token == eos: break` inside the captured
-region doesn't work: the branch was fixed at capture time. Sampling and stopping
-logic stay outside the graph.
+**No data-dependent control flow.** A recording is a straight line of commands
+— it has no branches. `if token == eos: break` inside the captured region
+can't work: the condition was evaluated once, at capture time, and the choice
+is baked into the recording. Sampling and stopping logic live outside the
+graph.
 
-**Prefill usually isn't captured.** Variable prompt lengths mean variable shapes.
-Prefill is compute-bound anyway, so launch overhead is a much smaller fraction of
-it: the payoff is concentrated in decode.
+**Prefill usually isn't captured.** Prompt lengths vary, so prefill shapes
+vary, so no fixed script exists to record. And prefill is compute-bound
+anyway: launch overhead is a small fraction of a long, heavy step. The payoff
+is concentrated in decode, where steps are short and overhead is half the
+story.
 
 ### `torch.compile` is the other half
 
-Different mechanism, complementary result. Where CUDA graphs remove *launch*
-overhead, `torch.compile` reduces the *number* of kernels through fusion, three
-elementwise ops become one.
+Different mechanism, complementary result. CUDA graphs remove *per-launch*
+cost: 400 calls become one. `torch.compile` reduces the *number* of kernels:
+it fuses adjacent elementwise ops, three launches become one (Lectures 16–17
+build such fused kernels by hand). Fewer kernels also means fewer launches, so
+the two compound — compile fuses, the graph replays the fused result in a
+single launch. Modern vLLM uses both. Try them separately first so you can
+attribute the wins: each removes a different cost.
 
-Fewer kernels also means fewer launches, so the two compound. Modern vLLM uses
-both. Try them separately first so you can attribute the wins.
-
-Watch for **recompilation**: a new input shape triggers a fresh compile, which is
-slow. If your steady-state throughput is fine but latency spikes occasionally,
-check whether shapes are varying.
+Watch for **recompilation**: a new input shape triggers a fresh compile, which
+is slow. If your steady-state throughput is fine but latency spikes
+occasionally, check whether shapes are varying.
 
 ---
 

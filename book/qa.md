@@ -1234,3 +1234,48 @@ because a long reasoning trace is precisely the regime where the cache is doing
 the most work.
 
 ---
+
+## How can decode shapes be identical every step when the KV cache grows?
+
+**Lecture:** [13. CUDA graphs](13-cuda-graphs.md)
+
+**Wrong intuition:** "The lecture claims every decode step has the same tensor
+shapes, but the KV cache grows by one token per step, so the attention shapes
+must change. The premise sounds false."
+
+Two different senses of "same" got conflated. Decode is **structurally**
+identical — the same kernel list, the same order — but the shapes are only
+identical because the setup *forces* them to be:
+
+- The cache is pre-allocated (`StaticCache` to `max_cache_len`), so attention
+  always runs over the same-size buffer; it never grows mid-flight.
+- The batch size is fixed (or padded up to a captured size).
+- Addresses never move (a captured graph records them).
+
+The "same shapes" claim is the *goal* of the engineering, not a given. That's
+exactly why the constraint section exists: every constraint (static shapes,
+static memory, no branches) is the answer to "what must be true so that the
+script exists at all." If you read the premise as "decode is already identical
+out of the box," the constraints look like arbitrary limitations; read it as
+"we want the script, so we engineer the conditions," and they're the recipe.
+
+## What does graph capture actually record?
+
+**Lecture:** [13. CUDA graphs](13-cuda-graphs.md)
+
+**Wrong intuition:** "Capture runs the model and saves its outputs, or
+compiles the Python, or snapshots the tensor values."
+
+None of those. Capture records **commands**: "launch kernel 3 on these
+addresses" — 400 entries, in order, the same stream of calls the CPU would
+otherwise issue one by one. During capture the kernels don't run at all; the
+math happens later, at replay time. That's why:
+
+- Replay is one CPU call: the graph already *is* the ready-made command list,
+  so the driver hands it to the GPU wholesale.
+- Addresses can never change: they're literally written into the recording, so
+  replay re-runs the commands against whatever occupies the recorded slots.
+  New values must be `copy_`d into the fixed slots; a fresh tensor at a new
+  address would make replay read stale garbage.
+- Control flow can't exist inside: a command list is a straight line, so any
+  branch was already resolved when the recording was made.
