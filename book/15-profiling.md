@@ -94,6 +94,14 @@ the roofline and should look elsewhere.
 
 That's the roofline from Lecture 02, now measured instead of predicted.
 
+??? question "What does 'achieved bandwidth as a fraction of peak' even mean?"
+    Achieved is derived, not measured: `bytes moved ÷ kernel time`, where
+    bytes are DRAM traffic the profiler counts. The fraction normalizes
+    hardware and is your distance to the roofline. One trap: cache hits don't
+    count as DRAM traffic, so the fraction only means "close to done" for
+    kernels that *should* be DRAM-bound — exactly decode.
+    [Full answer](qa.md#what-does-achieved-memory-bandwidth-as-a-fraction-of-peak-mean)
+
 ---
 
 ## The method

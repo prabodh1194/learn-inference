@@ -1304,3 +1304,25 @@ So the tradeoff is: launch savings (big at small batches, ~nothing at batch
 decision rule is to capture only the sizes where the win outweighs the cost —
 which is why engines capture small sizes (1, 2, 4, 8, 16, 32…) and stop long
 before their real max batch.
+
+## What does "achieved memory bandwidth as a fraction of peak" mean?
+
+**Lecture:** [15. Profiling](15-profiling.md)
+
+**Wrong intuition:** "The profiler measures 'achieved bandwidth' as if it were a
+direct readout like temperature."
+
+It's derived, not measured: `achieved = bytes moved ÷ kernel wall time`, where
+"bytes moved" is DRAM traffic counted by the profiler and the time is how long
+the kernel actually ran. The fraction is that number divided by the spec
+sheet's peak (bus width × transfer rate, e.g. 936 GB/s for a 3090) — a
+physical ceiling you can't fully reach (refresh, bank conflicts, granularity),
+which is why 70–90% is "done" and 100% never happens. Its job is to normalize
+hardware and tell you your distance to the roofline: at 30% there's headroom,
+at 85% move on.
+
+The trap: DRAM traffic only counts bytes that left the chip, so cache hits
+don't count. A kernel at 20% of peak can be perfect if its data was served
+from SRAM (flash attention). The fraction only means "close to done" for
+kernels that *should* be DRAM-bound — which is exactly what decode is, which
+is why the lectures keep coming back to it.
