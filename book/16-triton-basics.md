@@ -305,14 +305,36 @@ def softmax_kernel(x_ptr, out_ptr, n_cols, BLOCK_SIZE: tl.constexpr):
 
     x = tl.load(x_ptr + row * n_cols + offsets,  # the row's BLOCK_SIZE values
                 mask=mask, other=-float("inf"))
-
-    m = tl.max(x, axis=0)                        # the row's max — a scalar
-    p = tl.exp(x - m)                            # subtract-max, then exp: broadcasts
-    l = tl.sum(p, axis=0)                        # the row's sum — another scalar
-    out = p / l
-
-    tl.store(out_ptr + row * n_cols + offsets, out, mask=mask)
 ```
+
+**What that `tl.load` actually does, piece by piece:**
+
+- `x_ptr` is the base pointer to the whole matrix (shape `[n_rows, n_cols]`,
+  row-major in memory).
+- `row * n_cols` jumps to the start of *this* block's row. `n_cols` is the
+  leading dimension (stride between rows). Multiplying by `row` skips the
+  preceding rows entirely.
+- `offsets` is the per-lane index vector `[0, 1, 2, ..., BLOCK_SIZE-1]`
+  (created by `tl.arange`). Adding it to the row base gives the absolute
+  address each lane should read.
+- `mask=mask` fences off the padded lanes (the last 24 when `n_cols=1000`,
+  `BLOCK_SIZE=1024`). Those lanes still execute the load, but their result is
+  replaced by `other`.
+- `other=-float("inf")` is the value masked lanes *receive* instead of
+  reading garbage. We need `-inf` here (not `0.0`) because masked lanes
+  participate in `tl.max` and `tl.sum` — they must contribute `0` to the sum
+  (`exp(-inf - m) = 0`) and never win the max.
+- The return value `x` is a **block-wide tensor of shape `[BLOCK_SIZE]`** —
+  one value per lane, already in registers. The compiler emitted a single
+  coalesced load instruction per warp; neighbouring lanes read neighbouring
+  addresses, so the hardware fetches the whole row in a handful of wide
+  transactions.
+
+The key mental shift from PyTorch: `x` is not a Python list or a sliced tensor
+— it's a **block-wide value** where each lane holds one element, and every
+subsequent operation (`tl.max`, `tl.exp`, `tl.sum`) happens on that
+distributed representation in registers. No HBM traffic between `load` and
+`store`.
 
 Four things here that matter more than the code:
 
