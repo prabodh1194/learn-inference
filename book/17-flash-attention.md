@@ -239,7 +239,7 @@ uniquely confusing bug.
     `e²` is a 7:1 ratio, and the same toy softmax stays soft — dividing `[0, 6,
     2, 2]` by √4 = 2 gives `[0, 3, 1, 1]`, top weight **76%**. The scalar keeps
     the *spread* of the scores under control, not the individual values.
-    [Full answer](qa.md#why-divide-by-sqrt-d-and-not-by-d)
+    [Full answer](qa.md#why-divide-by-sqrtd-and-not-by-d)
 
 **`-inf` minus `-inf` is NaN.** If a whole tile is masked out (entirely above the
 diagonal) while `m_i` is still `-inf`, then `correction = exp(m_i - m_new)`

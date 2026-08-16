@@ -31,16 +31,38 @@ into one long strip, and hands that strip to attention. Draw it for a sequence
 of three blocks:
 
 ```
-logical sequence 0..37        physical blocks (scattered in VRAM)
-[chunk 0][chunk 1][chunk 2]    block table: [4, 1, 9]
-    ┆       ┆       ┆              ┆    ┆    ┆
-    └───────┴───────┴──────────────┘    ┆    ┆   (copy chunk 0, from block 4)
-                                     └───┴────┘   (copy chunks 1, 2 from 1, 9)
-                                          ↓
-                            one big contiguous strip in HBM
-                                          ↓
-                            attention reads the whole strip
+  the sequence thinks it has        VRAM actually holds it like this
+  one run of 38 tokens              (scattered, in whatever blocks were free)
+
+  ┌─────────┐ tokens  0..15         block 1  ┌─────────┐  chunk 1
+  │ chunk 0 │                                └─────────┘
+  ├─────────┤ tokens 16..31         block 4  ┌─────────┐  chunk 0
+  │ chunk 1 │                                └─────────┘
+  ├─────────┤ tokens 32..37         block 9  ┌─────────┐  chunk 2
+  │ chunk 2 │  (6 real, 10 unused)           └─────────┘
+  └─────────┘
+                    block table for this sequence:  [4, 1, 9]
+                    "my chunk 0 is in block 4,
+                     my chunk 1 is in block 1,
+                     my chunk 2 is in block 9"
+
+  the gather then does this, every step:
+
+      block 4 ──copy──┐
+      block 1 ──copy──┼──>  ┌───────────────────────────┐  a brand-new
+      block 9 ──copy──┘     │ chunk 0 │ chunk 1 │ chunk2│  contiguous strip
+                            └───────────────────────────┘  in HBM
+                                         │
+                                         └──> attention reads the strip
+
+  every K/V byte of the sequence: read out, written back, read again —
+  and the strip is thrown away at the end of the step
 ```
+
+Read the block table as the sequence's own private map. Its *logical* order
+(chunk 0, 1, 2) is tidy and contiguous; the *physical* blocks it points at
+(4, 1, 9) are in no particular order and never need to be. That mismatch is
+what paging bought, and what the gather is paying to hide.
 
 `cache[blocks]` **materializes**: it copies the bytes out of their scattered
 blocks into a brand-new contiguous strip. `reshape` and the slice handle that
@@ -94,18 +116,49 @@ Note the asymmetry that makes the lookup cheap and the gather expensive. The
 gather moved *every byte* of the cached sequence: bytes out of their blocks,
 bytes into a duplicate strip, and attention read the duplicate. The block table
 lookup moves a few bytes: the address of the next tile's home. That one
-address steers a much larger load. With `block_size = 16` and each token's K/V
-costing 114,688 bytes (from Lecture 05), one tile holds:
+address steers a much larger load.
+
+To put a number on "much larger", first be precise about what this kernel is
+working on, because it is easy to reach for the wrong figure here. **One
+program instance handles one (query tile, head) pair, for one layer.** The
+attention kernel runs inside a single layer; it never sees the other 27. So the
+K/V cost that matters is the *per-layer* one, not the whole-model one.
+
+Lecture 05 counted both. Per token, in one layer:
 
 ```
-16 tokens × 114,688 B/token  =  1,835,008 B  ≈  1.75 MiB
+2 (K and V)  ×  8 KV heads  ×  128 head_dim  ×  2 bytes  =  4,096 B  =  4 KiB
 ```
 
-And the lookup that finds it reads a single 32-bit index, 4 bytes. A 4-byte
-read steering a ~1.75 MiB read is why the indirection costs almost nothing
-while the gather it replaced cost a full extra copy of the sequence (224 MiB
-at the 2048-token context Lecture 02 used). You're spending 4 bytes to save
-megabytes, every tile.
+and that is the number this kernel spends. (Lecture 05's headline figure,
+114,688 B per token, is that same 4 KiB multiplied by all 28 layers — the cost
+of one token to the *whole model*. Use it for cache-capacity questions, not for
+one kernel's tile.)
+
+So with `block_size = 16`, one tile holds:
+
+```
+16 tokens × 4,096 B/token  =  65,536 B  =  64 KiB
+```
+
+And the lookup that finds it reads a single 32-bit index, 4 bytes:
+
+```
+   4 B  (the block-table entry)   steers   65,536 B  (the tile)
+   ratio  =  65,536 / 4  =  16,384×
+```
+
+A 4-byte read steering a 64 KiB read — one byte of address per 16,384 bytes of
+payload — is why the indirection costs almost nothing, while the gather it
+replaced cost a full extra copy of the sequence. You're spending 4 bytes to
+save tens of kilobytes, every tile, in every layer, on every step.
+
+Note also that 64 KiB *fits* in the ~100 KB of shared memory per SM that
+Lecture 17 established as the tile budget. That is not a coincidence: the block
+size is chosen so a tile fits on-chip. Had the tile really cost 1.75 MiB — the
+number you get by wrongly using the all-layers figure — it could not fit, and
+the whole tiling premise would collapse. When a tile size looks too big for
+SRAM, suspect a per-layer/whole-model mix-up.
 
 The write side gets the same treatment. Every step the model computes fresh K/V
 for the batch's newest tokens, and a naive engine would stage them in a
