@@ -82,7 +82,7 @@ The mask must be computed **per step, per sequence**: each step's answer is a
 list of 151,936 legal/illegal flags, one per vocabulary token, and the list
 changes every time the grammar position advances. Multiply by the number of
 sequences in the batch, every step. Naively that's a huge amount of CPU work on
-the critical path, and it lands squarely in the gap Lecture 24 warned you
+the critical path, and it lands squarely in the gap Lecture 13 warned you
 about: CPU work that stalls the GPU.
 
 Real implementations attack this with:
@@ -255,7 +255,7 @@ than a toy version.
 
 1. Why does logit masking give a *guarantee* where prompting gives a probability?
 2. Grammar masking is CPU work per step per sequence. Why is that dangerous
-   specifically, given Lecture 24?
+   specifically, given Lecture 13?
 3. How is grammar jump-ahead the same idea as speculative decoding?
 4. Two requests share a 400-token prefix but use different LoRA adapters. Can they
    share KV blocks? Why not?

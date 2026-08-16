@@ -75,48 +75,138 @@ Row-parallel (second matmul):    split weights by ROW
     -> all-reduce to combine
 ```
 
-Draw it with real shapes so the arithmetic is visible. Take a hidden dimension
-of `d` and two GPUs. The first matmul's weight matrix `W1` is `d × d` (in, out
-widths). Split it **down the middle of its columns**, each GPU holds a
-`d × d/2` slice:
+Draw it with real shapes so the arithmetic is visible. An MLP block is *not*
+two square matrices — it widens, then narrows. For Qwen3-0.6B the hidden size
+is `d = 1024` and the intermediate width is `d_ff = 3072`, three times wider:
 
 ```
-GPU 0:  x (1×d)  ×  W1[:, 0:d/2]   ->  z_0 (1×d/2)      a half-width hidden state
-GPU 1:  x (1×d)  ×  W1[:, d/2:d]   ->  z_1 (1×d/2)      the other half
+      x           W1              h            W2          out
+   (1×1024) → (1024×3072) → (1×3072) → (3072×1024) → (1×1024)
+                  ↑ widen        ↑           ↑ narrow
+                            activation
+```
+
+That middle width is the thing TP actually splits, and the fact that it's the
+*wide* dimension is why the split pays. Take two GPUs.
+
+**First matmul: split `W1` down its columns.** Each GPU holds a `1024 × 1536`
+slice — half the intermediate width:
+
+```
+GPU 0:  x (1×1024)  ×  W1[:, 0:1536]      ->  h_0 (1×1536)   half the hidden state
+GPU 1:  x (1×1024)  ×  W1[:, 1536:3072]   ->  h_1 (1×1536)   the other half
 ```
 
 A column split needs no communication: each GPU reads the same input row `x`
-but only its own half of the weights, so both sides compute independently and
-their outputs slot side by side into one hidden state.
+(replicated — it arrived from the previous layer's all-reduce) but only its own
+half of the weights, so both sides compute independently.
 
-The second matmul's weight `W2` is `d × d` again. Split it **across its rows**,
-each GPU holds a `d/2 × d` slice. Here is the elegant part: each GPU's second
-matmul consumes only the half of the hidden state that the same GPU computed,
-`z_0` on GPU 0, `z_1` on GPU 1, no gathering in between. It multiplies its half
-against its rows of `W2`, producing a partial sum of the output:
+**Then the activation — and this is the step that makes the whole scheme work.**
+A real MLP is `W2 · act(W1 · x)`, not `W2 · (W1 · x)`; Qwen3 uses SiLU. If the
+activation needed the *whole* hidden state, the split would break here and you'd
+need a gather before you could continue. It doesn't:
 
 ```
-GPU 0:  z_0 (1×d/2)  ×  W2[0:d/2, :] (d/2×d)  ->  out_0 (1×d)   a partial sum
-GPU 1:  z_1 (1×d/2)  ×  W2[d/2:d, :] (d/2×d)  ->  out_1 (1×d)   a partial sum
+   act is ELEMENTWISE — each output depends only on the value beneath it
+
+   h    :  [ h₀ h₁ h₂ ... h₁₅₃₅ │ h₁₅₃₆ ... h₃₀₇₁ ]
+             └─ GPU 0 has these ┘ └─ GPU 1 has these ┘
+                    ↓ ↓ ↓                  ↓ ↓ ↓
+   act(h):  [ σ σ σ  ...  σ     │  σ  ...  σ      ]
+             └── computed locally ┘ └── computed locally ┘
+
+   no neighbour needed → no communication
+```
+
+Because SiLU acts on each element independently, GPU 0 can apply it to `h_0`
+without ever seeing `h_1`. The activation *commutes with the column split*. Had
+the middle been something mixing across the width — a softmax over `d_ff`, a
+normalization — this would not hold, and that's precisely why attention (which
+has a softmax across positions) shards by **head** rather than by hidden width:
+each head's softmax is self-contained.
+
+**Second matmul: split `W2` across its rows.** Each GPU holds a `1536 × 1024`
+slice, and consumes only the half of the activated hidden state it already has —
+no gathering in between:
+
+```
+GPU 0:  act(h_0) (1×1536)  ×  W2[0:1536, :]      ->  out_0 (1×1024)  partial sum
+GPU 1:  act(h_1) (1×1536)  ×  W2[1536:3072, :]   ->  out_1 (1×1024)  partial sum
                                            all-reduce
-                              out = out_0 + out_1    (1×d)
+                              out = out_0 + out_1    (1×1024)
 ```
 
-Multiplication is distributive: `out_0 + out_1` equals the result the full
-`x · W2` would give, algebraically exactly. That's why the all-reduce is
-correct and not an approximation, and why a column-then-row pair needs only
-one all-reduce: the two matmuls hand the split to each other directly, and only
-the final output must be combined.
+Why summing partials is exactly right: a matrix product is a sum over the shared
+inner dimension, and splitting that dimension splits the sum into two groups of
+terms. Writing out one output element `j`:
 
-Column-then-row means **one all-reduce per MLP block**, not two. Attention shards
-the same way, by heads: each GPU owns a subset of heads, then all-reduce after the
-output projection.
+```
+full:    out[j]  =  Σ over k = 0..3071   act(h)[k] · W2[k, j]
 
-> **GQA caps your TP degree.** GQA — grouped-query attention, where several query
-> heads share one key/value head — means sharding is by *KV* heads, and Qwen3-0.6B
-> has only 8 of them (against 16 query heads). So TP-8 is the ceiling before you
-> must
-> replicate KV heads across ranks and give back some of the memory saving. This is
+split:   out_0[j] = Σ over k = 0..1535   act(h)[k] · W2[k, j]
+         out_1[j] = Σ over k = 1536..3071 act(h)[k] · W2[k, j]
+
+         out_0[j] + out_1[j] = Σ over k = 0..3071  =  out[j]   ✓
+```
+
+Every term appears exactly once, in exactly one group. So `out_0 + out_1` equals
+the full result **algebraically exactly** — the all-reduce is correct, not an
+approximation. And that is why a column-then-row pair needs only *one*
+all-reduce: the two matmuls hand the split to each other directly, the
+elementwise activation passes it through untouched, and only the final output
+must be combined.
+
+(Qwen3's MLP is *gated*: it has two up-projections, `gate_proj` and `up_proj`,
+multiplied together elementwise before `down_proj`. Both shard column-wise
+exactly as `W1` does, and their elementwise product is — again — elementwise, so
+the argument is unchanged. One all-reduce, still.)
+
+Column-then-row means **one all-reduce per MLP block**, not two.
+
+**Attention shards the same way, but by heads rather than by width.** The
+reason is the one from the activation discussion: attention has a softmax, which
+mixes values across positions, so you cannot cut a head in half and still
+compute it locally. A whole head, though, is self-contained — its softmax only
+ever looks at its own scores. So the unit of sharding is the head:
+
+```
+   16 query heads, 8 KV heads (Qwen3-0.6B), across 2 GPUs
+
+   GPU 0:  Q heads 0..7    KV heads 0..3   ─┐
+   GPU 1:  Q heads 8..15   KV heads 4..7   ─┤ each computes its heads
+                                            │ end to end, alone
+                    ↓                       │
+            concat along the head dim ──────┘
+                    ↓
+            output projection (row-split)  →  all-reduce
+```
+
+Same shape as the MLP: independent work, then one all-reduce at the output
+projection.
+
+> **GQA constrains your TP degree.** GQA — grouped-query attention, where several
+> query heads share one key/value head — means the shardable unit is the *KV*
+> head, and Qwen3-0.6B has only 8 of those (against 16 query heads).
+>
+> The constraint is **divisibility, not just a ceiling**: each rank needs a whole
+> number of KV heads, so the legal TP degrees are the divisors of 8 — TP-1, 2, 4,
+> 8. TP-3 and TP-6 are not options, even though both are below 8.
+>
+> ```
+> TP-2:  8 KV heads / 2 = 4 each   ✓
+> TP-4:  8 KV heads / 4 = 2 each   ✓
+> TP-8:  8 KV heads / 8 = 1 each   ✓   the ceiling
+> TP-16: 8 KV heads / 16 = 0.5     ✗   must replicate KV heads across ranks,
+>                                      giving back some of the memory saving
+> ```
+>
+> `d_ff` divisibility is a co-equal constraint on the MLP side: `3072 / TP` must
+> also come out whole (it does for all of 1, 2, 4, 8). In practice KV heads bind
+> first, because there are far fewer of them.
+>
+> (To be clear about scale: nobody runs TP-8 on a 0.6B model — the collectives
+> would swamp the compute. The *arithmetic* is what transfers; on a 70B model
+> with 8 KV heads the same divisibility rule is what caps you at TP-8.) This is
 > a real limit people hit, and it's exactly the "where scaling stops" question
 > this lecture is about.
 
@@ -132,8 +222,29 @@ Compute per GPU divides by N. Communication does not shrink with it. The
 standard implementation is a **ring all-reduce**: the GPUs stand in a circle,
 each holds `S/N` of the data (`S` being the total bytes of the tensor being
 summed), each passes its share one step around the ring, then a second lap
-spreads the total back. Every lap has `N−1` hops, so every GPU sends `N−1`
-chunks of `S/N` bytes and receives the same, in both directions:
+spreads the total back.
+
+Draw the circle with 4 GPUs, each starting with its own partial sum split into
+4 chunks:
+
+```
+                    ┌─────────┐
+              ┌────>│  GPU 0  │────┐
+              │     └─────────┘    │            lap 1 (reduce-scatter):
+              │                    ▼            each GPU adds the chunk it
+         ┌─────────┐          ┌─────────┐       receives to its own, then
+         │  GPU 3  │          │  GPU 1  │       passes it on. After N−1
+         └─────────┘          └─────────┘       hops, each GPU owns the
+              ▲                    │            complete sum of ONE chunk.
+              │     ┌─────────┐    │
+              └─────│  GPU 2  │<───┘            lap 2 (all-gather):
+                    └─────────┘                 those finished chunks go
+                                                round again so everyone
+      each hop carries S/N bytes                ends up with all of them.
+```
+
+Every lap has `N−1` hops, so every GPU sends `N−1` chunks of `S/N` bytes and
+receives the same, in both directions:
 
 ```
 bytes per rank  =  (N−1 + N−1) × S/N      two laps of N−1 hops each

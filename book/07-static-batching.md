@@ -42,10 +42,35 @@ shape every computation on the model runs on) is rectangular, every row must be
 as wide as the widest one. So you pad:
 
 ```
-"Explain paged attention"     -> [1234, 5678, 910, PAD, PAD, PAD, PAD, PAD]
-"Hi"                          -> [4321, PAD, PAD, PAD, PAD, PAD, PAD, PAD]
+"Explain paged attention"     -> [PAD, PAD, PAD, PAD, PAD, 1234, 5678,  910]
+"Hi"                          -> [PAD, PAD, PAD, PAD, PAD, PAD, PAD,  4321]
 "Write a function that ..."   -> [1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888]
+                                                                        ↑
+                                                          position -1, every row
 ```
+
+**Note which side the padding is on.** It is on the *left*, and that is not a
+stylistic choice — it is required, for a reason worth seeing now rather than
+discovering as a bug later.
+
+Decode reads the last position of every row to get the next token's logits:
+`logits[:, -1]`. One index, applied to the whole batch. With left-padding, every
+sequence's real final token lands on that same last column, so the one index is
+right for every row. Right-padding breaks it:
+
+```
+LEFT-padded  (correct)                RIGHT-padded  (broken)
+
+[PAD PAD PAD 1234 5678 910]           [1234 5678 910 PAD PAD PAD]
+[PAD PAD PAD PAD  PAD 4321]           [4321 PAD  PAD PAD PAD PAD]
+                        ↑                            ↑
+              logits[:, -1] reads          logits[:, -1] reads
+              a real token in both         PAD, PAD — garbage for
+              rows  ✓                      both short rows  ✗
+```
+
+You would be sampling the next token from the model's opinion about a padding
+token. The output still looks like text, which is what makes it nasty.
 
 Padding is computed and discarded, an attention mask keeps it from affecting
 results, but the GPU does the work regardless.

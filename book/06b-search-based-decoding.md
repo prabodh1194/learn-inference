@@ -29,16 +29,62 @@ there are `V^T` completions; the per-step argmax does **not** pick the argmax
 of that space, because the two goals disagree the moment one slightly-less-
 likely token leads to a far-more-likely continuation:
 
+A note on the numbers before the example, because the sign trips everyone up.
+Scores here are **log-probabilities**, and a probability is at most 1, so its
+logarithm is at most 0: every score below is **negative**, and *less negative is
+better*. `-0.2` is a likelier step than `-1.6`.
+
 ```
-step 0:  token 0 (logp 0.6)   token 1 (logp 0.4)
-step 1:  after 0 -> [0.1, 0.9]      after 1 -> [9.0, 8.0]
+step 0:  token 0 (logp -0.2)        token 1 (logp -1.6)
+step 1:  after 0 -> [-2.3, -0.4]    after 1 -> [-0.01, -0.5]
 ```
 
-Greedy walks into the trap: it takes token 0 at step 0 (0.6 > 0.4), then token 1
-(0.9), for a path score of `0.6 + 0.9 = 1.5`. The best path is `1 then 0` at
-`0.4 + 9.0 = 9.4`. A low-probability first step can be the entrance to a
-high-probability future, and argmax can't see past the current step. This is the
-"splitting point", and it is why search exists.
+Draw it as the tree it is, with each path's total score summed along its edges:
+
+```
+                        (start)
+                       /        \
+              -0.2    /          \    -1.6
+                     /            \
+                 token 0        token 1
+                  /    \          /    \
+           -2.3  /      \ -0.4   / -0.01 \ -0.5
+                /        \      /         \
+            [0,0]      [0,1]  [1,0]      [1,1]
+            -2.5       -0.6   -1.61      -2.1
+                        ↑        ↑
+                greedy lands   actually the best
+                   here            path
+```
+
+Greedy walks into the trap. At step 0 it compares `-0.2` against `-1.6`, takes
+token 0, and can never reconsider. At step 1 it takes `-0.4`, finishing at
+`-0.2 + -0.4 = -0.6`.
+
+But the best path is token 1 first: `-1.6 + -0.01 = -1.61`... which is *worse*
+than `-0.6`. Look again — and this is the point — greedy actually wins on these
+numbers. Change one edge and it doesn't:
+
+```
+step 1:  after 1 -> [+0.0 ... ]   an almost-certain continuation, logp ≈ -0.01
+         make token 0's best continuation -1.2 instead of -0.4:
+
+         greedy path  [0,1] :  -0.2 + -1.2  =  -1.4
+         better path  [1,0] :  -1.6 + -0.01 =  -1.61   still worse!
+```
+
+The honest version of this claim needs the gap to be large enough. Take token
+0's continuations as `[-2.3, -2.0]` and token 1's as `[-0.01, -0.5]`:
+
+```
+         greedy path  [0,1] :  -0.2 + -2.0  =  -2.2
+         best   path  [1,0] :  -1.6 + -0.01 =  -1.61   ← now the best path wins
+```
+
+Greedy took the better *first* step (`-0.2` beats `-1.6`) and ended up on the
+worse *sequence* (`-2.2` against `-1.61`). A slightly-less-likely first token was
+the entrance to a much-more-likely future, and argmax cannot see past the current
+step. This is the **splitting point**, and it is why search exists.
 
 ### Beam search
 
@@ -46,14 +92,41 @@ Beam search keeps the `K` highest-scoring partial sequences alive at each step
 instead of one. Each step, every surviving path is extended by every token, the
 `K` best extensions are kept, and the rest are dropped:
 
+On the numbers above (`token 0 → [-2.3, -2.0]`, `token 1 → [-0.01, -0.5]`):
+
 ```
-K=2:  step 0:  keep [0] (0.6), [1] (0.4)
-      step 1:  [0,0]=0.7  [0,1]=1.5  [1,0]=9.4  [1,1]=8.4   -> keep [1,0], [1,1]
+K=2:  step 0:  keep [0] (-0.2)  and  [1] (-1.6)      ← greedy would drop [1] here
+      step 1:  expand both, score every extension:
+
+               [0,0] = -0.2 + -2.3  = -2.5
+               [0,1] = -0.2 + -2.0  = -2.2
+               [1,0] = -1.6 + -0.01 = -1.61   ← best
+               [1,1] = -1.6 + -0.5  = -2.1
+
+               keep the K=2 best:  [1,0] (-1.61), [1,1] (-2.1)
 ```
 
-The path greedy threw away (token 1 first) survived long enough to reveal its
-9.4. That is the entire mechanism. `K` is the **beam width**; `K=1` *is* greedy,
-and `K=V^T` is exhaustive search, with beam search the entire spectrum between.
+Watch what the width bought. At step 0, `[1]` looked worse and greedy discarded
+it; beam search kept it alive on probation. One step later `[1]`'s children
+scored so well that **both** survivors descend from it, and the greedy path
+`[0,1]` has been eliminated entirely:
+
+```
+   step 0 frontier:   [0] -0.2   [1] -1.6        both kept (K=2)
+                        │           │
+   step 1 candidates:  [0,0] [0,1] [1,0] [1,1]
+                       -2.5  -2.2  -1.61 -2.1
+                        ✗     ✗     ✓     ✓      keep top 2
+```
+
+The path greedy threw away survived long enough to reveal its `-1.61`. That is
+the entire mechanism: **delay the commitment, and let the evidence arrive.**
+
+`K` is the **beam width**. `K=1` *is* greedy (keep one path, never reconsider).
+Larger `K` explores more of the tree for proportionally more memory and compute,
+and in the limit it becomes exhaustive search over all `V^T` completions — which
+is why nobody runs it: at `V ≈ 150,000` and `T = 100`, `V^T` is a number with
+half a million digits.
 
 ### The length problem
 
@@ -162,13 +235,18 @@ by sampling with a verifier instead.
 
 ## Go deeper
 
-- **[The Curse of Beam Search](https://arxiv.org/abs/1904.09751)**
-  (also Holtzman et al., 2019): larger beams *reduce* downstream quality on
-  likelihood-trained models. The empirical case against search.
-- **[A* sampling](https://arxiv.org/abs/2103.13923)** (Luong et al.): search with
-  a probabilistic twist. Useful middle ground.
-- **"If beam search is the answer, what was the question?"** — the framing that
-  search's value depends entirely on whether the mode is what you want.
+- **[The Curious Case of Neural Text Degeneration](https://arxiv.org/abs/1904.09751)**
+  (Holtzman et al., 2019): the same paper Lecture 06 cites for nucleus sampling.
+  Read it here for its other half — the evidence that maximizing likelihood, which
+  is exactly what larger beams do better, produces *worse* text on open-ended
+  generation. The empirical case against search.
+- **[If beam search is the answer, what was the question?](https://arxiv.org/abs/2010.02650)**
+  (Meister, Cotterell & Vieira, EMNLP 2020): the framing that search's value
+  depends entirely on whether the mode is what you actually want. The title is
+  the thesis.
+- **[A* Sampling](https://arxiv.org/abs/1411.0030)** (Maddison, Tarlow & Minka,
+  NeurIPS 2014): exact sampling built on A* search over a Gumbel process. A
+  genuinely different use of search — sampling rather than mode-seeking.
 - **HuggingFace `generate` docs** on `num_beams`, `length_penalty`, and the
   `((5+len)/6)^alpha` normalization — the production details.
 

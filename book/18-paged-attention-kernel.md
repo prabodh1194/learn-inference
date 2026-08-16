@@ -108,9 +108,42 @@ block_id = tl.load(block_table_ptr + block_idx)      # where does this tile live
 k_tile = tl.load(K_cache + block_id * block_stride + offsets)
 ```
 
-One extra load (the block table lookup) per tile. The block table is tiny and
-stays in fast on-chip memory (**SRAM**), so the overhead is small. The gather
-disappears entirely.
+Read the two versions side by side. FlashAttention computes an address by
+*arithmetic*: "tile number 3 starts at 3 × stride." PagedAttention computes it
+by *lookup*: "where does tile 3 live? Ask the table." One extra load per tile,
+and that is the entire change.
+
+Here is the hop the second version makes, drawn out:
+
+```
+   logical position          block table            physical KV blocks
+   (what the sequence        (this sequence's       (scattered in HBM,
+    thinks it has)            own little map)        any order at all)
+
+   ┌────────────┐           ┌──────┬───────┐        ┌──────────┐
+   │ tok  0..15 │  slot 0 ─>│  0   │   93  │───────>│ block 93 │  64 KiB
+   ├────────────┤           ├──────┼───────┤        ├──────────┤
+   │ tok 16..31 │  slot 1 ─>│  1   │   12  │───────>│ block 12 │  64 KiB
+   ├────────────┤           ├──────┼───────┤        ├──────────┤
+   │ tok 32..47 │  slot 2 ─>│  2   │   57  │───────>│ block 57 │  64 KiB
+   └────────────┘           └──────┴───────┘        └──────────┘
+    contiguous, by            4 bytes per            NOT contiguous —
+    construction              entry                  and it no longer matters
+
+    the kernel reads:   4 B (one index)  ──steers──>  64 KiB (one tile)
+```
+
+The block table itself is tiny, so it stays in fast on-chip memory (**SRAM**,
+the small scratchpad next to the compute units) and the lookup costs almost
+nothing. Tiny is worth a number: one 4-byte entry per 16 tokens, so even a
+32,768-token sequence has a table of
+
+```
+32,768 tokens ÷ 16 tokens/block  =  2,048 entries
+2,048 entries × 4 B              =  8,192 B  =  8 KiB
+```
+
+8 KiB of map to steer megabytes of K/V. The gather disappears entirely.
 
 Note the asymmetry that makes the lookup cheap and the gather expensive. The
 gather moved *every byte* of the cached sequence: bytes out of their blocks,

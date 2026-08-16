@@ -50,24 +50,155 @@ zeros through the model. Store the tiny integer matrix and a few numbers per
 group, reconstruct each weight when it is loaded, do the math as if nothing
 happened.
 
+### Where scale and zero_point come from
+
+The formula above is the *decode* direction. You also need the *encode*
+direction, and it is the thing you will actually implement, so derive it.
+
+You have a block of real weights spanning some range `[w_min, w_max]`, and you
+have exactly 256 integer slots to represent them (`int8`, values 0..255 in the
+unsigned convention). Two requirements fix the mapping completely:
+
+1. `w_min` must land on integer 0.
+2. `w_max` must land on integer 255.
+
+The float range spans `w_max − w_min`; the integer range spans `255 − 0 = 255`
+steps. So one integer step is worth:
+
+```
+scale  =  (w_max − w_min) / 255
+```
+
+And the offset that puts `w_min` at integer 0 — set `w = w_min` in
+`w ≈ scale × (q − zero_point)` and solve for `q`:
+
+```
+w_min = scale × (0 − zero_point)      we want q = 0 here
+    ⟹  zero_point = −w_min / scale
+```
+
+rounded to an integer, since `zero_point` is stored as one.
+
+**Work it on real numbers.** Take a block of weights with
+`w_min = −0.31`, `w_max = 0.44`:
+
+```
+scale       = (0.44 − (−0.31)) / 255  =  0.75 / 255  =  0.00294
+
+zero_point  = −(−0.31) / 0.00294      =  0.31 / 0.00294  =  105.4  →  105
+```
+
+Now quantize one weight, `w = 0.137`:
+
+```
+q  =  round(w / scale) + zero_point
+   =  round(0.137 / 0.002941) + 105
+   =  round(46.58) + 105
+   =  47 + 105
+   =  152
+```
+
+Note the `round`: `46.58` is not an integer, and that rounding is where the
+information is lost. Dequantize to see exactly how much:
+
+```
+ŵ  =  scale × (q − zero_point)
+   =  0.002941 × (152 − 105)
+   =  0.002941 × 47
+   =  0.138235
+
+error  =  |0.137 − 0.138235|  =  0.001235      (0.90% of the value)
+```
+
+Contrast a weight that happens to land cleanly, `w = 0.10`:
+
+```
+q  =  round(0.10 / 0.002941) + 105  =  round(34.0) + 105  =  139
+ŵ  =  0.002941 × 34  =  0.100000        error = 0  (exactly on a grid point)
+```
+
+So the error is not uniform — it depends on where each weight falls between two
+grid points — but it is **bounded**, always, by half a step:
+
+```
+max error  =  scale / 2  =  0.002941 / 2  =  0.00147
+```
+
+That bound is the entire cost of the technique. Everything else in this lecture
+is about **making `scale` smaller**, because a smaller step means a smaller
+bound — and the way you shrink it is to stop sharing one scale across weights
+that don't belong together.
+
+??? question "Doesn't dequantizing on every load cost more time than it saves?"
+    No, and the reason is Lecture 16's. The multiply-and-subtract happens in
+    registers, on data that has *already arrived* on-chip — it costs arithmetic,
+    and decode has arithmetic to spare (Lecture 02: 0.79 ops:byte against a ridge
+    of 76). What you saved is the HBM traffic, which is the thing you were
+    actually waiting on. You are spending the abundant resource to conserve the
+    scarce one, which is the same trade FlashAttention makes.
+    [Full answer](qa.md#doesnt-dequantizing-on-every-load-cost-more-time-than-it-saves)
+
 The interesting question is what `scale` covers.
 
-**Per-tensor**: one scale for the whole matrix. Smallest metadata, worst accuracy:
-a single outlier (one weight far outside the typical range) stretches the range
-and crushes precision for everything else.
-The picture: one number to describe every weight in the matrix, so a single
-huge value spreads the integer grid over a wider span, and the weights that
-matter are all squeezed into a coarse corner of it.
+Here are the three, drawn on the same weight matrix. `s` marks one stored scale:
+
+```
+  PER-TENSOR              PER-CHANNEL             PER-GROUP
+  one s for everything    one s per row           one s per 64-128 weights
+
+  ┌──────────────┐ s      ┌──────────────┐        ┌──────┬──────┐
+  │ ▪ ▪ ▪ ▪ ▪ ▪  │        │ ▪ ▪ ▪ ▪ ▪ ▪  │ s₀     │ ▪ ▪ ▪│▪ ▪ ▪ │ s₀ s₁
+  │ ▪ ▪ ▪ ▪ ▪ ▪  │        │ ▪ ▪ ▪ ▪ ▪ ▪  │ s₁     ├──────┼──────┤
+  │ ▪ ▪ ▪ ▪ ▪ ▪  │        │ ▪ ▪ ▪ ▪ ▪ ▪  │ s₂     │ ▪ ▪ ▪│▪ ▪ ▪ │ s₂ s₃
+  │ ▪ ▪ ▪ ▪ ▪ ▪  │        │ ▪ ▪ ▪ ▪ ▪ ▪  │ s₃     ├──────┼──────┤
+  └──────────────┘        └──────────────┘        │ ▪ ▪ ▪│▪ ▪ ▪ │ s₄ s₅
+                                                  └──────┴──────┘
+  1 scale stored          4 scales stored         6 scales stored
+  worst accuracy          standard choice         best accuracy
+```
+
+**Per-tensor**: one scale for the whole matrix. Smallest metadata, worst
+accuracy — and here is why, drawn as the number line from the derivation above.
+One **outlier** (a single weight far outside the typical range) forces `w_max`
+wide, which forces `scale` large, which makes the grid coarse *everywhere*:
+
+```
+  without the outlier:  range [-0.3, 0.3],  scale = 0.6/255  = 0.0024
+  ├─┼─┼─┼─┼─┼─┼─┼─┼─┼─┤        fine grid where the weights actually are
+ -0.3                0.3
+
+  with one outlier at 4.0:  range [-0.3, 4.0],  scale = 4.3/255 = 0.0169
+  ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤
+ -0.3     0.3      1.0      1.7      2.4      3.1      4.0
+  └──┬──┘
+     └─ every real weight is crammed in here, 7× coarser than before
+        one outlier made 99.9% of the matrix less accurate
+```
 
 **Per-channel**: one scale per output channel. Standard, and much better. A
-channel, for a weight matrix, is one output neuron's row of incoming weights;
-giving each row its own number line means a row with small weights gets a fine
-grid, regardless of what other rows contain.
+channel, for a weight matrix, is one output neuron's row of incoming weights.
+Giving each row its own number line means a row of small weights gets a fine
+grid regardless of what other rows contain — the outlier now damages only
+*its own row*, and the other rows are untouched.
 
-**Per-group**: one scale per group of 64–128 weights — the size is the
-accuracy-versus-metadata trade: smaller groups track local ranges better, but
-each group carries its own scale and zero point. Best accuracy, most
-metadata. What INT4 methods use, because 4 bits can't absorb any range waste.
+**Per-group**: one scale per group of 64–128 weights along the row. Best
+accuracy, most metadata. What INT4 methods use, because 4 bits (16 levels, not
+256) cannot absorb any range waste at all.
+
+**Count the metadata**, since "most metadata" deserves a number. At group size
+128, each group stores one fp16 scale (2 B) and one int8 zero-point (1 B):
+
+```
+  3 bytes of metadata  per  128 weights
+  = 3 × 8 bits / 128 weights
+  = 0.19 bits per weight
+```
+
+So "INT4" is really about **4.19 bits per weight** once you count the scales —
+a 4.7% overhead on the thing you were trying to shrink. Halve the group size to
+64 and you double that overhead to 0.38 bits/weight for a finer grid. That
+trade — accuracy against metadata — is exactly what the group size dial
+controls.
 
 ### Weights vs. activations vs. KV cache
 

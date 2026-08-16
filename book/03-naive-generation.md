@@ -34,15 +34,58 @@ Generating 512 tokens from a 64-token prompt, with no cache:
 ```
 
 Every number above is a sum. Step `n` runs `64 + n − 1` tokens through the
-model, and of those only 1 (the newest) is genuinely new work; on step 1 the
-whole prompt is new, so that one step is all useful. Over all 512 steps:
+model: the 64 prompt tokens plus the `n − 1` tokens generated so far. Of those,
+only 1 (the newest) is genuinely new work.
+
+Derive the total, one step at a time. Split the summand into its constant part
+and its growing part:
 
 ```
-computed  = Σₙ₌₁⁵¹² (64 + n − 1)      = 512 · 63 + 511·512/2  = 163,584
-needed    = 512                        (one new K/V vector per step)
-wasted    = 163,584 − 512 − 63         = 163,009    (step 1's 63 are real work)
-share     = 163,009 / 163,584          = 99.6%
+computed  =  Σₙ₌₁⁵¹² (64 + n − 1)
+
+          =  Σₙ₌₁⁵¹² 64      +  Σₙ₌₁⁵¹² (n − 1)     split the sum
+
+          =  512 · 64        +  (0 + 1 + 2 + ... + 511)
+
+          =  32,768          +  511 · 512 / 2        the triangular number
+
+          =  32,768          +  130,816
+
+          =  163,584
 ```
+
+The second sum is `0 + 1 + … + 511`, which is the triangular number
+`m(m+1)/2` with `m = 511`, i.e. `511 · 512 / 2 = 130,816`. That growing term is
+the quadratic one, and it already dwarfs the constant 32,768 at this length.
+
+Now the waste, counted the way `book/code/recomputation.py` counts it. Step 1
+processes the 64-token prompt and every one of those 64 vectors is real work,
+so step 1 wastes nothing. Each later step recomputes everything it has seen
+before and adds exactly 1 new vector, so step `n` wastes `(64 + n − 1) − 1`:
+
+```
+wasted    =  Σₙ₌₂⁵¹² (64 + n − 2)         step 1 wastes nothing
+
+          =  Σₙ₌₂⁵¹² 62  +  Σₙ₌₂⁵¹² n     split again
+
+          =  511 · 62    +  (2 + 3 + ... + 512)
+
+          =  31,682      +  (512·513/2 − 1)
+
+          =  31,682      +  131,327
+
+          =  163,009
+```
+
+and the share:
+
+```
+computed  = 163,584                     (every K/V vector the model computed)
+wasted    = 163,009                     (all but the 575 that were new)
+share     = 163,009 / 163,584  =  99.6%
+```
+
+Run the script and you will see exactly these numbers.
 
 The 19.1 TFLOP is the same sum turned into projection FLOPs. Each K/V vector
 is a multiply-accumulate over `hidden × kv_dim` weights, in every layer; that's
@@ -55,7 +98,18 @@ V), so for the 163,009 wasted vectors:
 ```
 
 **99.6% waste.** And the scaling table: each row is the same sum with a
-different upper limit (`Σₙ₌₁ᴺ (64 + n − 1) = N · 63 + N(N−1)/2`):
+different upper limit. Using the split from above, with `N` in place of 512:
+
+```
+Σₙ₌₁ᴺ (64 + n − 1)  =  64N  +  N(N−1)/2
+                       └─┬─┘    └───┬──┘
+                     linear in N   quadratic in N
+```
+
+Check it at `N = 512`: `64·512 + 511·512/2 = 32,768 + 130,816 = 163,584` ✓.
+The two terms are the whole story — the linear one is the prompt being re-read,
+the quadratic one is the generated text being re-read, and the second overtakes
+the first as `N` grows:
 
 ```
   output len    total K/V work   vs 128 tokens

@@ -14,10 +14,25 @@ a tool result, and an action to the conversation, so the context grows
 *linearly with the number of steps* — and context is exactly the resource
 Lecture 05 showed you is finite and Lecture 09 showed you how to budget.
 
-An agent that runs 2,000 steps is "tens of millions of tokens in context". The
-book's ~8k crossover (Lecture 05) is crossed within the first ~100 steps. Agent
-serving is long-context serving, and the optimization is not kernels — it's
-*deciding what stays in the context*.
+Put numbers on "grows linearly", because the slope is the whole story. Say each
+round-trip adds ~100 tokens (a prompt, a tool result, an action — the figure you
+will measure yourself in the build section):
+
+```
+step   10  :     10 × 100  =    1,000 tokens
+step  100  :    100 × 100  =   10,000 tokens   <- past L05's ~8k crossover
+step  500  :    500 × 100  =   50,000 tokens
+step 2,000 :  2,000 × 100  =  200,000 tokens   <- a frontier context window, full
+```
+
+So the book's ~8k KV crossover (Lecture 05) is passed inside the first ~100
+steps, and a long-running agent walks a full 200k context window by step 2,000.
+Heavier round-trips — a large file read, a verbose tool result — push all of
+this earlier; agents that paste whole documents into context reach the same
+place in tens of steps rather than hundreds.
+
+Agent serving is therefore long-context serving, and the optimization is not
+kernels — it's *deciding what stays in the context*.
 
 ---
 
@@ -42,6 +57,59 @@ The ordering matters because each rung destroys more information. Trimming old
 turns loses almost nothing; collapsing the whole conversation loses a lot. You
 climb one rung at a time, and only as far as the budget forces.
 
+Seen against the growing context, the ladder is a sawtooth — growth, a cut,
+growth again:
+
+```
+ tokens
+        │                              ╱│              ╱│
+ budget ├──────────────╱│─────────────╱ │────────────╱ │───  the budget line
+        │            ╱  │           ╱   │          ╱   │
+        │          ╱    │         ╱     │        ╱     │
+        │        ╱      ▼       ╱       ▼      ╱       ▼
+        │      ╱      trim    ╱        snip  ╱      compact
+        │    ╱                                (rung 3)
+        │  ╱   ← context grows ~100 tokens per step
+        └──────────────────────────────────────────────────>  steps
+
+        each ▼ is a rung firing; the rung climbs only when
+        the cheaper one below it can no longer buy enough room
+```
+
+**And here is the cost the diagram hides.** Every one of those cuts rewrites the
+*beginning* of the context — trimming drops the oldest turns, compaction
+replaces them with a summary. Prefix caching (L10) keys on an exact token
+prefix, so the moment you change the front of the prompt, **every cached block
+after the change is invalidated** and the next call re-prefills the whole
+conversation from scratch.
+
+That reframes the ladder entirely. Its cost is not the summarizing model call
+(though micro-compaction and collapse are real model calls, and are not free) —
+it is the lost prefix cache on the step after the cut:
+
+```
+before a cut:  [ system │ tools │ turn 1 │ ... │ turn N ]
+               └────────── all cached, prefill ≈ free ─────┘
+
+after a cut :  [ system │ tools │ SUMMARY │ turn N ]
+               └─ cached ─┘└──── changed: re-prefill everything after here ────┘
+```
+
+Which gives the real design rule: **compact rarely and in big steps.** Ten small
+trims cost ten cache invalidations; one larger compaction costs one. It also
+explains why deferred tool schemas (next section) are subtler than they look —
+loading a schema mid-session changes the prompt prefix too, with exactly the
+same effect.
+
+??? question "Wait — compaction makes the context smaller. How can it cost more?"
+    It makes every *future* step cheaper and the very next step much more
+    expensive. Prefix caching matches an exact token prefix, so rewriting the
+    front of the context invalidates every cached block after the change: the
+    next call re-prefills the whole surviving conversation from scratch. You
+    shrank the ongoing cost and paid a one-off bill for it — which is why
+    frequent small trims are the intuitive policy and the expensive one.
+    [Full answer](qa.md#why-does-compaction-hurt-the-prefix-cache)
+
 ### Tool definitions are prompt tokens
 
 Every tool you hand the model — its name, description, and input schema — is
@@ -60,6 +128,15 @@ short summary. Isolation is the point — the subagent's dead ends and digressio
 don't pollute the parent's context. It costs, though: a reported ~7× the tokens
 of a normal session, because the subagent re-derives context the parent already
 had. **Delegation is context hygiene at a price**, and the price is real.
+
+??? question "If a subagent costs ~7× the tokens, why would anyone use one?"
+    Because tokens spent and context *kept* are different currencies. The
+    subagent re-derives what the parent already knew (that's the 7×), but hands
+    back only a short summary — so the parent's context grows by hundreds of
+    tokens instead of tens of thousands. It's a good trade when the exploration
+    is long and mostly discardable, and a bad one when the task is short or the
+    parent actually needs the details rather than the conclusion.
+    [Full answer](qa.md#if-a-subagent-costs-7-the-tokens-why-use-one)
 
 ### Scoring is cheap; generating is dear
 
@@ -85,12 +162,27 @@ def compaction_ladder(turns, budget):
     # turns: list of (role, text), oldest first
     # returns (final_token_count, actions)
     actions = []
-    while token_count(turns) > budget and turns:
+    # len(turns) > 1, NOT just `turns`: stop while one turn remains, so the
+    # newest turn can never be trimmed. That is the invariant the tests check.
+    while token_count(turns) > budget and len(turns) > 1:
         oldest = turns[0]
         turns = turns[1:]                     # rung 1: trim the oldest
         actions.append(("trim", tokens(oldest)))
     return token_count(turns), actions
 ```
+
+Look closely at the loop condition, because the obvious version is wrong.
+Writing `while token_count(turns) > budget and turns:` reads fine and passes
+casual inspection — but if a single turn is itself bigger than the budget, it
+deletes turns until the list is *empty*, taking the newest turn with it. The
+agent then has no working memory at all and the next model call has nothing to
+act on.
+
+`len(turns) > 1` stops one turn early. The consequence is worth stating plainly:
+**the ladder can return a context that still exceeds the budget.** That is the
+correct behaviour — one over-budget turn is a problem you solve by *snipping*
+that turn (rung 2), not by deleting the only thing the agent knows. A rung-1-only
+implementation should hand that case upward rather than pretend it succeeded.
 
 That is the cheapest rung. The full ladder adds the summary rungs on top of it,
 each replacing several turns with one shorter summary instead of deleting them.

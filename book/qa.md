@@ -1147,14 +1147,32 @@ from training time to serving time, priced as tokens.
 
 **Lecture:** [25. Load testing](25-load-testing.md)
 
-Each decode step re-reads the whole weight set, so a step's lower bound is the
-time to read the card's entire memory: `capacity / bandwidth`. On the 3090 that
-is `24 GB / 936 GB/s ≈ 26 ms`; it has stayed ~20 ms across HBM generations
-because capacity and bandwidth scale together. The cadence matters because a
-request can't start mid-step: it waits up to one full cadence to board the next
-batch, then another for that batch to finish — a ~50 ms floor on latency even
-with zero queueing pressure. Short tokens and big GPUs don't lower this floor;
-they just make the same ~20 ms step produce one token instead of many.
+Each decode step re-reads the whole weight set plus the KV cache of everything
+in the batch, so a step's duration is `bytes read / bandwidth`. That makes the
+cadence a property of **how full your card is**, not a constant — and the
+frequently quoted "~25 ms" is the saturated case, which is easy to misapply.
+
+The upper bound is reading the card's entire memory, `capacity / bandwidth`. On
+a 3090: `24 GB / 936 GB/s ≈ 25.6 ms`. That is the beat for a model whose weights
+and cache fill the GPU. This book's model is nowhere near that:
+
+```
+saturated card   :  24 GB    / 936 GB/s  =  25.6 ms
+Qwen3-0.6B       :  880.8 MB / 936 GB/s  =   0.94 ms
+```
+
+**A ~27× difference.** The wrong intuition is that ~25 ms is a hardware
+constant you can quote for any workload on that card; it isn't. It's what you
+get when the working set is 24 GB. Derive your own cadence from the bytes your
+step actually reads.
+
+What *is* general is the structure. A request can't start mid-step, so it waits
+up to one full cadence to board the next batch, then another for that batch to
+finish — a **two-cadence floor** on latency even with zero queueing pressure.
+On a saturated card that's ~50 ms; on Qwen3-0.6B it's ~2 ms. Bigger GPUs don't
+lower the floor so much as change what fills them: capacity and bandwidth have
+grown together, which is why the saturated figure has hovered around 20–25 ms
+across HBM generations even as the models got much larger.
 
 ---
 
@@ -1473,3 +1491,111 @@ slice of the array am I?"). An OS process ID, by contrast, identifies a
 running process on your machine's scheduler. The two-level model is: program
 id tells you which block, `tl.arange` tells you which lane within it — you
 never get a global thread id, always a derived one.
+
+---
+
+## Why does compaction hurt the prefix cache?
+
+**Lecture:** [24b. Serving agents](24b-serving-agents.md)
+
+**Wrong intuition:** "Compaction shrinks the context, so the next call has less
+to prefill and must be cheaper."
+
+The opposite, on the very next call. Prefix caching (L10) works by matching an
+*exact* token prefix: the engine walks your prompt block by block and reuses
+cached KV for as long as the tokens match what it already has. Every rung of the
+compaction ladder rewrites the **front** of the context — trimming removes the
+oldest turns, compaction replaces them with a summary — so the match now fails
+at the first changed block, and every block after it is invalidated.
+
+```
+before:  [ system │ tools │ turn 1 │ turn 2 │ ... │ turn N ]
+         └─────────── all cached: prefill is nearly free ───┘
+
+after :  [ system │ tools │ SUMMARY │ turn N ]
+         └ cached ┘└─── changed → re-prefill everything from here ───┘
+```
+
+So the step after a cut pays a *full* prefill of the surviving context, even
+though that context is smaller. You shrank the ongoing per-step cost and bought
+a one-off bill to do it.
+
+Two consequences worth designing around:
+
+1. **Compact rarely, in big steps.** Ten small trims cost ten invalidations; one
+   larger compaction costs one. Frequent cheap trimming is the intuitive policy
+   and the expensive one.
+2. **Anything that edits the prompt prefix has this cost**, not just compaction.
+   Deferred tool schemas (loading a tool's full definition mid-session) insert
+   tokens near the front of the prompt and invalidate everything after them.
+   That doesn't make deferred schemas wrong — a hundred always-loaded schemas
+   cost KV for the whole session — but it means the win is smaller than the
+   token count suggests.
+
+The real accounting for the ladder is therefore *not* the summarizing model call
+(real, but occasional). It's the lost cache on the step after the cut.
+
+---
+
+## If a subagent costs ~7× the tokens, why use one?
+
+**Lecture:** [24b. Serving agents](24b-serving-agents.md)
+
+**Wrong intuition:** "7× the tokens is 7× the cost, so subagents are just a
+worse way to do the same work."
+
+Two things are being conflated: tokens spent, and the *quality of the context*
+the parent is left holding.
+
+A subagent re-derives context the parent already had — it starts fresh, reads
+the files again, rebuilds its understanding — and that duplication is where the
+~7× goes. What comes back is a short summary. So the parent's context grows by a
+few hundred tokens instead of by the tens of thousands the exploration would
+have cost inline.
+
+That trade is favourable exactly when the exploration is *long and mostly
+discardable*: searching a large codebase, trying several approaches and
+abandoning most, reading files to answer one question. Inline, all the dead ends
+land in the parent's context permanently — they push it toward the ladder, and
+every rung of the ladder costs a prefix-cache invalidation (above). Isolated,
+they're thrown away with the subagent.
+
+It is unfavourable when the task is short (the setup cost dominates), or when
+the parent genuinely needs the details rather than the conclusion — a summary
+is lossy, and if the next step needs what got summarized away, you pay to
+rediscover it.
+
+So: **delegation is context hygiene at a price.** Pay it for work whose output is
+much smaller than its working set; skip it when the working set *is* the output.
+
+---
+
+## Why would generating more tokens make an answer more correct?
+
+**Lecture:** [28b. Reasoning and test-time compute](28b-reasoning-and-test-time-compute.md)
+
+**Wrong intuition:** "The model already knows what it knows. Writing more words
+can't add information, so a long trace is just a verbose version of the short
+answer."
+
+The information isn't added — it's *computed*. A transformer does a fixed amount
+of work per token: one forward pass, a fixed depth. That's a hard ceiling on how
+much serial computation can happen before it must commit to a token. A problem
+needing more serial steps than that simply cannot be solved in one token,
+however much the model knows.
+
+Generated tokens lift the ceiling. Each token is written back into the context,
+so the next forward pass reads it as input — the model's own output becomes
+scratch memory, and a chain of N tokens gives roughly N times the serial depth.
+This is why "think step by step" works at all, and why it helps most on
+multi-step arithmetic and proofs while doing little for factual recall (recall
+needs no serial depth — it's one lookup).
+
+Majority voting is the parallel counterpart: instead of thinking longer on one
+path, sample many paths and vote. It fixes a different failure — one unlucky
+sampling step derailing an otherwise sound approach — which is why the two
+compose, and why L28b treats trace length and sample count as separate dials.
+
+Both have the same shape of return: cost grows multiplicatively, accuracy
+additively and with diminishing steps. Neither buys reasoning the model doesn't
+have; both buy it more room to use what it has.

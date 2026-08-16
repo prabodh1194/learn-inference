@@ -46,16 +46,32 @@ load = poisson_arrivals(mixed_length(n=1000), rate=20.0)   # 20 req/s
 Using a fixed inter-arrival time hides queueing entirely and makes your service
 look far more predictable than it is.
 
-??? question "Where does the ~25 ms per-step cadence come from?"
+??? question "Where does the per-step cadence come from, and is it always ~25 ms?"
     Decode steps don't take a variable amount of time; each one is a roughly
-    fixed wall-clock beat. The bound is the time to read the card's *entire*
-    memory: `capacity / bandwidth`. On the 3090 that's `24 GB / 936 GB/s ≈ 26
-    ms` (and it's stayed ~20 ms across HBM generations precisely because
-    capacity and bandwidth have grown together). A request that arrives just
-    after a step's batch is fixed has to wait up to one full cadence to *board*
-    the next step, then another for that step to finish — a ~50 ms worst-case
-    floor under *any* queueing, at *any* load. The train leaves on a schedule;
-    you wait for it even when it's empty.
+    fixed wall-clock beat, set by the bytes the step must read divided by
+    bandwidth. **How long that beat is depends entirely on how full the card
+    is**, so there is no single universal number — and the often-quoted ~25 ms
+    is the *saturated* case, not yours.
+
+    The upper bound is reading the card's entire memory, `capacity / bandwidth`:
+    on a 3090 that's `24 GB / 936 GB/s ≈ 26 ms`. That's the beat for a model
+    whose weights plus KV cache fill the GPU. Our Qwen3-0.6B does not:
+
+    ```
+    saturated card :  24 GB    / 936 GB/s  =  25.6 ms   <- the "~25 ms" figure
+    Qwen3-0.6B     :  880.8 MB / 936 GB/s  =   0.94 ms  <- this book's model
+    ```
+
+    A ~27× difference, so don't carry the 25 ms into your own measurements —
+    derive your own from what your step actually reads (weights, plus the KV
+    cache of everything in the batch). The *structure* of the argument survives
+    at any cadence: a request arriving just after a step's batch is fixed waits
+    up to one full cadence to *board* the next step, then another for that step
+    to finish, giving a **two-cadence worst-case floor** under any queueing, at
+    any load. On a saturated card that's ~50 ms; on ours it's ~2 ms. The train
+    leaves on a schedule and you wait for it even when it's empty — but check
+    the timetable before quoting the wait.
+    [Full answer](qa.md#where-does-the-25-ms-per-step-cadence-come-from)
 
 ??? question "Arrivals average 20 req/s and the server keeps up on average. Why does a queue ever form?"
     Because "on average" describes no particular moment. The 50 ms mean gap
