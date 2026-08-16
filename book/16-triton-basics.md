@@ -181,6 +181,17 @@ add_kernel[grid](x, y, out, n_elements, BLOCK_SIZE=1024)
 
 - **(1)** `tl.program_id(0)` is the block's index, in `[0, grid)`. The grid
   declares how many blocks exist; each block computes its own slice from its id.
+
+??? question "Is `pid` the same as a process ID?"
+    No — it's **program id**, and it's nothing to do with the operating
+    system. Triton compiles your kernel to one device program, then
+    instantiates many copies of it, one per block (the paper calls them
+    "program instances"). `pid` is the index of *this copy* among all of them
+    in the launch — the same role as CUDA's `blockIdx.x`. An OS process id
+    identifies a running process on your machine's scheduler; this identifies
+    a work unit inside one GPU call. It's a number chosen before the kernel
+    starts, and its only job is addressing.
+    [Full answer](qa.md#is-pid-the-same-as-a-process-id)
 - **(2)** `tl.arange(0, BLOCK_SIZE)` is a **vector of offsets**, `[0, 1, …,
   BLOCK_SIZE-1]`, held in registers. Add the block's starting offset and you
   have the addresses this block owns. This is where the compiler's coalescing

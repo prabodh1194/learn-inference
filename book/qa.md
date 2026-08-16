@@ -1455,3 +1455,21 @@ usually not "make memory busier" — it's latency-hiding (more occupancy, more
 parallelism); the utilization number just points you there. And step 6 exists
 to catch utilization-chasing: a kernel 2× faster that was 4% of runtime buys
 +2% end-to-end, inside noise.
+
+## Is `pid` the same as a process ID?
+
+**Lecture:** [16. Triton basics](16-triton-basics.md)
+
+**Wrong intuition:** "`pid` must be a process ID — that's what `pid` means in
+every other context."
+
+No. In Triton, `pid` is **program id**, and the operating system is nowhere
+involved. Triton compiles your kernel to one device program, then instantiates
+many copies of it — one per block — and the Triton paper calls those copies
+"program instances". `tl.program_id(0)` is the index of *this copy* among all
+of them in the launch: the same role as CUDA's `blockIdx.x`. It's a number
+assigned before the kernel starts, and its only job is addressing ("which
+slice of the array am I?"). An OS process ID, by contrast, identifies a
+running process on your machine's scheduler. The two-level model is: program
+id tells you which block, `tl.arange` tells you which lane within it — you
+never get a global thread id, always a derived one.
