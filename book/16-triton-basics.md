@@ -305,6 +305,13 @@ def softmax_kernel(x_ptr, out_ptr, n_cols, BLOCK_SIZE: tl.constexpr):
 
     x = tl.load(x_ptr + row * n_cols + offsets,  # the row's BLOCK_SIZE values
                 mask=mask, other=-float("inf"))
+
+    m = tl.max(x, axis=0)                        # the row's max — a scalar
+    p = tl.exp(x - m)                            # subtract-max, then exp: broadcasts
+    l = tl.sum(p, axis=0)                        # the row's sum — another scalar
+    out = p / l
+
+    tl.store(out_ptr + row * n_cols + offsets, out, mask=mask)
 ```
 
 **What that `tl.load` actually does, piece by piece:**
