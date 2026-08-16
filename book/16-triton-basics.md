@@ -1,7 +1,6 @@
 # 16. Triton basics
 
-**Build:** `kernels/triton/softmax.py`, `kernels/triton/rmsnorm.py`
-**Test:** `tests/test_16_triton.py` (cuda) · **Moves:** fewer memory round-trips on elementwise ops
+**Build:** `kernels/triton/softmax.py`, `kernels/triton/rmsnorm.py` · **Test:** `tests/test_16_triton.py` (cuda) · **Moves:** fewer memory round-trips on elementwise ops
 **Prereq:** [15. Profiling](15-profiling.md), with your kernel ranking in hand
 
 > **NVIDIA GPU required.** Triton is CUDA-only in practice.
@@ -58,15 +57,32 @@ read once and written once.
 
 ---
 
-## The idea
+## The mental model
 
-Triton is a Python DSL (a miniature programming language built on Python) that
-compiles to GPU kernels, the small programs the chip runs, the same things
-Lecture 15 ranked. You write code describing what **one block of threads**
-does; Triton handles the bookkeeping: thread indexing (which thread reads
-which data element), memory coalescing (making neighbouring threads read
-neighbouring addresses, so the hardware can fetch them in one go), and
-scheduling (deciding which threads run, and when).
+Before the code, the map. There are three ways to run math on a GPU, and
+knowing which one you're in is half the battle:
+
+| | Eager PyTorch | Raw CUDA | Triton |
+|---|---|---|---|
+| What you write | Python ops | what **one thread** does | what **one block** does, on tensors |
+| Kernel launches | one per op | one per kernel you write | one per kernel you write |
+| Compiler/bookkeeping | — | you manage it all | indexing, coalescing, scheduling |
+| Control over hardware | none | total | block-level; the rest hidden |
+
+**Eager PyTorch** launches a kernel per operation, and the launch overhead and
+the memory round-trip between them is Lecture 13's story and the 12 KiB above.
+**Raw CUDA** (Lecture 20) gives you everything, at the price of writing a
+thread's worth of work and managing the machine yourself. **Triton** sits
+between: you write a kernel like a NumPy function, and the compiler does the
+bookkeeping a CUDA programmer does by hand.
+
+That bookkeeping is concrete, and naming it demystifies the abstraction:
+
+- **Thread indexing** — which thread reads which data element.
+- **Memory coalescing** — arranging neighbouring threads to read neighbouring
+  addresses, so the hardware fetches them in one transaction instead of many.
+- **Scheduling** — which warps (the chip's fixed 32-thread groups) run when,
+  and how the grid of blocks drains onto the machine.
 
 The mental model differs from CUDA in one important way:
 
@@ -75,12 +91,169 @@ The mental model differs from CUDA in one important way:
 
 That's why a Triton kernel looks like NumPy with explicit loads and stores.
 
-### Anatomy
+Two consequences that shape everything that follows:
+
+**It's a compiler, and it compiles the whole body.** The kernel you write is
+compiled to one launch — one CPU-to-GPU dispatch, not one per `tl.*` line. All
+the lines between your first `tl.load` and your final `tl.store` become
+register-level arithmetic that never touches memory. That fusion, in one
+launch, is the entire win this lecture is about.
+
+**It's a block language, not a thread language.** The `tl.*` functions operate
+on the block's tensor — `tl.sum(x * x, axis=0)` reduces the block, `x * w`
+broadcasts a scalar across it. The compiler turns those tensor operations into
+per-thread instructions and reductions across threads (shared memory and warp
+shuffles). You express the shape of the work; it does the threading.
+
+### When Triton wins — and when it can't
+
+Honest boundaries, so you don't reach for it in the wrong place.
+
+**It wins** on memory-bound, shape-regular work: elementwise and reduction
+patterns (norms, activations, the fused attention tiles of Lecture 17). The
+win is removing HBM round-trips, and Triton's one-launch fused body is exactly
+that. It wins for anything you'd happily write as a small CUDA kernel and
+settle for 80% of peak.
+
+**It can't fix the algorithm.** FlashAttention's speedup is an *idea* (never
+materialize the score matrix) — Triton is only the tool that implements it.
+If a kernel is slow because of an algorithmic choice, no kernel language fixes
+that; you have to change the algorithm first (Lecture 17).
+
+**It won't beat a kernel already at the roofline.** Lecture 15's ceiling check
+applies. If your kernel is at 85% of peak bandwidth, Triton has nothing to add;
+the win was taken before you started.
+
+**Dynamic shapes are awkward.** `BLOCK_SIZE` is a power-of-two compile-time
+constant. A different shape is a different compiled kernel, and a shape that
+changes per call recompiles (or autotunes, below). Ragged tails are handled
+with masks, not dynamic loop bounds.
+
+**The last 5% is hidden.** Register allocation, warp specialization (different
+warps doing different jobs), explicit pipelining (overlapping the next tile's
+fetch with the current tile's math) are under the compiler's control. When an
+official kernel beats yours by 2×, the gap is usually exactly these — which is
+why Lecture 17 warns you not to expect to beat it, and why Lecture 20's raw
+CUDA exists.
+
+**You still need the profiler's view.** Triton hides the hardware, so occupancy
+and achieved bandwidth (Lecture 15) are still your windows into what's really
+happening. The abstraction makes writing kernels cheap; it doesn't make
+reading the machine unnecessary.
+
+---
+
+## Close reading: three kernels
+
+The three kernels below are the lecture. Read each one twice: once for the
+pattern it teaches, once for the annotations. Then type them into the stubs in
+`kernels/triton/` and the build section has what to do next.
+
+### The skeleton every kernel shares
+
+Four pieces, in this order, every time:
+
+1. **Launch config** — the `@triton.jit` decorator and the grid (how many
+   blocks, and with what compile-time constants).
+2. **Compute your addresses** — `tl.program_id` + `tl.arange` + offsets.
+3. **Load** — `tl.load` brings data into registers.
+4. **Compute, then store** — everything between the load and the store lives
+   on-chip; the store is the only write.
+
+### 1. Vector add
+
+The "hello world" — no reduction, no mask subtleties, just the skeleton:
 
 ```python
-import triton
-import triton.language as tl
+@triton.jit
+def add_kernel(x_ptr, y_ptr, out_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
+    pid = tl.program_id(0)                                  # (1) which block am I?
+    offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)   # (2) my slice of the array
+    mask = offsets < n_elements                             #     guard the tail
 
+    x = tl.load(x_ptr + offsets, mask=mask)                 # (3) one coalesced read
+    y = tl.load(y_ptr + offsets, mask=mask)
+    tl.store(out_ptr + offsets, x + y, mask=mask)           # (4) one coalesced write
+
+grid = (triton.cdiv(n_elements, BLOCK_SIZE),)               # enough blocks to cover the array
+add_kernel[grid](x, y, out, n_elements, BLOCK_SIZE=1024)
+```
+
+- **(1)** `tl.program_id(0)` is the block's index, in `[0, grid)`. The grid
+  declares how many blocks exist; each block computes its own slice from its id.
+- **(2)** `tl.arange(0, BLOCK_SIZE)` is a **vector of offsets**, `[0, 1, …,
+  BLOCK_SIZE-1]`, held in registers. Add the block's starting offset and you
+  have the addresses this block owns. This is where the compiler's coalescing
+  happens: the block's lanes map to consecutive addresses, so the hardware
+  fetches the whole slice in a handful of transactions.
+- **(3)** `tl.load` reads a whole tensor of values into registers. The mask
+  suppresses out-of-bounds lanes; masked-out lanes read undefined values, which
+  is fine here because the store is masked too — undefined lanes are never
+  written.
+- **(4)** `x + y` is one elementwise add across the block, all in registers.
+  One `tl.store`, masked, and the kernel is done.
+
+`triton.cdiv(n, block)` is "divide, rounding up": `n=1000, block=1024` → `1`,
+`n=3000, block=1024` → `3`. Exactly enough blocks to cover the array, no
+overshoot.
+
+### 2. Fused softmax
+
+The first real one, and the point of the lecture: numerically stable softmax
+is four passes over the row in PyTorch (max, subtract, exp, sum, divide), one
+in Triton. A pass is a full read of the row from memory, so the row crosses
+memory four times for an operation that is one read, one scaling, one write.
+
+```python
+@triton.jit
+def softmax_kernel(x_ptr, out_ptr, n_cols, BLOCK_SIZE: tl.constexpr):
+    row = tl.program_id(0)
+    offsets = tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_cols                      # ragged row: 1000 real, 24 pad
+
+    x = tl.load(x_ptr + row * n_cols + offsets,  # the row's BLOCK_SIZE values
+                mask=mask, other=-float("inf"))
+
+    m = tl.max(x, axis=0)                        # the row's max — a scalar
+    p = tl.exp(x - m)                            # subtract-max, then exp: broadcasts
+    l = tl.sum(p, axis=0)                        # the row's sum — another scalar
+    out = p / l
+
+    tl.store(out_ptr + row * n_cols + offsets, out, mask=mask)
+```
+
+Four things here that matter more than the code:
+
+**Why `other=-float("inf")`, not `0.0`.** The masked lanes (24 of them, the
+pad) participate in the `tl.max` and `tl.sum`. If `other=0.0`, the max is
+unaffected, but the sum gets `24 × exp(0 − m) = 24 × e^−m` of junk — the
+softmax denominator is slightly too big, the row is slightly off. With
+`other=-inf`, the masked lanes contribute `exp(-inf − m) = 0` to the sum and
+never win the max: the math is exactly right, pad lanes add nothing.
+
+**Subtract the max before exponentiating.** `exp(x − max)` instead of `exp(x)`;
+otherwise large logits overflow to `inf`. This is the same trick that becomes
+*online softmax* in Lecture 17, so understand it here where it's simple.
+
+**The reduction collapses the block to a scalar.** `tl.max(x, axis=0)` reduces
+a `[BLOCK_SIZE]` tensor to one value. The compiler implements it as reductions
+across the block's warps (shuffles plus shared memory). The scalar then
+**broadcasts** back: `x - m` and `p / l` apply a single value to every lane.
+One reduction down, one broadcast up — that shape is the fingerprint of a
+row-wise kernel, and you'll see it in RMSNorm right now.
+
+**Why this beats PyTorch.** Four passes over the row in eager mode, one pass
+here. The four rounds of round-tripping become zero — the max, subtract, exp,
+sum, and divide all happen in registers on the one load. Same math, same
+result, a quarter of the traffic.
+
+### 3. RMSNorm
+
+What Qwen3 actually uses. No mean subtraction, unlike LayerNorm, just
+root-mean-square scaling. Straight from your profile's tail. Two loads, one
+store — the entire 12 KiB problem at the top of the lecture, reduced to 6 KiB:
+
+```python
 @triton.jit
 def rmsnorm_kernel(x_ptr, w_ptr, out_ptr, n_cols,
                    eps, BLOCK_SIZE: tl.constexpr):
@@ -90,67 +263,25 @@ def rmsnorm_kernel(x_ptr, w_ptr, out_ptr, n_cols,
 
     x = tl.load(x_ptr + row * n_cols + offsets, mask=mask, other=0.0)
 
-    # everything below happens in registers/SRAM -- no HBM traffic
-    variance = tl.sum(x * x, axis=0) / n_cols
-    x_norm = x * tl.rsqrt(variance + eps)
+    variance = tl.sum(x * x, axis=0) / n_cols   # reduce, in registers
+    x_norm = x * tl.rsqrt(variance + eps)       # scalar broadcast: x * (1/√var)
     w = tl.load(w_ptr + offsets, mask=mask, other=0.0)
 
     tl.store(out_ptr + row * n_cols + offsets, x_norm * w, mask=mask)
 ```
 
-Four things to internalize:
+**Note the `other=0.0` here — deliberately different from softmax's `-inf`.**
+This reduction is a sum of squares; a masked lane *should* contribute 0, that's
+exactly what "not part of the row" means. The neutral value isn't a magic
+number — it's whatever makes the reduction correct for masked-out lanes, and
+it depends on the reduction. Sum of squares: `0`. `exp` of a max-subtracted
+value: `-inf`. That one line is the whole lesson about masking.
 
-**`tl.program_id(0)`**: your block's index. Launch a **grid** (all the blocks
-launched for this one call) of `n_rows`, and each block handles one row.
-
-**`BLOCK_SIZE: tl.constexpr`**: known at compile time, so Triton unrolls, lays
-the fixed-size work out as straight-line code, and allocates registers
-accordingly. A different `BLOCK_SIZE` is a different compiled kernel.
-
-**`mask`**: vocabulary sizes aren't powers of two. `BLOCK_SIZE` is. The mask
-suppresses out-of-bounds lanes (lane: one slot of the block's parallel work),
-and `other=0.0` supplies a neutral value so reductions stay correct. Draw one
-block over a row of 1000 values, `BLOCK_SIZE = 1024`:
-
-```
-   [  value 0  ...  value 999  ][  lanes 1000–1023  ]
-   \______ real data, read and stored ________/\_ masked, read as 0.0 _/
-```
-
-**One load, one store.** Between them, everything is in registers. That's the
-entire win.
-
----
-
-## The exercises
-
-### 1. Vector add
-
-The "hello world". Get the launch grid and masking right; the kernel is trivial.
-Won't beat PyTorch (it's already one fused kernel) but it teaches the mechanics.
-
-### 2. Fused softmax
-
-The first real one. Numerically stable softmax needs max, subtract, exp, sum,
-divide, four passes over the row in PyTorch, one in Triton. A pass is one full
-read of the row from memory: four passes means the row crosses memory four
-times, for an operation that is one read, one scaling, and one write.
-
-**Subtract the max before exponentiating.** `exp(x - max)` instead of `exp(x)`;
-otherwise large logits overflow to `inf`. This is the same trick that becomes
-*online softmax* in Lecture 17, so understand it here where it's simple.
-
-### 3. RMSNorm
-
-What Qwen3 actually uses. No mean subtraction, unlike LayerNorm, just
-root-mean-square scaling. Straight from your profile's tail.
-
-### Benchmark all three
-
-Against the PyTorch built-in, at realistic sizes (`hidden=1024`, batch × seq
-matching your workload). Report **achieved bandwidth as a fraction of peak**, the
-Lecture 15 metric. A fused elementwise kernel should approach peak; if it doesn't,
-your block size or launch grid is wrong.
+**Two loads, one store.** `x` and `w` are each read once, the output written
+once. `variance`, `x_norm`, and the product all live in registers between
+them — the sum of squares is reduced on-chip, the scaling is applied on-chip.
+The arithmetic is identical to the three-PyTorch-op version; the traffic is
+half. This is the fused kernel that "just" fused.
 
 ### Autotuning
 
@@ -165,21 +296,33 @@ your block size or launch grid is wrong.
 Triton benchmarks the configurations and caches the winner per `key`. Cheap to
 add, and the optimum genuinely varies by GPU, which is a small lesson in itself
 about portable performance. (`num_warps` is how many warps, the chip's fixed
-32-thread groups, the block is split into.)
+32-thread groups, the block is split into.) Because each configuration is a
+*different compiled kernel* — different unrolling, different register
+allocation — autotuning is really "try the whole design space of compiled
+versions, keep the fastest." It is the direct answer to the dynamic-shape
+problem from the mental model section: shapes don't have to be one fixed
+constant, they just have to be *chosen from a fixed set the compiler has
+already prepared*.
 
 ---
 
 ## Build it
 
-1. Vector add → softmax → RMSNorm, in that order.
-2. `uv run pytest tests/test_16_triton.py -v` on a CUDA box.
+1. Type the three annotated kernels above into `kernels/triton/` — `softmax.py`
+   and `rmsnorm.py` are stubs waiting for exactly this code.
+2. Vector add → softmax → RMSNorm, in that order. (Vector add won't beat
+   PyTorch — it's already one fused kernel — but it teaches the launch and the
+   mask before the real ones.)
+3. `uv run pytest tests/test_16_triton.py -v` on a CUDA box.
    **`torch.allclose` against the PyTorch version is non-negotiable.** A kernel
    that's fast and wrong is worthless, and numerics bugs here are subtle, they
    show up as slightly worse output quality, not crashes.
-3. Benchmark each against PyTorch. Record speedup **and** achieved bandwidth.
-4. Swap RMSNorm into your engine. **Re-run the end-to-end benchmark.**
+4. Benchmark each against PyTorch. Record speedup **and** achieved bandwidth
+   as a fraction of peak, the Lecture 15 metric. A fused elementwise kernel
+   should approach peak; if it doesn't, your block size or launch grid is wrong.
+5. Swap RMSNorm into your engine. **Re-run the end-to-end benchmark.**
 
-Step 4 is the point. Predict the end-to-end gain from your Lecture 15 profile
+Step 5 is the point. Predict the end-to-end gain from your Lecture 15 profile
 first: if RMSNorm was 4% of runtime and you make it 2× faster, you get 2%. Check
 whether reality agrees, if it doesn't, your profile or your measurement is wrong,
 and finding out which is worth more than the 2%.
@@ -203,7 +346,7 @@ ones.
 - **[Triton tutorials](https://triton-lang.org/main/getting-started/tutorials/)**:   02 (fused softmax) and 05 (layer norm) are directly this lecture. Work them.
 - **[Triton: An Intermediate Language and Compiler for Tiled Neural Network
   Computations](https://dl.acm.org/doi/10.1145/3315508.3329973)** (Tillet et al.)
- : the design rationale for block-level programming.
+  : the design rationale for block-level programming.
 - **Kiely §4.1.3** (p.100), kernel fusion and reducing memory accesses.
 - **vLLM `vllm/model_executor/layers/layernorm.py`**: production fused norms.
 
@@ -212,11 +355,15 @@ ones.
 ## Check yourself
 
 1. Why is fused RMSNorm faster when the arithmetic is identical?
-2. Why must `BLOCK_SIZE` be `tl.constexpr`?
+2. Why must `BLOCK_SIZE` be `tl.constexpr`? (Hint: what changes when it is?)
 3. What breaks without `mask` when `n_cols=1000` and `BLOCK_SIZE=1024`?
-4. Why subtract the max before `exp`?
-5. Your kernel is 3× faster but end-to-end improved 1.5%. Is that a
+4. Softmax masks with `other=-inf`, RMSNorm with `other=0.0`. Why are they
+   different, and what rule decides which you need?
+5. Why subtract the max before `exp`?
+6. Your kernel is 3× faster but end-to-end improved 1.5%. Is that a
    disappointment or exactly what you predicted?
+7. A Triton kernel is at 20% of peak bandwidth and correct. Is that a Triton
+   failure? (Lecture 15.)
 
 ---
 
@@ -228,3 +375,8 @@ matters, and the deepest idea in Part III.
 Two things to hold onto: it is **exact**, not an approximation; and it does
 *more* arithmetic to move *less* data, which is the right trade on a
 memory-bound operation, and the whole lesson of the roofline.
+
+The mental model from this lecture carries straight over: FlashAttention is the
+algorithm (never materialize the score matrix), and the Triton you just learned
+is the tool that implements it — blocks, tiles, reductions, and the same
+one-load-one-store discipline, on a 2-D tile instead of a row.
