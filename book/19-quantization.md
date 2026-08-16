@@ -12,7 +12,8 @@ Everything so far has moved bytes more cleverly. Quantization asks a blunter
 question: **why are the bytes so big?**
 
 Every weight is currently stored as a 16-bit float (FP16, 2 bytes). Decode is
-memory-bound (Lecture 02, 0.79 ops:byte), which means the GPU is mostly waiting
+memory-bound (Lecture 02, 0.79 ops:byte — 0.79 operations for every byte it
+loads), which means the GPU is mostly waiting
 for bytes to arrive, not computing. Time is proportional to bytes loaded, for
 a simple reason: on a memory-bound kernel, the bytes *are* the work. So halve
 the bytes and you nearly halve the time, no algorithmic cleverness required.
@@ -52,7 +53,8 @@ happened.
 The interesting question is what `scale` covers.
 
 **Per-tensor**: one scale for the whole matrix. Smallest metadata, worst accuracy:
-a single outlier stretches the range and crushes precision for everything else.
+a single outlier (one weight far outside the typical range) stretches the range
+and crushes precision for everything else.
 The picture: one number to describe every weight in the matrix, so a single
 huge value spreads the integer grid over a wider span, and the weights that
 matter are all squeezed into a coarse corner of it.
@@ -62,7 +64,9 @@ channel, for a weight matrix, is one output neuron's row of incoming weights;
 giving each row its own number line means a row with small weights gets a fine
 grid, regardless of what other rows contain.
 
-**Per-group**: one scale per group of 64–128 weights. Best accuracy, most
+**Per-group**: one scale per group of 64–128 weights — the size is the
+accuracy-versus-metadata trade: smaller groups track local ranges better, but
+each group carries its own scale and zero point. Best accuracy, most
 metadata. What INT4 methods use, because 4 bits can't absorb any range waste.
 
 ### Weights vs. activations vs. KV cache
@@ -94,16 +98,22 @@ entries. The two compose, and the field-notes caveat applies to both.
 
 ### The methods worth knowing
 
+The objective here is being able to choose: when round-to-nearest isn't good
+enough, each method below is a different way of making rounding hurt less,
+distinguished by what it spends its effort on.
+
 | Method | Idea |
 |---|---|
-| **RTN** | round-to-nearest; the baseline, no calibration |
-| **GPTQ** | layer-wise, compensating for error using second-order information |
+| **RTN** | round-to-nearest; the baseline, no calibration (no pass over sample data to set the scales) |
+| **GPTQ** | layer-wise, compensating for error (the mismatch each rounded weight introduces) using second-order information |
 | **AWQ** | protect the ~1% of channels that matter most, based on activation magnitude |
 | **SmoothQuant** | shift outlier difficulty from activations into weights |
 
 AWQ's premise is worth stating because it generalizes: **not all weights matter
-equally.** A small fraction of channels carry disproportionate influence, and
-keeping those at higher precision recovers most of the quality.
+equally.** A small fraction of channels carry disproportionate influence — the
+activations that flow through them are consistently the largest, so rounding
+errors there get multiplied by the biggest values — and keeping those at
+higher precision recovers most of the quality.
 
 Two table entries read as magic; unpack them. GPTQ's "second-order information"
 is the shape of the error surface, measured by running a few batches of data
@@ -131,7 +141,9 @@ is rarely the actual operation; mixed precision across layer types is normal.
 
 ## Measuring what it costs
 
-This is the part people skip, and it's the reason this lecture exists.
+The objective here is quantifying the quality trade before you trust any
+speedup — the speed is easy to measure, the damage is not. This is the part
+people skip, and it's the reason this lecture exists.
 
 **Perplexity is necessary and not sufficient.** Perplexity is one number: how
 surprised, on average, the model is by each next token in a corpus, lower is
@@ -140,7 +152,8 @@ predictions; a small delta can hide a specific broken capability. A model can ho
 perplexity nearly constant while losing the ability to follow a multi-step format.
 
 The [field notes](field-notes.md) describe a much better methodology, from a
-community comparison across BF16 → Q8 → Q6 → Q5 → Q4 → IQ3. Two principles:
+community comparison across BF16 (bfloat16, a 16-bit float) → Q8 → Q6 → Q5 →
+Q4 → IQ3 (a 3-bit variant). Two principles:
 
 **Grade a task with a verifiable answer.** Theirs: given a chess PGN, track the
 board state and render it as SVG. Degradation appeared as *wrong piece placement*

@@ -40,8 +40,10 @@ POST /v1/chat/completions
 
 ### Streaming is the point
 
-Lecture 01's TTFT only matters if the user *sees* the first token. Buffer the whole
-response and you've thrown away every latency optimization in this book: the user
+Lecture 01's TTFT (time to first token — the gap between sending the request and
+the first token arriving) only matters if the user *sees* the first token. Buffer
+the whole response and you've thrown away every latency optimization in this book:
+the user
 waits for the entire generation and receives it all at once, so a fast engine
 feels like a slow one.
 
@@ -61,7 +63,8 @@ data: [DONE]
 ### Decouple the API server from the engine loop
 
 The architectural point of this lecture, and the reason vLLM runs the API server
-in a **separate process**.
+in a **separate process**: the objective here is to see why that separation is
+necessary, not a preference.
 
 An **event loop** is a single thread that handles every event a program receives,
 one at a time: one request arriving, then another socket becoming readable, then
@@ -77,7 +80,7 @@ are competing for one thread:
   halfway around the world, for data that hasn't arrived yet.
 
 Put them in one event loop and request parsing, JSON serialization, and SSE
-writes all steal time from the scheduler. Picture a chef who also answers the
+writes all steal time from the scheduler (the engine's step loop, Lecture 08). Picture a chef who also answers the
 phone: every call that comes in while the stove is on makes the stove wait too,
 because there's only one person. The fix is a second process with its own event
 loop, connected by queues, the serving equivalent of a waiter taking orders:
@@ -117,14 +120,18 @@ free the sequence (one request's in-flight generation), releasing its blocks
 
 ### The whole path, and where time goes
 
+The objective here is to have a map of the whole path, so a measured delay has a
+place to look.
+
 ```
 tokenize -> queue -> schedule -> prefill -> decode xN -> detokenize -> SSE
 ```
 
 The arrows are handoffs between components. The queue is where requests wait;
-prefill and decode are the engine steps from Lecture 01; detokenize is the
-reverse of tokenization, turning token IDs back into text; and the SSE stream is
-what the client actually sees.
+schedule is the scheduler's choice of which sequences run this step; prefill and
+decode are the engine steps from Lecture 01; detokenize is the reverse of
+tokenization, turning token IDs back into text; and the SSE stream is what the
+client actually sees.
 
 Kiely §7.5.1 (p.205) makes a point worth taking seriously: **client-side
 overhead can dominate**. A 20ms TTFT is invisible behind a 200ms TLS handshake

@@ -42,6 +42,9 @@ CUDA's model is one level finer than Triton's:
 
 ### The four things that determine performance
 
+The objective here is knowing which knob to turn when a kernel is slow — every
+slowdown you'll meet traces back to one of these four.
+
 Before the list of four, the situation to keep in your head: a GPU
 runs many threads at once, and they all need data. The memory that holds the
 data (HBM, the GPU's main RAM) is far away and slow compared to the chip's own
@@ -67,12 +70,13 @@ strided:    thread  0   1    2   ...  31
             (a column, or every 1024th)        needs its own separate visit
 ```
 
-Both loops are just `data[tid * stride]` versus `data[tid]`. The innocent
+The two patterns are just `data[tid * stride]` versus `data[tid]`. The innocent
 expression is the strided one. The tell: your indexing expression jumps, the
 hardware pays per jump.
 
 **Shared memory.** The fast private memory attached to each SM, ~20× faster than
-HBM on the 3090, ~100 KB per SM, explicitly managed. This
+HBM on the 3090 (why moving a working set there pays), ~100 KB per SM (the
+budget FlashAttention's tiles must fit in), explicitly managed. This
 is the resource FlashAttention's tiling exists to exploit; in Triton it was
 implicit, here you allocate it yourself. It exists to let the threads of one
 block hand data to each other and to hold a working set close, both without
@@ -146,7 +150,7 @@ one.
 1. Write it in `kernels/cuda/`, bind with `torch.utils.cpp_extension.load`.
 2. `uv run pytest tests/test_20_cuda.py -v`, correctness first, as always.
 3. Profile with `ncu`. Record: achieved bandwidth vs. peak, occupancy, warp
-   efficiency.
+   efficiency (the share of time warps have work to do instead of stalling).
 4. **Compare against your Triton version**, and against PyTorch.
 5. If Triton wins, use `ncu` to find out *why*, usually better memory pipelining
    or a smarter thread mapping than you chose.
@@ -176,9 +180,13 @@ Not often, and it's worth being clear about when:
 
 - **Novel algorithms** Triton can't express well (unusual memory patterns,
   specialized warp cooperation).
-- **The last 10–20%** on a kernel that dominates your profile.
-- **Hardware-specific features**: tensor core instructions, async copy, TMA on
-  Hopper.
+- **The last 10–20%** on a kernel that dominates your profile — the headroom
+  left once you're near the roofline, where Triton's defaults stop being good
+  enough.
+- **Hardware-specific features**: tensor core instructions (the chip's
+  specialist matmul units), async copy (hardware that moves data to shared
+  memory while threads compute), TMA on Hopper (its bulk data-movement
+  engine).
 
 For everything else, Triton is a better default: dramatically less code, portable
 across architectures, and usually within a small factor. FlashAttention itself is
@@ -198,7 +206,8 @@ the honest summary of this tradeoff.
   attention itself to Triton, so `csrc/attention/` now holds mostly headers; the
   old `paged_attention_v1.cu` lives only in pre-V1 tags. A good reminder that
   hand-written CUDA gets replaced when a portable version gets close enough.
-- **Kiely §4.1–4.1.3** (p.96–100), CUDA kernels, selection, and fusion.
+- **Kiely §4.1–4.1.3** (p.96–100), CUDA kernels, selection, and fusion (merging
+  several ops into one kernel so data stays on-chip).
 
 ---
 

@@ -19,8 +19,8 @@ Two reasons to use more than one GPU:
 **One GPU is too slow for one user.** Decode is memory-bound (Lecture 02), so a
 single user's tokens/sec is capped by *one* GPU's bandwidth: every token moves
 the active weights, and the token can leave no faster than the memory can hand
-those bytes over. Batching raises
-aggregate throughput but never helps that one user. Splitting the weights across
+those bytes over. Batching raises aggregate
+throughput (tokens per second across all users) but never helps that one user. Splitting the weights across
 GPUs multiplies the bandwidth available to a single sequence: each GPU now
 carries a slice of the weights, each slice loaded in parallel, so the bytes the
 sequence must wait for are divided by the number of GPUs. Same memory, more
@@ -39,7 +39,7 @@ Three ways to split a model:
 |---|---|---|---|
 | **Pipeline (PP)** | layers across GPUs | training: bubbles; inference: latency-neutral, can't shard KV | multi-node, low bandwidth |
 | **Tensor (TP)** | tensors *within* each layer | all-reduce every layer | **default within a node** |
-| **Expert (EP)** | MoE experts across GPUs | token routing | MoE throughput (L23) |
+| **Expert (EP)** | MoE experts across GPUs | token routing (each token sent to the GPU holding its chosen expert) | MoE throughput (L23) |
 
 Two phrases to unpack. "Bubbles" are idle stretches: in a pipeline, a layer
 finishes its batch and then waits for work from the layer behind it, and the
@@ -59,6 +59,9 @@ TP is the default for single-node inference because every GPU works on *every*
 token, no pipeline bubbles, and latency genuinely drops.
 
 ### How the split works
+
+The objective here is to see exactly where the collective must sit — and that
+most of the split is free until the final output.
 
 The elegance is that the two matmuls in an MLP shard complementarily:
 
@@ -109,16 +112,21 @@ Column-then-row means **one all-reduce per MLP block**, not two. Attention shard
 the same way, by heads: each GPU owns a subset of heads, then all-reduce after the
 output projection.
 
-> **GQA caps your TP degree.** Sharding is by *KV* heads, and Qwen3-0.6B has only
-> 8 of them (against 16 query heads). So TP-8 is the ceiling before you must
+> **GQA caps your TP degree.** GQA — grouped-query attention, where several query
+> heads share one key/value head — means sharding is by *KV* heads, and Qwen3-0.6B
+> has only 8 of them (against 16 query heads). So TP-8 is the ceiling before you
+> must
 > replicate KV heads across ranks and give back some of the memory saving. This is
 > a real limit people hit, and it's exactly the "where scaling stops" question
 > this lecture is about.
 
-So: **two all-reduces per transformer layer.** For a 28-layer model, 56 collectives
-per forward pass. That's the cost, and it's why interconnect matters.
+So: **two all-reduces per transformer layer.** For a 28-layer model, that's 56
+collectives per forward pass (2 × 28). That's the cost, and it's why interconnect matters.
 
 ### Why scaling isn't linear
+
+The objective here is to derive the communication cost per GPU, so "sublinear
+scaling" becomes a number you can predict rather than a surprise.
 
 Compute per GPU divides by N. Communication does not shrink with it. The
 standard implementation is a **ring all-reduce**: the GPUs stand in a circle,
@@ -164,8 +172,9 @@ happens depends on interconnect, the wires that connect the GPUs:
 *(NVIDIA's published figures as of 2026; NVLink numbers are bidirectional per
 GPU. Rubin is announced, not shipping, check before planning around it.)*
 
-**Roughly an order of magnitude, in the thing that isn't parallelized**: and the
-gap has widened with each NVLink generation, not narrowed. This is why the same
+**Roughly an order of magnitude — 900 / 64 ≈ 14× — in the thing that isn't
+parallelized**: and the gap has widened with each NVLink generation, not
+narrowed. This is why the same
 model scales beautifully on one box and poorly on another with identical GPUs.
 
 Note also what this means for **rented** hardware: a Vast.ai listing advertising
@@ -184,7 +193,8 @@ exactly that advice.
 shouldn't.
 
 The same operator found `--max-num-seqs 16`, a scheduler concurrency limit from
-Lecture 08, mattered more than the parallelism strategy did.
+Lecture 08 (the cap on how many sequences share the GPU at once), mattered more
+than the parallelism strategy did.
 
 Take the lesson generally: **rules of thumb about parallelism are workload- and
 model-dependent.** Measure your own scaling curve. That's the actual deliverable

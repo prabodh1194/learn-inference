@@ -1,14 +1,14 @@
 # 14c. Weight residency: the memory curve is a policy, not a fact
 
 > Lecture 14b's engine map is one fact away from being useful: the model is
-> **37 GiB** and the machines it runs on have **64–128 GiB of unified memory**.
+> **37 GiB** and the machines it runs on have **64–128 GiB of unified memory** (one shared pool the CPU and GPU both address — no host/device copy).
 > The weights are not in memory or out of memory — they are *resident to a
 > degree you choose*, and each choice has a measured cost. This lecture is
 > about how h3.c chooses, and why "the weights are loaded" is not one thing.
 
 ## Three policies, one checkpoint
 
-The checkpoint is a pile of BF16 safetensors: the DiT and both encoders, about
+The checkpoint is a pile of BF16 (brain float16: 8-bit exponent, 7-bit mantissa) safetensors (a tensor-serialization format with a header index separate from the payload bytes): the DiT (diffusion transformer) and both encoders, about
 37 GiB total. How do they get from disk into the GPU?
 
 1. **mmap, zero-copy** — the file is mapped, Metal binds the pages lazily, the
@@ -43,9 +43,11 @@ memory system, measure it.
 
 ## Streaming: 37 GiB model, 2 GiB resident
 
+The objective here is to shrink the resident set from the whole model to one
+slice — trading memory for time at a price you can quote.
+
 The flagship residency trick is `h3_streamed_forward` (README: 4.2). The 50
-DiT blocks are split into two slices along the layer axis — for the 864-class
-geometry, layers 1–25 in one half, 26–50 in the other. The forward pass runs
+DiT blocks are split into two slices along the layer axis — for the 864-class geometry (the 864×864 video resolution), layers 1–25 in one half, 26–50 in the other. The forward pass runs
 the first half, and while the GPU is busy, a CPU worker reads the *second*
 half's weights from SSD into memory. Then the pass runs the second half, which
 is already resident. The SSD reads and the GPU math overlap, and the resident
@@ -58,9 +60,10 @@ resident slice: 25 × ~930 MiB   ≈  23.4 GiB   ← still big
 
 …which is why the README's headline numbers use a *coarser* split at the
 encoder level. In the reported configuration the resident set goes from
-36.5 GiB to **2.0 GiB** — an 18× cut — at a measured cost of 84% slower
-forward time at 512-class (1.35 s → 2.49 s) and 26% slower at 864-class
-(2.14 s → 2.68 s). The numbers, quoted: *"streaming from the SSD takes 2.49
+36.5 GiB to **2.0 GiB** — an 18× cut (36.5 ÷ 2.0 = 18.25×) — at a measured cost of 84% slower
+forward time at 512-class (the 512×512 video geometry; 1.35 s → 2.49 s, i.e.
+2.49 ÷ 1.35 = 1.84× the time) and 26% slower at 864-class
+(2.14 s → 2.68 s, i.e. 2.68 ÷ 2.14 = 1.25× the time). The numbers, quoted: *"streaming from the SSD takes 2.49
 seconds vs 1.35 seconds, at 512-class... using the SSD storage is 84% slower,
 at 864-class only 26% slower."*
 
@@ -79,12 +82,14 @@ which is really "the first touch was slow."
 
 ## The prefetch ring: encode without stalling
 
+The objective here is to keep the once-per-generation encoder load from
+serializing the whole pipeline on disk.
+
 The text/vision encoder path has the same problem at a different scale. The
 Qwen3-VL encoder is 46.9 GiB of weights (52 layers for the 27B configuration),
 and it's needed once per generation, then freed. Loading it with a single
 blocking read would serialize the whole pipeline on disk. Instead, the encoder
-weights stream through a **prefetch ring**: 8 worker threads, ring depth 2–3,
-blocks of ~930 MiB each. While the GPU encodes the prompt with block *n*, the
+weights stream through a **prefetch ring**: 8 worker threads, ring depth 2–3 (two is enough to keep the next block in flight; three buys extra slack at ~0.9 GiB more residency), blocks of ~930 MiB each. While the GPU encodes the prompt with block *n*, the
 workers are fetching blocks *n+1* and *n+2* from disk.
 
 The residency arithmetic, derived: a depth-2 ring holds `depth + 1` blocks in
@@ -95,7 +100,7 @@ ring residency @ depth 2  =  3 × 930 MiB  ≈  2.72 GiB
 ring residency @ depth 3  =  4 × 930 MiB  ≈  3.63 GiB
 ```
 
-At 13–14.6 GiB/s, a 930 MiB block arrives in 65 ms, and a depth-2 ring keeps
+At 13–14.6 GiB/s, a 930 MiB block arrives in 65 ms (930 MiB ÷ 13–14.6 GiB/s = 62–70 ms), and a depth-2 ring keeps
 the GPU's consumption covered: by the time the GPU wants block *n+2*, it has
 been in flight for the duration of blocks *n* and *n+1*. The tradeoff is
 explicit: **more depth = more residency = more slack**, and both are measured
@@ -104,7 +109,10 @@ question, but the producer is the disk.
 
 ## The re-read decision
 
-Not everything is streamed. The video decoder VAE (9.7 GiB) is loaded into
+The objective here is to decide, per component, whether holding it resident is
+cheaper than re-reading it from disk.
+
+Not everything is streamed. The video decoder VAE (variational autoencoder — the decoder network that turns the latent back into frames; 9.7 GiB) is loaded into
 memory once and stays for the decode phase — even though it's only *read*,
 never written. Why not stream the decoder too? Because the VAE's weights are
 consumed by short, bandwidth-hungry convs, the decode phase re-reads chunks

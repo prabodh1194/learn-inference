@@ -3,14 +3,14 @@
 > Lecture 14c was about weights — the budget you can plan. Activations are the
 > budget that surprises you: they live per-step, scale with the sequence, and
 > pile up invisibly until peak memory is whatever the worst moment was. The
-> DiT's trick is to treat activation memory as a **lifetime-scheduling
+> DiT's (diffusion transformer's) trick is to treat activation memory as a **lifetime-scheduling
 > problem**: read when each tensor is born and when it dies, then overlap the
 > dead ones. Three moves in h3.c, each worth real MiB at 20 steps per
 > generation.
 
 ## The budget, derived
 
-At 512-class, the denoise grid is about **2,835 rows × 5376 hidden**, BF16:
+At 512-class (the 512×512 video geometry), the denoise grid is about **2,835 rows × 5376 hidden**, BF16 (brain float16: 8-bit exponent, 7-bit mantissa):
 
 ```
 per buffer   =  2835 × 5376 × 2 bytes
@@ -19,13 +19,16 @@ per buffer   =  2835 × 5376 × 2 bytes
 ```
 
 Every per-block activation that h3.c eliminates is a multiple of ~29 MiB per
-buffer — and the DiT keeps several alive per block: the QKV input, the
-attention output, the MLP intermediate, the AdaLN schedule, the skip. The
+buffer — and the DiT keeps several alive per block: the QKV input (the query/key/value projection's output), the
+attention output, the MLP intermediate, the AdaLN (adaptive layer norm — the per-row shift/scale schedule from 14d) schedule, the skip. The
 naive budget is "however many buffers the block holds, at the worst block, at
 the worst moment." The optimized budget is "however many buffers are *alive*
 at that moment" — and aliveness is the tool.
 
 ## Move 1: the alias assignment
+
+The objective here is to show three named buffers sharing one allocation —
+legal because their lifetimes never overlap.
 
 The three lines of code that saved the most MiB for the least complexity
 (`h3_gpu.c:1360-1362`):
@@ -47,12 +50,13 @@ Three named buffers, two allocations. The trick is in the lifetimes:
 At 512-class, the QKV buffer holds `qkv → attention_heads → mod_mlp` in
 sequence — each successor born only after its predecessor died, so they share
 one allocation. The measured savings, quoted: **61.25 MiB** at 512-class,
-**99.63 MiB** at 864-class, from this single alias — versus the naive layout
-that would allocate all three.
+**99.63 MiB** at 864-class (the 864×864 video geometry), from this single
+alias — three lines of code buying the engine's largest activation saving —
+versus the naive layout that would allocate all three.
 
 Why is this legal? Because the alias is *time-disjoint*, not just
 size-compatible: the code that writes `attention_heads` is exactly the GQA
-reshape, which completes before the output projection reads it, which
+reshape (grouped-query attention's data shuffle — the repacking of the QKV buffer into per-head views), which completes before the output projection reads it, which
 completes before `mod_mlp` is written. The safety comes from reading the
 kernel as a dataflow graph and checking the interleaving. The risk — and why
 it's an *engineering* artifact, not a code smell — is that the alias is only
@@ -61,6 +65,9 @@ of the first things that would break if a future block reorders the GQA
 against the MLP.
 
 ## Move 2: the token-reduction bypass in the QKV tail
+
+The objective here is to reuse a buffer region that is dead after pooling as
+free scratch — saving an allocation at zero cost.
 
 The token-reduction path (14h) reduces the attention grid by pooling rows
 2×2. The pooled input rows are produced by a row-pooling kernel — and that
@@ -79,6 +86,9 @@ contiguous. It saves whatever the pooled rows would have cost as a separate
 allocation, at zero allocation cost, because the tail was dead anyway.
 
 ## Move 3: the per-block AdaLN schedule
+
+The objective here is to bound peak activation memory by one block's working
+set instead of the number of blocks.
 
 The AdaLN schedule (14d) computes ~498 MiB of shift/scale per block. It is
 allocated per block and **released before the next block starts** — which

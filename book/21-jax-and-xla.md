@@ -24,9 +24,10 @@ between themselves over their link, such as an all-reduce, which every GPU will
 meet by name in Lecture 22, a sum spread over all of them so each ends with the
 total.
 
-That matters here for one specific reason: **sharding**. In Lecture 22 you'll do
-tensor parallelism twice, once declaratively in JAX, where you annotate a layout
-and XLA inserts the collectives, and once by hand in PyTorch with explicit
+Those definitions matter here for one specific reason: **sharding**. In Lecture
+22 you'll do tensor parallelism (splitting a matmul across GPUs, each one
+computing part of it) twice, once declaratively in JAX, where you annotate a
+layout and XLA inserts the collectives, and once by hand in PyTorch with explicit
 `all_reduce` calls.
 
 Doing the declarative version first makes the manual version legible. You'll know
@@ -42,6 +43,10 @@ is increasingly expressed.
 ## The idea
 
 ### Pure functions and explicit state
+
+The objective here is understanding why JAX refuses mutation: the rule is a
+contract that buys the compiler the right to reuse buffers, and everything else
+follows from that.
 
 JAX functions must be pure, no mutation, no hidden state. Parameters go in as
 arguments:
@@ -71,8 +76,10 @@ def decode_step(params, token, cache):
     return forward(params, token, cache)
 ```
 
-The first call **traces** the function into an XLA graph and compiles it, fusing
-operations, allocating buffers, eliminating dead code. A trace is a rehearsal
+The first call **traces** the function into an XLA graph and compiles it — the
+just-in-time in JIT, compile on first use rather than in advance — fusing
+operations (merging several ops into one kernel so intermediate values never
+leave the chip), allocating buffers, eliminating dead code. A trace is a rehearsal
 with fake placeholder values: JAX runs your Python function once, but instead
 of computing, every operation writes down what it would have done, building the
 graph. Later calls run the compiled artifact.
@@ -87,8 +94,8 @@ Lecture 04 rule, again.
 
 ### `scan` for the decode loop
 
-A Python loop over 512 decode steps unrolls into 512 copies of the graph.
-Compilation takes forever. `lax.scan` expresses the loop *inside* the graph:
+A Python loop over 512 decode steps unrolls into 512 copies of the graph, each
+one compiled separately. Compilation takes forever. `lax.scan` expresses the loop *inside* the graph:
 
 ```python
 def decode_body(carry, _):
@@ -130,10 +137,12 @@ compilation is actually doing.
    compiler walks it like one object, and a new set of weights is just a new
    value). Load the same weights you've been using.
 2. **Verify numerically against PyTorch** (`tests/test_21_jax.py`). Same weights,
-   same input, same logits within fp32 tolerance. Do this before anything else;
+   same input, same logits within fp32 tolerance (JAX computes in fp32, so
+   agreement should be at fp32 rounding error). Do this before anything else;
    a silent transcription bug in RoPE or attention will waste hours later.
 3. Implement `scan`-based decode with the KV cache as carry.
 4. Dump and read the HLO. Find one fusion XLA performed that PyTorch eager
+   (its default mode, which runs each op immediately without compilation)
    wouldn't.
 5. Benchmark against your PyTorch engine, **after warmup**.
 
@@ -155,7 +164,8 @@ shape of problem.
 It's the same failure mode that bites `torch.compile` in production.
 
 **Cleaner fusion in the HLO** than eager PyTorch, and a decode step that reads as
-one fused region rather than a hundred kernel launches.
+one fused region rather than a hundred kernel launches (each a separate
+CPU-to-GPU dispatch with its own overhead).
 
 ---
 

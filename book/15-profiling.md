@@ -210,7 +210,24 @@ That's the roofline from Lecture 02, now measured instead of predicted.
 
 ## The method
 
-The discipline that makes profiling useful rather than a hobby:
+The discipline that makes profiling useful rather than a hobby. One thing to
+state up front, because it's easy to lose in the bandwidth talk above:
+
+> **The objective is less end-to-end decode time — never "higher memory
+> utilization" for its own sake.** Utilization is the *instrument*, not the
+> goal: it tells you whether a kernel can still get faster. For a
+> memory-bound kernel the two coincide — at 85% of peak you *are* as fast as
+> physics allows — which is why the ceiling check below works. But the score
+> is always the `bench/` number, and step 6 exists to say so.
+
+??? question "Is the objective to improve memory utilization?"
+    No — the objective is less end-to-end decode time. Utilization is the
+    instrument: it tells you whether a kernel can still get faster. The
+    confusion is natural because for a memory-bound kernel the two coincide
+    (85% of peak = as fast as physics allows), which is why step 4 uses it as
+    the "stop" check. And at 30%, the fix is usually *not* "make memory
+    busier" — it's latency-hiding: more occupancy, more parallelism.
+    [Full answer](qa.md#is-the-objective-to-improve-memory-utilization)
 
 1. **Measure first.** Get a baseline with `bench/`.
 2. **Profile.** Rank kernels by total time.

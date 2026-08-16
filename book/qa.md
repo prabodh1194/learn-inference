@@ -1436,3 +1436,22 @@ looked at it and it seemed right"; with one, it's a number computed on every
 change — which is exactly how the layer-thinning gate failure and the QKV
 head-interleave layout bug were caught. Your engine's oracle is the same
 shape: the un-optimized path, kept runnable, compared automatically.
+
+## Is the objective to improve memory utilization?
+
+**Lecture:** [15. Profiling](15-profiling.md)
+
+**Wrong intuition:** "The method's steps — profile, check the ceiling,
+optimize — are all about bandwidth, so the goal must be raising memory
+utilization."
+
+No. The objective is **less end-to-end decode time**. Memory utilization
+(achieved bandwidth as a fraction of peak) is a diagnostic, not a goal: it
+tells you whether a kernel can still get faster. The confusion is natural
+because for a memory-bound kernel the two coincide — a decode GEMM at 85% of
+peak *is* as fast as physics allows — which is why step 4 uses it as the
+"stop optimizing" check. The direction that matters: at 30% the fix is
+usually not "make memory busier" — it's latency-hiding (more occupancy, more
+parallelism); the utilization number just points you there. And step 6 exists
+to catch utilization-chasing: a kernel 2× faster that was 4% of runtime buys
++2% end-to-end, inside noise.

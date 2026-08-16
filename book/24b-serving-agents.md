@@ -68,7 +68,7 @@ several candidates, score them, keep the best. The two halves sit on opposite
 sides of your roofline (L02):
 
 - **Scoring** N finished candidates = one *prefill*, compute-bound, all tokens
-  in one block.
+  at once.
 - **Generating** N candidates = N *decodes*, memory-bound, weights re-read per
   token.
 
@@ -105,8 +105,8 @@ each replacing several turns with one shorter summary instead of deleting them.
 2. `uv run pytest tests/test_24b_agent.py -v`. The key assertion: the newest
    turn always survives, and the budget is always met.
 3. Simulate a 500-step agent with 100 tokens per round-trip and watch the
-   context line: 50,000 tokens uncompressed. Run the ladder at a 8,192 budget
-   and report how many turns survive.
+   context line: 50,000 tokens uncompressed (500 × 100). Run the ladder at a
+   8,192 budget and report how many turns survive.
 4. (Optional) Instrument your own agent loops, if you run any, with the number
    of tokens per round-trip. It is the single most informative number about why
    an agent is slow.

@@ -78,6 +78,9 @@ compute.
 
 ### What this does to your bottlenecks
 
+The objective here is to see which of the three bottlenecks MoE actually moves —
+and which it leaves standing.
+
 Go back to Lecture 02 and re-derive it.
 
 **Compute per token falls**: only active experts run.
@@ -129,7 +132,8 @@ combinations to choose from:
 
 ```
 C(16, 2)  =  16·15 / 2          =  120        possible expert pairs
-C(64, 8)  =  64! / (8! 56!)     ≈  4.4 billion
+C(64, 8)  =  64·63·62·61·60·59·58·57 / 40,320
+           =  178,462,987,637,760 / 40,320   ≈  4.4 billion
 ```
 
 Granularity buys *combinations*, not capacity: the router can assign each token a
@@ -149,6 +153,9 @@ Fine-grained + shared is the fix: isolate the common knowledge in always-on
 experts, and let the routed ones specialize.
 
 ### Expert parallelism
+
+The objective here is to compare the two axes on the same terms: what each pays
+in communication, and what each buys.
 
 TP splits every tensor across GPUs. EP takes a different axis: **put whole experts
 on different GPUs.**
@@ -193,7 +200,7 @@ hide the transfer underneath compute. "EP scales multi-node" is true, but only
 with that overlap work. And with 257 experts to shard, V3 **skipped tensor
 parallelism entirely**: enough experts give EP the intra-node sharding TP would,
 without the per-layer all-reduce. TP is the default when experts are few; EP can
-absorb its role when they are many.
+absorb TP's role when experts are many.
 
 ### Load imbalance is the operational problem
 

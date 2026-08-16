@@ -11,11 +11,11 @@ Why should a video-generation engine live inside a book about LLM serving?
 Because every lesson of Part II shows up again here, wearing different
 clothes:
 
-- **Decode is memory-bound** → a 37 GiB checkpoint on unified memory makes the
+- **Decode is memory-bound** → a 37 GiB checkpoint on unified memory (one shared pool the CPU and GPU both address — no host/device copy) makes the
   *weight residency* question the whole ballgame (14c).
-- **Launch overhead hurts** → the DiT fuses kernels to kill dispatches (14d).
+- **Launch overhead hurts** → the DiT (diffusion transformer) fuses kernels to kill dispatches — one kernel launch on the GPU's command queue (14d).
 - **Memory is a budget** → activations are aliased by lifetime, not bought (14e).
-- **CPU/GPU are async** → command buffers are split so encoding hides under
+- **CPU/GPU are async** → command buffers (the GPU's work queues, filled by the CPU) are split so encoding hides under
   execution (14f).
 - **Quantization is a trade** → int8 lands with SSIM receipts (14g).
 - **Optimization changes outputs** → the aggressive paths say so, out loud (14h).
@@ -29,10 +29,12 @@ at the end of this lecture.
 
 H3 is a **33B-parameter diffusion transformer** that generates video *and*
 audio from a text prompt. One "token" of output isn't a word — it's a patch of
-pixels (24 latent channels, patched 2×2×2 into width-96 rows) plus a width-32
+pixels (latent channels — the model's internal feature planes; here 24 of them, patched 2×2×2 into width-96 rows) plus a width-32
 audio row. A 512×512, 22-frame video is a grid of about 2,800 such rows, and
-generating it is a **denoising loop**: ~20 steps, each step a full 50-block
-forward pass over the whole grid, predicting a velocity.
+generating it is a **denoising loop** (each step removes a little more of the
+noise the latent started as): ~20 steps, each step a full 50-block
+forward pass over the whole grid, predicting a velocity (the direction the
+latent moves toward a clean frame).
 
 That loop is the analogue of your decode loop. Each denoise step is a full
 model forward — same weights, same shapes, same layout, step after step. The
@@ -53,12 +55,17 @@ video/audio VAE encoders
 Each phase loads its weights when it starts and frees them when it ends. The
 README states the rule outright: the transformer, the Qwen encoder, and the
 decoders **"never have to coexist in unified memory."** On a 128 GB M5 Max the
-end-to-end peak is ~40 GB with zero swaps — the phases each fit in the budget
+end-to-end peak is ~40 GB with zero swaps — about a third of the machine,
+which is the point: the phases each fit in the budget
 *separately*, and the scheduler is what makes that true. This is Lecture 09's
 budget discipline, applied at the component level instead of the token level:
 **peak memory is a scheduling problem, not a purchase.**
 
 ## The one binary, three front-ends
+
+The objective here is to see how one binary serves three use patterns from a
+single model state — the same CLI question your own engine answers, with a
+memory axis added.
 
 `main.c` is a thin dispatcher over three modes:
 
@@ -69,7 +76,7 @@ budget discipline, applied at the component level instead of the token level:
 - **Inspection**: `--info` → device + checkpoint inventory, **without mapping
   any weights**.
 
-That last mode is quietly profound: the model metadata lives in safetensors
+That last mode is quietly profound: the model metadata lives in safetensors (a tensor-serialization format with a header index separate from the payload bytes)
 headers, and the loader reads *every header once* and never touches payloads
 (`h3_weight_store_open`). A 37 GiB model is fully inspectable through an
 index pass that costs kilobytes. Same instinct as your engine's `--info`: the
@@ -78,14 +85,17 @@ question the index can answer.
 
 ## The session cache: cache the prefill, re-roll the sampling
 
+The objective here is to make repeated generations cheap: cache everything
+that doesn't depend on the seed, and re-roll only what does.
+
 The interactive session keeps three things resident, each keyed by its true
 dependencies (`h3.c:139-192`):
 
 | Cache | Key | What it holds |
 |---|---|---|
-| conditioning | `mode\|prompt\|render\|frames\|media size:mtime` | exact BF16 text embedding + condition rows |
+| conditioning | `mode\|prompt\|render\|frames\|media size:mtime` | exact BF16 (brain float16: 8-bit exponent, 7-bit mantissa) text embedding + condition rows |
 | prepared DiT | conditioning key + shape + steps + layers + quant flags | the loaded model, reset per run |
-| video decoder | VAE path + latent geometry | resident weights |
+| video decoder | VAE (variational autoencoder — the decoder that turns the latent into frames) path + latent geometry | resident weights |
 
 The seed is deliberately **absent** from every key. "Same prompt, new seed"
 re-encodes nothing, re-loads nothing — it re-rolls the Gaussian noise and
@@ -119,7 +129,7 @@ kernels compile at runtime, exactly as designed):
   FFmpeg isn't on PATH.
 
 So the engine builds clean and its GPU core runs on a first-gen Apple Silicon
-Mac. The M5-only paths (TensorOps, int8, zero-copy weights) are runtime-gated
+Mac. The M5-only paths (TensorOps — Apple's low-precision matrix-multiply path — int8, zero-copy weights) are runtime-gated
 and fall back gracefully — a design choice worth noting: **capability
 detection by device-name string**, `[device.name rangeOfString:@"M5"]`, with
 env-var overrides for everything. It's fragile as hardware detection goes, and
