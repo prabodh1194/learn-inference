@@ -49,168 +49,120 @@ scatter never has to be undone.
 
 ## The idea
 
-Two words name similar things from two lectures, and getting their relationship
-right is the whole trick:
+**Change the addressing. Change nothing else.**
 
-```
-   tile   (L17)  a chunk of K/V the kernel LOADS at once    unit of COMPUTE
-                 sized to fill SRAM        →  BLOCK_N, typically 64–128 tokens
-
-   block  (L09)  a chunk of K/V the allocator OWNS          unit of STORAGE
-                 sized to limit waste      →  block_size,  typically 16 tokens
-```
-
-**They are not the same size, and they are not chosen by the same person.** The
-allocator picked 16 to bound internal fragmentation (L09); the kernel picks 64
-or 128 so a tile fits in SRAM alongside Q and the score patch (L17). Neither
-gets to overrule the other.
-
-So the requirement is not that they match. It is only that **a tile is a whole
-number of blocks**, so a tile boundary never lands in the middle of a block:
-
-```
-   one tile, BLOCK_N = 64 tokens
-   ┌───────────────────────────────────────────────────┐
-   │ block  │ block  │ block  │ block  │                │   4 lookups,
-   │ 16 tok │ 16 tok │ 16 tok │ 16 tok │                │   4 possibly-distant
-   └────────┴────────┴────────┴────────┘                    physical locations
-       ↑        ↑        ↑        ↑
-     tbl[0]   tbl[1]   tbl[2]   tbl[3]     ← block table entries for this tile
-```
-
-Get that right and the fight ends: the kernel keeps the tile size it wants, the
-allocator keeps the block size it wants, and the block table translates between
-them.
-
-> Make the tile loop gather its blocks *through the block table* instead of
-> reading one contiguous span.
-
-Nothing else about the algorithm changes. Same online softmax, same running max
-and accumulator, same rescaling. Only the address computation differs:
+That is the entire lecture, so start with it. Attention reads K/V somewhere in
+its inner loop. Today that read assumes one contiguous span:
 
 ```python
-# FlashAttention: one contiguous span, address by arithmetic
-k_tile = tl.load(K + start_n * stride + offsets)
-
-# PagedAttention: BLOCK_N/block_size blocks, each found by lookup
-for b in range(BLOCK_N // block_size):               # e.g. 64/16 = 4
-    block_id = tl.load(block_table_ptr + block_idx + b)
-    k_part   = tl.load(K_cache + block_id * block_stride + offsets)
-    # ...assembled into the tile, in registers/SRAM — never staged in HBM
+# FlashAttention: where does the next chunk live? Compute it.
+k = tl.load(K + start_n * stride + offsets)          # address by arithmetic
 ```
 
-(Real kernels flatten that loop into vectorized index arithmetic rather than
-writing it out; the shape of the work is what matters here.)
+Replace it with a read that asks the block table first:
 
-Read the two versions side by side. FlashAttention computes an address by
-*arithmetic*: "tile number 3 starts at 3 × stride." PagedAttention computes it
-by *lookup*: "where does tile 3 live? Ask the table." One extra load per tile,
-and that is the entire change.
+```python
+# PagedAttention: where does the next chunk live? Look it up.
+block_id = tl.load(block_table_ptr + block_idx)      # 4-byte index
+k = tl.load(K_cache + block_id * block_stride + offsets)
+```
 
-Here is the hop the second version makes, drawn out:
+**Arithmetic becomes lookup.** Same online softmax, same running max, same
+accumulator, same rescaling — the algorithm from Lecture 17 is untouched. One
+extra tiny load tells the kernel where to read, and the gather disappears.
+
+Here is the hop that extra load makes:
 
 ```
    logical position          block table            physical KV blocks
    (what the sequence        (this sequence's       (scattered in HBM,
-    thinks it has)            own little map)        any order at all)
+    thinks it has)            private map)           in any order)
 
    ┌────────────┐           ┌──────┬───────┐        ┌──────────┐
-   │ tok  0..15 │  slot 0 ─>│  0   │   93  │───────>│ block 93 │  64 KiB
+   │ tok  0..15 │  slot 0 ─>│  0   │   93  │───────>│ block 93 │
    ├────────────┤           ├──────┼───────┤        ├──────────┤
-   │ tok 16..31 │  slot 1 ─>│  1   │   12  │───────>│ block 12 │  64 KiB
+   │ tok 16..31 │  slot 1 ─>│  1   │   12  │───────>│ block 12 │
    ├────────────┤           ├──────┼───────┤        ├──────────┤
-   │ tok 32..47 │  slot 2 ─>│  2   │   57  │───────>│ block 57 │  64 KiB
+   │ tok 32..47 │  slot 2 ─>│  2   │   57  │───────>│ block 57 │
    └────────────┘           └──────┴───────┘        └──────────┘
-    contiguous, by            4 bytes per            NOT contiguous —
-    construction              entry                  and it no longer matters
-
-    per block:  4 B (one index)  ──steers──>  64 KiB of K/V
-    per tile :  4 lookups (16 B) ──steers──>  4 blocks = 256 KiB
-                                              (BLOCK_N=64, block_size=16)
+    contiguous, by            4 bytes                NOT contiguous —
+    construction              per entry              and it no longer matters
 ```
 
-(64 KiB is one 16-token block for *one layer* — `16 × 4,096 B`, derived below.)
-
-The block table itself is tiny, so it stays in fast on-chip memory (**SRAM**,
-the small scratchpad next to the compute units) and the lookup costs almost
-nothing. Tiny is worth a number: one 4-byte entry per 16 tokens, so even a
-32,768-token sequence has a table of
+**Why this is nearly free.** The lookup reads 4 bytes; the block it points at is
+16 tokens of K/V. From Lecture 05, one token costs `2 × 8 heads × 128 dims ×
+2 bytes = 4,096 B` in a single layer, so:
 
 ```
-32,768 tokens ÷ 16 tokens/block  =  2,048 entries
-2,048 entries × 4 B              =  8,192 B  =  8 KiB
+   one block  =  16 tokens × 4,096 B  =  65,536 B  =  64 KiB
+
+   4 B of address  ──steers──>  64 KiB of payload      1 : 16,384
 ```
 
-8 KiB of map to steer megabytes of K/V. The gather disappears entirely.
-
-Note the asymmetry that makes the lookup cheap and the gather expensive. The
-gather moved *every byte* of the cached sequence: bytes out of their blocks,
-bytes into a duplicate strip, and attention read the duplicate. The block table
-lookup moves a few bytes: the address of the next tile's home. That one
-address steers a much larger load.
-
-To put a number on "much larger", first be precise about what this kernel is
-working on, because it is easy to reach for the wrong figure here. **One
-program instance handles one (query tile, head) pair, for one layer.** The
-attention kernel runs inside a single layer; it never sees the other 27. So the
-K/V cost that matters is the *per-layer* one, not the whole-model one.
-
-Lecture 05 counted both. Per token, in one layer:
+And the table you are reading is small enough to sit on chip permanently. Even a
+32,768-token sequence needs only
 
 ```
-2 (K and V)  ×  8 KV heads  ×  128 head_dim  ×  2 bytes  =  4,096 B  =  4 KiB
+   32,768 ÷ 16  =  2,048 entries  ×  4 B  =  8 KiB of block table
 ```
 
-and that is the number this kernel spends. (Lecture 05's headline figure,
-114,688 B per token, is that same 4 KiB multiplied by all 28 layers — the cost
-of one token to the *whole model*. Use it for cache-capacity questions, not for
-one kernel's tile.)
+8 KiB of map steering megabytes of K/V. Compare that against what it replaced:
+the gather moved **every cached byte** out of its block, into a duplicate strip,
+and attention then read the duplicate. Now nothing moves but addresses.
 
-So with `block_size = 16`, one **block** holds:
+### One detail: tiles and blocks are different sizes
 
-```
-16 tokens × 4,096 B/token  =  65,536 B  =  64 KiB
-```
-
-and the lookup that finds it is a single 32-bit index, 4 bytes:
+You will hit this the moment you write the loop, so settle it now.
 
 ```
-   4 B  (one block-table entry)   steers   65,536 B  (one block)
-   ratio  =  65,536 / 4  =  16,384×
+   tile   (L17)   what the kernel LOADS at once     BLOCK_N     64–128 tokens
+   block  (L09)   what the allocator OWNS           block_size  16 tokens
 ```
 
-One byte of address per 16,384 bytes of payload. Scale it to a whole tile at
-`BLOCK_N = 64`, which is four blocks:
+They are set by different people for different reasons — the allocator picked 16
+to bound fragmentation, the kernel picks its tile to fit SRAM — and neither
+overrules the other. So a tile spans **several blocks**, and the loop above runs
+once per block rather than once per tile:
 
 ```
-   16 B  (four entries)   steers   262,144 B  (256 KiB of K/V)
+   one tile of 64 tokens  =  4 blocks of 16
+   ┌────────┬────────┬────────┬────────┐
+   │ blk 93 │ blk 12 │ blk 57 │ blk  8 │    4 lookups, 4 scattered locations,
+   └────────┴────────┴────────┴────────┘    assembled on chip into one tile
+      tbl[0]   tbl[1]   tbl[2]   tbl[3]
 ```
 
-Same ratio, four times the payload. That is why the indirection costs almost
-nothing while the gather it replaced cost a full extra copy of the sequence:
-you spend a handful of address bytes to avoid moving hundreds of kilobytes,
-every tile, in every layer, on every step.
+The only real constraint is that a tile be a **whole number of blocks**, so a
+tile boundary never lands mid-block. Then the kernel keeps the tile size it
+wants, the allocator keeps the block size it wants, and the table translates
+between them.
 
-Sanity-check the tile against SRAM, because this is where a mistake shows up
-loudly. That 4,096 B/token covers K *and* V together, so at `BLOCK_N = 64`:
+!!! warning "Use the per-layer K/V figure, not the whole-model one"
+    The `4,096 B` above is one token's K/V **in one layer**, and that is the
+    number this kernel spends — one program instance handles one (query tile,
+    head) pair, inside a single layer, and never sees the other 27.
+
+    Lecture 05's headline figure of `114,688 B` per token is that same 4 KiB
+    × 28 layers: the cost of a token to the *whole model*. It is the right
+    number for cache-capacity questions and the wrong one here, by 28×. If a
+    tile ever looks far too big for SRAM, this mix-up is the first thing to
+    suspect.
+
+That per-layer figure also sets a real constraint on `BLOCK_N`. Since 4,096 B
+covers K and V together, a 64-token tile needs
 
 ```
-   K tile   64 tokens × 2,048 B  =  128 KiB
-   V tile   64 tokens × 2,048 B  =  128 KiB
-                                    ────────
-                                    256 KiB   against a ~100 KB scratchpad
+   K  64 × 2,048 B  =  128 KiB
+   V  64 × 2,048 B  =  128 KiB
+                       ────────
+                       256 KiB   against a ~100 KB scratchpad
 ```
 
-It does not fit — and that is a real constraint, not an arithmetic slip. Paged
-decode kernels respond by using a smaller `BLOCK_N`, or by streaming blocks
-through rather than holding a whole tile resident. Decode also helps itself
-here: its "tile" is a *single* query row rather than 64, so the score patch is
-`1 × BLOCK_N` instead of `64 × 64`, and the budget looks nothing like L17's
-prefill case.
-
-The general rule: when a tile looks too big for SRAM, either `BLOCK_N` is too
-large for this kernel, or you have mixed up per-layer and whole-model K/V — the
-114,688 B figure overshoots by 28×.
+which does not fit. Paged decode kernels answer that by using a smaller
+`BLOCK_N`, or by streaming blocks through instead of holding a whole tile
+resident. Decode also helps itself: its query side is a *single* row rather than
+64, so the score patch is `1 × BLOCK_N` instead of `64 × 64` and the budget
+looks nothing like Lecture 17's prefill case.
 
 The write side gets the same treatment. Every step the model computes fresh K/V
 for the batch's newest tokens, and a naive engine would stage them in a
