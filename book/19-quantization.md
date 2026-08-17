@@ -329,11 +329,44 @@ your measurement match, and if not, what else is now the bottleneck?
 
 **Memory roughly halves at INT8.** Predictable.
 
-**Speedup below 2×.** You quantized weights, not everything, activations, KV
-cache, and overhead are unchanged. This is Amdahl's law in miniature: the total
-speedup of a change is capped by the share of the time the change actually
-touches. Weights are the biggest share of decode traffic, so you get most of
-the win, but everything unquantized still takes the same time it always did.
+**Speedup below 2×, and you can predict the number before you measure it.** You
+quantized weights, not everything — activations, KV cache, and overhead are
+unchanged. Lecture 02 counted what a decode step actually moves:
+
+```
+weights                     880.8 MB      ← the only part INT8 shrinks
+KV cache + activations      234.9 MB      ← unchanged
+                          ──────────
+total per step            1,115.7 MB
+```
+
+Weights are `880.8 / 1,115.7 = 78.9%` of the traffic. Halve *that* term and
+leave the rest alone:
+
+```
+INT8 step  =  880.8/2  +  234.9   =  440.4 + 234.9  =  675.3 MB
+
+speedup    =  1,115.7 / 675.3     =  1.65×
+```
+
+So **~1.65×**, not 2×, and now you know the number to check your measurement
+against. This is Amdahl's law in miniature: the speedup of a change is capped by
+the share of the time the change actually touches. Weights are the biggest
+share, so you get most of the win — but the 21% you didn't touch takes exactly
+as long as it always did.
+
+Work the same arithmetic for INT4 before you run it. Weights go to a quarter:
+
+```
+INT4 step  =  880.8/4  +  234.9   =  220.2 + 234.9  =  455.1 MB
+speedup    =  1,115.7 / 455.1     =  2.45×
+```
+
+Note what happened: halving the weights *again* bought only another 0.8×, not
+another 1.65×. The unquantized 234.9 MB is now more than half the step, and it
+is the new ceiling. Chasing bits has diminishing returns for a reason you can
+compute in advance, and that is precisely when attention should shift to the KV
+cache instead.
 
 **INT8 quality nearly indistinguishable** on most tasks. This is why W8A16 is
 close to a default.

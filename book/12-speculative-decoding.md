@@ -126,24 +126,26 @@ train heads. The trade: it's a trained addition to the model, and drafting still
 runs a small network per position, so it isn't as free as Medusa's single-
 forward drafting.
 
-**DFlash — draft in parallel, with a block diffusion model.** The newest
-paradigm, and it attacks the constraint every method above quietly shares:
-drafting has always been *autoregressive*. Even the cheap drafters produce token
-t+1 only after token t, so γ drafts cost γ sequential drafting steps — cheap
-steps, but sequential. DFlash instead trains a **lightweight block-diffusion
-model** that emits all γ draft tokens **in one parallel pass**, conditioned on
-features from the target model rather than on its own previous guesses
-(**KV-injection** — the drafter reads the target's hidden states directly).
+**Parallel drafting — the direction the frontier is moving.** Every method above
+quietly shares one constraint: drafting is itself *autoregressive*. Even the
+cheap drafters produce token `t+1` only after token `t`, so γ drafts cost γ
+sequential drafting steps. They are cheap steps, but they are sequential, and
+that is the same disease the whole lecture is trying to cure — one level down.
 
-That one change moves the ceiling. The expected-tokens formula from the next
-section still bounds how many drafts *get accepted*, but the draft *cost* stops
-scaling with γ: producing 16 drafts costs no more than producing 4. DeepSeek's
-**DSpark** is the production sibling — semi-autoregressive drafting with
-confidence scheduling, shipped in their DeepSpec framework, and reported at
-51–400% faster decoding on DeepSeek-V4 (MIT-licensed) versus the single-token
-MTP path. The trade is the most machinery yet: a diffusion model to train plus
-the KV-injection plumbing into the target, which is why this is the frontier
-rather than the default.
+The obvious cure is a drafter that emits all γ tokens in **one parallel pass**,
+conditioned on features read from the target model rather than on its own
+previous guesses. If that works, the draft *cost* stops scaling with γ:
+producing 16 drafts costs about what producing 4 does. The expected-tokens
+formula in the next section still bounds how many drafts get *accepted*, so
+acceptance stays the thing to measure — but the cost side of the trade changes
+shape, and the optimal γ moves right.
+
+This is an active research direction rather than a technique to reach for, and
+the trade is the most machinery of any option here: a separate drafting model to
+train, plus plumbing to feed it the target's internal states. Treat it as the
+frontier, not the default — and when you meet a specific paper making this
+claim, check its acceptance rate and its *drafting* cost separately, because
+that is exactly where the interesting variation lives.
 
 **N-gram / prompt lookup — no model at all.** The degenerate case, and the one
 this lecture makes you build. Keep an n-gram index of the prompt and everything
@@ -155,14 +157,20 @@ collapses where the text is novel: prose has no matching n-gram, acceptance near
 zero, and you've added overhead for nothing. That failure is not a bug — it's
 the sharpest demonstration of "the workload decides" in the lecture.
 
-| | Draft model | Medusa / MTP | EAGLE | DFlash / DSpark | N-gram |
+| | Draft model | Medusa / MTP | EAGLE | Parallel drafting | N-gram |
 |---|---|---|---|---|---|
-| Extra weights | a second model | heads on the target | trained module | block-diffusion drafter | none |
-| Training | no | yes | yes | yes (diffusion) | no |
-| Draft mechanism | sequential small decode | one forward, parallel heads | per-position feature net | **one parallel block pass** | dictionary lookup |
-| Draft cost vs γ | scales with γ | scales with γ | scales with γ | **independent of γ** | O(1) |
-| Acceptance | model-dependent | good | very good | **best (reported)** | code high, prose ~0 |
+| Extra weights | a second model | heads on the target | trained module | a separate drafter | none |
+| Training | no | yes | yes | yes | no |
+| Draft mechanism | sequential small decode | one forward, parallel heads | per-position feature net | **one parallel pass** | dictionary lookup |
+| Draft cost vs γ | scales with γ | scales with γ | scales with γ | **~independent of γ** | O(1) |
+| Acceptance | model-dependent | good | very good | varies by method | code high, prose ~0 |
 | When it wins | no training allowed | target is fine-tunable | acceptance is the goal | long γ, draft tax matters | output echoes input |
+
+Read the last column-but-one as a research direction rather than a product you
+can install today. The first three and the last are things you can actually
+reach for now, and **N-gram is the one you build in this lecture** — it needs no
+training, no extra weights, and it is the honest baseline every other method has
+to beat.
 
 ### The metric that matters
 
@@ -174,8 +182,37 @@ it alongside tok/s, always. Without it you can't tell these apart:
 - Slow despite high acceptance → verification overhead is eating the gain
 
 Acceptance rate is not a nicety to report — it *is* the speedup, and you can
-prove it. Under exact speculative decoding with γ drafts and per-token
-acceptance probability α, the expected tokens per verify pass is:
+prove it.
+
+Before the algebra, the shape. Each draft is checked in order, and the *first*
+rejection ends the run — so the outcomes form a chain, not a tree of every
+combination. With γ = 4:
+
+```
+  draft1   draft2   draft3   draft4
+    │        │        │        │
+    ✓ α      ✓ α      ✓ α      ✓ α  ──► all 4 accepted, +1 BONUS = 5 tokens
+    │        │        │        │              probability α⁴
+    ✗        ✗        ✗        ✗
+  (1−α)    α(1−α)   α²(1−α)  α³(1−α)
+    │        │        │        │
+    ▼        ▼        ▼        ▼
+  1 token  2 tokens 3 tokens 4 tokens
+  (just    (draft1  (drafts  (drafts
+   the      + the    1-2 +    1-3 +
+   fix)     fix)     fix)     fix)
+
+  note: EVERY outcome yields at least 1 token — a rejection still
+  produces the corrected token, so a verify pass is never wasted
+```
+
+Read the probabilities down the ✗ row: reaching the `k`-th rejection means
+accepting `k` drafts first (`α^k`) and then failing one (`1−α`), giving
+`α^k(1−α)` — and that outcome is worth `k+1` tokens. The far-right branch is the
+bonus: accept everything and the verify pass hands you one extra token free.
+
+Under exact speculative decoding with γ drafts and per-token acceptance
+probability α, the expected tokens per verify pass is therefore:
 
 ```
 E[tokens] = 1 + α + α² + … + α^γ  =  (1 − α^(γ+1)) / (1 − α)
@@ -186,7 +223,39 @@ plus the correction token) with probability `α^k(1 − α)`; accept all γ and 
 get γ + 1 (the bonus token) with probability `α^γ`. Summing:
 
 ```
+E = Σ_{k=0}^{γ−1} (k+1)·α^k·(1−α)  +  (γ+1)·α^γ
+```
+
+That collapses to the clean geometric sum, and the collapse is worth seeing
+rather than taking on faith. Do it concretely at `γ = 2`, where you can write
+every term out:
+
+```
+E = 1·(1−α)          k=0: reject immediately, 1 token
+  + 2·α·(1−α)        k=1: one draft accepted, then a rejection
+  + 3·α²             all γ=2 accepted, plus the bonus token
+
+  = (1 − α) + (2α − 2α²) + 3α²        expand each product
+
+  = 1 − α + 2α − 2α² + 3α²            drop the brackets
+
+  = 1 + α + α²                        collect: (−α+2α)=α, (−2α²+3α²)=α²
+```
+
+Every term cancels except the geometric one. The same cancellation happens at
+any γ — each `(k+1)α^k` contributes `+(k+1)α^k`, and the `−(k+1)α^(k+1)` it
+drags along is exactly cancelled by the next term's `+(k+2)α^(k+1)` minus one
+copy, leaving a single `α^(k+1)`. It telescopes:
+
+```
 E = Σ_{k=0}^{γ−1} (k+1)·α^k·(1−α)  +  (γ+1)·α^γ  =  1 + α + α² + … + α^γ
+```
+
+And a geometric series has a closed form, which is where the `(1 − α^(γ+1))/(1 − α)`
+above comes from:
+
+```
+1 + α + … + α^γ  =  (1 − α^(γ+1)) / (1 − α)        for α < 1
 ```
 
 At `α = 0.8, γ = 4`: `1 + 0.8 + 0.64 + 0.512 + 0.4096 = 3.36` tokens per verify
@@ -195,11 +264,49 @@ buy `1.25×`: barely above doing nothing. That gap is the entire lecture, and
 it's why this is one of the few techniques that moves *per-user* latency, which
 batching (Lecture 07) cannot touch.
 
-γ is not free either — a rejected draft is wasted work — so the peak sits at
-moderate γ. From the [field notes](field-notes.md), an operator running 2×3090
-found the documented 3 draft tokens beaten by 5, and above 5, performance got
-measurably **worse**: past the peak you're paying to verify tokens that get
-thrown away.
+Now notice that the formula you just derived has an awkward property. `E[tokens]
+= 1 + α + … + α^γ` is **strictly increasing in γ** — every extra draft adds
+another positive `α^k` term. Taken literally, it says: draft 50 tokens, draft
+500, the expected yield only goes up.
+
+Reality disagrees. From the [field notes](field-notes.md), an operator running
+2×3090 found the documented 3 draft tokens beaten by 5, and above 5 performance
+got measurably **worse**. So the model and the measurement contradict each other,
+and the model is the one that is wrong — or rather, incomplete.
+
+**What the formula leaves out is the cost of drafting.** It counts tokens
+*produced per verify pass* and says nothing about what the pass costs. Put both
+sides in:
+
+```
+                    E[tokens]           1 + α + … + α^γ
+  speedup  ≈  ───────────────────  =  ───────────────────
+              1 verify + γ drafts       1 + γ·c
+
+  where c = cost of one draft step ÷ cost of one target forward pass
+```
+
+The numerator grows, but it grows by ever-smaller amounts — the terms are
+`α^k`, shrinking geometrically. The denominator grows **linearly**, forever. A
+ratio whose numerator saturates and whose denominator doesn't must eventually
+turn over, and that turning point is the peak:
+
+```
+  E[tokens]     ▁▃▅▆▇▇▇▇▇  saturates at 1/(1−α)
+  draft cost    ▁▂▃▄▅▆▇█▉  grows without limit
+                ─────────
+  speedup       ▁▃▅▆▇▆▅▃▁  rises, peaks, falls
+                      ▲
+                   the peak the field notes measured at γ=5
+```
+
+Where the peak sits depends on both α and `c`: a cheaper drafter (small `c`)
+pushes it right, a lower acceptance rate pulls it left. That is also exactly why
+the parallel-drafting direction above matters — it attacks `γ·c`, flattening the
+denominator, which moves the peak right.
+
+Past the peak you are paying to verify tokens that get thrown away. **Measure
+your own peak; do not inherit someone else's γ.**
 
 ### The workload decides everything
 
@@ -326,14 +433,15 @@ verify tokens that get thrown away.
 - **[EAGLE](https://arxiv.org/abs/2401.15077)**: feature-level drafting, the
   current practical default.
 - **[Medusa](https://arxiv.org/abs/2401.10774)**: multiple decoding heads.
-- **[DSpec](https://arxiv.org/abs/2406.14846)** (Zhou et al., 2024): distillation
-  for speculative decoding — train the draft model to mimic the target and
-  acceptance goes up. DeepSeek's contribution to the draft-model line.
-- **[DFlash](https://arxiv.org/abs/2602.06036)** (z-lab): block-diffusion
-  drafting — all drafts in one parallel pass, so drafting cost stops scaling
-  with γ. **DSpark** (DeepSeek, via DeepSpec) is the production sibling:
-  semi-autoregressive, confidence-scheduled drafting, 51–400% faster decode on
-  V4.
+- **Distillation for speculative decoding**: train the draft model to mimic the
+  target's distribution and acceptance goes up, because acceptance *is* the
+  agreement between the two models. A productive line of work and the most
+  reliable way to improve α for a given draft-model size.
+- **Parallel / non-autoregressive drafting**: the frontier direction described
+  above, where the drafter emits γ tokens in one pass instead of γ. When
+  evaluating any paper here, separate the two claims — acceptance rate, and
+  drafting cost per token — because the headline speedup is a product of both
+  and papers vary in which one they actually improve.
 - **Kiely §5.2–5.2.4** (p.129–136), all four approaches compared, including the
   n-gram/lookahead variant you built.
 - **[Field notes](field-notes.md)**: docs said 3 draft tokens, measurement said 5,

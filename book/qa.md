@@ -1599,3 +1599,93 @@ compose, and why L28b treats trace length and sample count as separate dials.
 Both have the same shape of return: cost grows multiplicatively, accuracy
 additively and with diminishing steps. Neither buys reasoning the model doesn't
 have; both buy it more room to use what it has.
+
+---
+
+## Doesn't dequantizing on every load cost more time than it saves?
+
+**Lecture:** [19. Quantization](19-quantization.md)
+
+**Wrong intuition:** "If you convert INT8 back to FP16 before every matmul, the
+matmul does exactly the same work as before — and now there's extra conversion
+work on top. That has to be slower, not faster."
+
+The error is in *where* the conversion happens. Dequantization does not restore
+the FP16 weights in memory and then read them; it happens in **registers**, on
+data that has already crossed HBM.
+
+Trace one weight through both paths:
+
+```
+FP16 path :  HBM ──2 bytes──► registers ──► multiply
+INT8 path :  HBM ──1 byte───► registers ──► ×scale, −zp ──► multiply
+             └─ half the traffic ─┘        └─ 2 extra ops, on-chip ─┘
+```
+
+The bytes that crossed the slow path were halved. The two extra arithmetic
+operations happen on the fast path, where you have enormous headroom: Lecture 02
+measured decode at **0.79 ops:byte** against a 3090 ridge of **76**. You are
+roughly 96× away from being compute-limited, so spending a couple of ops per
+weight is free in the only currency that is scarce.
+
+This is the same trade FlashAttention makes (Lecture 17): *do more arithmetic to
+move less data*. On a memory-bound operation that is always the right direction,
+and decode is memory-bound by two orders of magnitude.
+
+Two caveats worth carrying:
+
+1. **It only works because decode is memory-bound.** In a compute-bound regime —
+   large-batch prefill sitting right of the ridge — the extra ops are no longer
+   free, which is part of why W8A8 (quantizing activations too, so the matmul
+   itself runs in INT8) exists for that regime.
+2. **The speedup is under 2×**, even though you halved the weights. Weights are
+   880.8 MB of the 1,115.7 MB a decode step moves; the KV cache and activations
+   are unchanged. Halving only the weight term gives
+   `1,115.7 / (440.4 + 234.9) = 1.65×`. Amdahl's law, applied to bytes.
+
+---
+
+## Why divide inside the loop instead of once at the end?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+FlashAttention's paper (Algorithm 1) normalizes *inside* the tile loop:
+
+```
+O[i] = (1/l_new) * ( l[i]*e^(m[i]-m_new)*O[i] + e^(m~-m_new)*P~@V[j] )
+```
+
+while most real kernels — including the one this lecture builds — accumulate
+unnormalized and divide once after the loop ends:
+
+```
+acc = acc * correction + P @ V        # in the loop, no division
+...
+out = acc / l_i                       # once, at the end
+```
+
+**Both are correct and produce the same answer.** The difference is only where
+the division sits, and each choice has a consequence worth understanding.
+
+**In-loop (the paper).** `O[i]` is a *valid, normalized* attention output after
+every tile — if you stopped early you'd have the correct answer for the keys
+seen so far. The price is that you must store `l[i]` alongside `O[i]` and
+multiply it back out on every update (`l[i]*...*O[i]`), because you cannot add a
+new contribution to an already-divided value without first undoing the division.
+That is why the paper's state is a *triple* `(O, l, m)` written to HBM together.
+
+**Accumulate-then-divide (real kernels).** `acc` holds an unnormalized weighted
+sum, meaningless on its own until the final divide. You skip the multiply-back
+entirely — one fewer multiply per tile per row — and `l` never has to be
+recovered from the output. Since the loop runs `Tc` times per query block, that
+saved multiply is real work removed from the inner loop.
+
+The reason the paper writes it the first way is structural, not numerical: in
+FlashAttention-1 the query block's state is evicted to HBM between tiles (see
+the loop-order comparison in the lecture), so it has to be in a self-consistent
+form when it lands there. FlashAttention-2 keeps that state in registers for the
+whole walk, so there is no reason to normalize until the end.
+
+A useful check on your own implementation: if you accumulate unnormalized, `acc`
+should look *wrong* if you print it mid-loop — growing without bound as tiles
+are added. That's expected. Only `acc / l_i` is meaningful.

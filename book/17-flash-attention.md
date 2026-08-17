@@ -166,6 +166,73 @@ cheaper than a memory round-trip.
 
 ## The structure
 
+### First, the algorithm on its own
+
+Before any Triton, here is the whole forward pass as the paper states it
+(FlashAttention-1, Algorithm 1). No GPU vocabulary, just two loops and the
+running state — read this until it makes sense, and the kernel afterwards is
+only this with the loops rearranged:
+
+```
+init O=0, l=0, m=-inf                    # in HBM, one per query row-block
+
+for j in 1..Tc:                          # outer: K,V column-blocks
+    load K[j], V[j]  ->  SRAM
+
+    for i in 1..Tr:                      # inner: Q row-blocks
+        load Q[i], O[i], l[i], m[i]  ->  SRAM
+
+        S  = Q[i] @ K[j].T               # [Br x Bc], on chip, never stored
+        m~ = rowmax(S)                   # this tile's max
+        P~ = exp(S - m~);  l~ = rowsum(P~)   # this tile's weights and their sum
+
+        m_new = max(m[i], m~)                            # merge the maxes
+        l_new = e^(m[i]-m_new)*l[i] + e^(m~-m_new)*l~    # merge the sums
+
+        O[i]  = (1/l_new)*( l[i]*e^(m[i]-m_new)*O[i] + e^(m~-m_new)*P~@V[j] )
+
+        store O[i], l[i]=l_new, m[i]=m_new  ->  HBM
+
+return O    # exact softmax(QK^T)V — the N×N matrix was never built
+```
+
+**Two loops, and everything between the load and the store happens on chip.**
+That is the entire kernel.
+
+Read the update line by line, because each piece is doing one job:
+
+- **`S = Q[i] @ K[j].T`** — the only place scores exist. `[Br × Bc]`, a *tile*
+  of the score matrix, alive in SRAM for a few instructions and then gone. The
+  `N × N` matrix from the opening section is never assembled anywhere.
+- **`m~`, `P~`, `l~`** (the tilde means "for this tile alone") — a complete,
+  correct softmax of the tile in isolation, using the tile's own max.
+- **`m_new = max(m[i], m~)`** — the merge. Everything computed before this
+  moment used the *old* max, so if this tile brought a bigger value, the history
+  is now scaled wrong.
+- **`e^(m[i]-m_new)` and `e^(m~-m_new)`** — the two correction factors, one for
+  the history and one for this tile. Whichever max won, its factor is `e⁰ = 1`
+  and the other shrinks. Nothing is ever scaled *up*, which is what keeps this
+  numerically safe.
+- **`l_new = ...`** — the same correction applied to the running denominator.
+- **`O[i] = (1/l_new)*( l[i]*e^(...)*O[i] + e^(...)*P~@V[j] )`** — the
+  accumulator. Note the `l[i]*` on the left: `O[i]` was stored *already divided*
+  by the old `l[i]`, so you multiply it back out, add the new tile's
+  contribution, and divide by the new total. That is why `l` must be stored
+  next to `O` — you cannot undo the normalization without it.
+
+Then the state goes back to HBM and the next `(i, j)` pair picks it up.
+
+??? question "Why divide inside the loop instead of once at the end?"
+    You can do either, and the Triton kernel below does it the other way —
+    accumulate unnormalized, divide once after the loop. The paper's in-loop
+    version keeps `O[i]` a *valid* attention output at every step, which is why
+    it must store `l[i]` alongside it and multiply it back out each time. The
+    accumulate-then-divide version skips that multiply-back and is slightly
+    cheaper, which is why real kernels prefer it. The arithmetic is identical;
+    it is only a question of where you put the division.
+
+Now the same algorithm as a Triton kernel:
+
 ```python
 @triton.jit
 def flash_attention_kernel(Q, K, V, Out, softmax_scale, N, ...):
@@ -195,11 +262,45 @@ def flash_attention_kernel(Q, K, V, Out, softmax_scale, N, ...):
     tl.store(Out + ..., acc / l_i[:, None])
 ```
 
-Note the loop direction: each program owns a row of queries and walks the key
-sequence in the inner loop (Q-per-program, K/V-inner). FlashAttention-1's
-Algorithm 1 loops the other way — K/V-outer, Q-inner. Your arrangement is the
-FlashAttention-2 one, and it's what the official kernels use today; nothing in
-the math changes, only which tile stays resident.
+**Compare the two loop orders.** The kernel above is not a transcription of the
+algorithm — the loops have been turned inside out, and it is worth seeing
+exactly what moved:
+
+```
+   FlashAttention-1 (the algorithm above)   FlashAttention-2 (the kernel above)
+   K/V outer, Q inner                       Q outer, K/V inner
+
+   for j in K/V blocks:        ← outer      for i in Q blocks:        ← outer
+       load K[j], V[j]                          load Q[i]   (stays put)
+       for i in Q blocks:      ← inner          m,l,acc = 0  (in registers)
+           load Q[i],O[i],l[i],m[i]  ← HBM      for j in K/V blocks:  ← inner
+           ...update...                             load K[j], V[j]
+           store O[i],l[i],m[i]      → HBM          ...update...
+                                                store O[i]            → HBM
+                                                └─ ONCE, after the loop
+```
+
+Follow the running state. In FA-1 it lives in **HBM**: every `(i, j)` pair loads
+`O[i], l[i], m[i]`, updates them, and writes them back — so a query block's
+state crosses memory once per K/V block. In FA-2 the query block is the outer
+loop, so `m`, `l`, and `acc` stay in **registers** for that block's entire walk
+across the keys, and `O[i]` is written exactly once at the end.
+
+Count the writes for one query block against `Tc` K/V blocks:
+
+```
+FA-1:  Tc loads + Tc stores of (O, l, m)
+FA-2:   1 store of O
+```
+
+**Nothing in the math changed** — same online softmax, same corrections, same
+exact result. What changed is which tile stays resident, and therefore how many
+times the running state crosses HBM. That is the entire FA-1 → FA-2 improvement,
+and it is the same lesson as the rest of the lecture: the arithmetic was never
+the problem.
+
+Your kernel is the FA-2 arrangement, which is what the official kernels use
+today.
 
 Three things that go wrong:
 
