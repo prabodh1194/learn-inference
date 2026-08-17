@@ -329,6 +329,35 @@ Q = [1 0 1 0]      K = [1 0 0 0]      V = [1 0 0 0]
      2 × 4              2 × 4              2 × 4
 ```
 
+**Be clear about what a "tile" is at this size, because it is a degenerate
+case.** A tile is normally a *block of rows*: `Q[i]` is `Br × d` and `K[j]` is
+`Bc × d`, so `S_tile = Q[i] @ K[j].T` is a `Br × Bc` matrix. Here `Br = Bc = 1`,
+so every tile is a single row — a `1 × 4` vector — and `S_tile` collapses to a
+`1 × 1` scalar:
+
+```
+   REAL KERNEL  (Br = Bc = 64, d = 128)      THIS EXAMPLE  (Br = Bc = 1, d = 4)
+
+   Q[i]     64 × 128   a block of queries    Q[0]     1 × 4    one query
+   K[j]     64 × 128   a block of keys       K[0]     1 × 4    one key
+   V[j]     64 × 128   a block of values     V[0]     1 × 4    one value
+   S_tile   64 ×  64   a patch of scores     S_tile   1 × 1    one score
+```
+
+Three tiles are still loaded per step — `Q[i]`, `K[j]`, `V[j]` — exactly as the
+algorithm says. They are simply one row each instead of sixty-four.
+
+What that costs you: with a `1 × 1` score tile, **`rowmax` and `rowsum` have
+nothing to reduce over.** In the real kernel `m~ = rowmax(S_tile)` picks the
+largest of 64 scores in a row and `l~ = rowsum(P~)` adds 64 weights; here both
+are just the single value, so those two lines look like no-ops.
+
+That is fine — and deliberate. The intra-tile reduction is ordinary softmax,
+which you already know. **What the example isolates is the part that is new: how
+state carries *across* tiles.** Every correction, every rescale, every `m_old →
+m_new` transition below behaves exactly as it does at `Br = Bc = 64`; the only
+thing missing is the plain reduction inside each tile.
+
 **Standard attention** would start by building the full score matrix
 `S = QKᵀ` — the thing FlashAttention refuses to build. At this size it's 2×2:
 
@@ -365,21 +394,25 @@ running state `(m, l, acc)` resets between query tiles** — rows never interact
 #### Query tile i=0 — the max changes, history gets repaired
 
 ```
-step (0,0):   the new tile is key/value 0:   K[0]=[1,0,0,0]  V[0]=[1,0,0,0]
+step (0,0):   in SRAM:  Q[0]=[1,0,1,0]   ← resident for both steps
+                        K[0]=[1,0,0,0]   ← this step's new tile
+                        V[0]=[1,0,0,0]   ← this step's new tile
 
-              s  = Q[0]·K[0] = 1        the score for this tile
-              m~ = 1                    its max (one element, so itself)
-              weight = e^(s − m~) = e^(1−1) = e⁰ = 1
+              S_tile = Q[0] @ K[0].T = 1    a 1×1 score matrix
+              m~     = rowmax(S_tile) = 1   (one element, so itself)
+              weight = e^(S_tile − m~) = e^(1−1) = e⁰ = 1
 
               nothing to repair yet — this is the first tile
               l   = 1                              ( = the weight )
               acc = 1 · V[0] = [1, 0, 0, 0]        ( = weight × its value )
 
-step (0,1):   the new tile is key/value 1:   K[1]=[2,0,2,0]  V[1]=[0,1,0,0]
+step (0,1):   in SRAM:  Q[0]=[1,0,1,0]   ← still resident, never reloaded
+                        K[1]=[2,0,2,0]   ← new tile, replaces K[0]
+                        V[1]=[0,1,0,0]   ← new tile, replaces V[0]
 
-              s  = Q[0]·K[1] = 4        ← bigger than anything seen so far
-              m~ = 4
-              m:  1 → 4                 ← THE MOMENT: the max moved
+              S_tile = Q[0] @ K[1].T = 4   ← bigger than anything seen so far
+              m~     = 4
+              m:  1 → 4                    ← THE MOMENT: the max moved
 
               correction = e^(1−4) = e^−3 = 0.0498
                            everything computed so far is wrong by this factor
