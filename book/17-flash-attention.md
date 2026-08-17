@@ -716,15 +716,22 @@ The loop order is the one worth learning first, because the other three follow
 naturally from it: once a query block owns the outer loop, keeping its state in
 registers and deferring the division both become the obvious thing to do.
 
-### First, the algorithm on its own
+### The original, as the paper wrote it
 
-Recall the four symbols from "Tiles, and the four symbols that name them":
-`Br`/`Bc` are how many queries/keys sit in one tile, and `Tr = N/Br`,
-`Tc = N/Bc` are how many such tiles there are. Here is the whole forward pass
-as the paper states it
-(FlashAttention-1, Algorithm 1). No GPU vocabulary, just two loops and the
-running state — read this until it makes sense, and the kernel afterwards is
-only this with the loops rearranged:
+You now have the algorithm twice — as arithmetic in the toy example, and as a
+shape derived from constraints. Here it is a third way: **verbatim in the
+paper's own notation**, so that when you open FlashAttention-1 you recognize
+what you're looking at rather than meeting it cold.
+
+This is Algorithm 1, and it is the **FA-1** arrangement — K/V outside, queries
+inside, state round-tripping through HBM. That is the version you just saw lose
+the loop-order comparison, and it is printed here deliberately: the kernel you
+write below is its FA-2 rearrangement, and the two are worth seeing in the same
+lecture.
+
+Recall `Br`/`Bc` (queries/keys per tile) and `Tr = N/Br`, `Tc = N/Bc` (how many
+such tiles). No GPU vocabulary beyond that — just two loops and the running
+state:
 
 ```
 init O=0, l=0, m=-inf                    # in HBM, one per query row-block
@@ -963,25 +970,15 @@ exactly what moved:
                                                 └─ ONCE, after the loop
 ```
 
-Follow the running state. In FA-1 it lives in **HBM**: every `(i, j)` pair loads
-`O[i], l[i], m[i]`, updates them, and writes them back — so a query block's
-state crosses memory once per K/V block. In FA-2 the query block is the outer
-loop, so `m`, `l`, and `acc` stay in **registers** for that block's entire walk
-across the keys, and `O[i]` is written exactly once at the end.
-
-Count the writes for one query block, which meets all `Tc = 64` K/V blocks:
+This is the same trade you counted by hand on the 2×2 toy, now at production
+size. In FA-1 a query block's `(O, l, m)` lives in **HBM** and is fetched and
+written back once per K/V block; in FA-2 it stays in **registers** for the whole
+walk. Per query block, against `Tc = 64` K/V blocks:
 
 ```
 FA-1:  Tc loads + Tc stores of (O, l, m)   =  64 + 64  =  128 round-trips
 FA-2:   1 store of O                       =              1 write
 ```
-
-**Nothing in the math changed** — same online softmax, same corrections, same
-exact result. What changed is which tile stays resident, and therefore how many
-times the running state crosses HBM. That is the largest single piece of the
-FA-1 → FA-2 improvement (the others are listed back in "Deriving the kernel's
-shape"), and it is the same lesson as the rest of the lecture: the arithmetic
-was never the problem.
 
 Your kernel is the FA-2 arrangement, which is what the official kernels use
 today.
