@@ -258,9 +258,10 @@ steps but risk overflowing SRAM; smaller tiles always fit but launch more
 steps. **The block sizes are a fitting problem; the tile counts just fall out
 of them.**
 
-In the toy example above, `N = 2` with tiles of one token gives
-`Br = Bc = 1`, hence `Tr = Tc = 2` and `Tr × Tc = 4` tile-steps — the four
-steps you walked through by hand.
+These four symbols are about to earn their keep. In the worked example a few
+sections below, the universe shrinks to `N = 2` with tiles of one token — so
+`Br = Bc = 1`, hence `Tr = Tc = 2`, and `Tr × Tc = 4` tile-steps, small enough
+to walk through by hand.
 
 ### Online softmax
 
