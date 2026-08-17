@@ -159,10 +159,9 @@ covers K and V together, a 64-token tile needs
 ```
 
 which does not fit. Paged decode kernels answer that by using a smaller
-`BLOCK_N`, or by streaming blocks through instead of holding a whole tile
-resident. Decode also helps itself: its query side is a *single* row rather than
-64, so the score patch is `1 × BLOCK_N` instead of `64 × 64` and the budget
-looks nothing like Lecture 17's prefill case.
+`BLOCK_N`, or by streaming blocks through rather than holding a whole tile
+resident. Decode's own shape helps too, for the reason the next section makes
+precise.
 
 The write side gets the same treatment. Every step the model computes fresh K/V
 for the batch's newest tokens, and a naive engine would stage them in a
@@ -179,12 +178,33 @@ Prefill attends with many queries, one per prompt token, side by side.
 to look back over everything cached) attending over the whole cached context.
 That changes the shape of the problem:
 
-- No query tiling, one row.
-- No causal masking within the tile: the single query attends to everything
-  cached, all of which precedes it.
-- The whole kernel is dominated by **streaming K/V from memory**: reading each
-  byte exactly once, on its way through, never holding it. That is Lecture
-  02's memory-bound decode, in kernel form.
+- **No query tiling — one row.** `Br = 1`, so the score patch is `1 × BLOCK_N`
+  rather than `64 × 64`. That is why the SRAM budget above looks nothing like
+  Lecture 17's prefill case: the scores cost almost nothing, and essentially the
+  whole scratchpad is available for K/V.
+- **No causal masking within the tile.** The single query attends to everything
+  cached, all of which precedes it, so the diagonal-tile masking from Lecture 17
+  simply does not arise.
+
+    You do still mask, but for a different reason: the sequence's **last block
+    is usually partly empty.** A 37-token sequence with `block_size = 16` fills
+    two blocks and uses 5 slots of the third:
+
+    ```
+    block 0 [################]  16 valid
+    block 1 [################]  16 valid
+    block 2 [#####...........]   5 valid, 11 slots of stale garbage
+                   ↑
+            mask these to -inf, or they contribute real weights
+            to the softmax and silently corrupt the output
+    ```
+
+    Causal masking hides the *future*; this hides the *unwritten*. Same
+    operation, different reason, and this one applies to decode as much as
+    prefill.
+- **The kernel is pure streaming.** Every K/V byte is read exactly once, on its
+  way through, and never held. That is Lecture 02's memory-bound decode in
+  kernel form.
 
 Because it's pure bandwidth, the metric from Lecture 15 is the right one: measure
 achieved bandwidth against peak. A good decode attention kernel gets close.
@@ -194,9 +214,11 @@ like.
 
 ### Parallelizing over context
 
-"Nearly idle" deserves a number, because it is the entire reason this section
-exists. The natural parallel unit for attention is one thread block per
-(sequence, head). At batch 1 with Qwen3-0.6B's 16 query heads, that is
+One query row per sequence is not much work, and at small batch that becomes a
+problem in its own right: **the GPU runs out of things to do.**
+
+Put a number on it. The natural parallel unit for attention is one thread block
+per (sequence, head). At batch 1 with Qwen3-0.6B's 16 query heads, that is
 **16 thread blocks** — on a 3090 with **82 SMs**:
 
 ```
