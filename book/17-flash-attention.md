@@ -387,9 +387,60 @@ one per cell of that matrix:
            └─────────┴─────────┘
 ```
 
-In the FA-2 order (query tile outer, key tiles inner) you sweep row 0
-completely, then row 0's state is finished and discarded, then row 1. **The
-running state `(m, l, acc)` resets between query tiles** — rows never interact.
+You can visit those four cells in either order, and the arithmetic is identical
+either way. But **which loop you put outside decides where the running state
+lives**, and this tiny example is big enough to show it. Walk both.
+
+**Q outside (what this example does).** Sweep row 0 completely, then row 1:
+
+```
+   step (0,0)   Q[0] loaded ──┐
+   step (0,1)   Q[0] still ───┴─ m,l,acc live in registers the whole time
+                              →  write out[0]           ← one write
+
+   step (1,0)   Q[1] loaded ──┐
+   step (1,1)   Q[1] still ───┴─ fresh m,l,acc, again in registers
+                              →  write out[1]           ← one write
+```
+
+Row 0's state is born at step (0,0), lives across both its steps, and dies when
+`out[0]` is written. It never touches memory. **The running state `(m, l, acc)`
+resets between query tiles** — rows never interact, so row 1 starts clean.
+
+**K outside (the other option).** Sweep column 0, then column 1:
+
+```
+   step (0,0)   K[0],V[0] loaded.  Query 0's state: create,  → park in HBM
+   step (1,0)   K[0],V[0] still.   Query 1's state: create,  → park in HBM
+
+   step (0,1)   K[1],V[1] loaded.  Query 0's state: FETCH from HBM,
+                                   update, → write back
+   step (1,1)   K[1],V[1] still.   Query 1's state: FETCH from HBM,
+                                   update, → write back
+```
+
+Watch query 0's state. It is created at step (0,0), and its next turn is step
+(0,1) — but step (1,0) happened in between, and that step needed the registers
+for query 1. So query 0's `(m, l, acc)` has to be **evicted to HBM and fetched
+back**.
+
+Count the state traffic for this 2×2 toy:
+
+```
+   Q outside:  2 writes total          (one final output per query)
+   K outside:  4 writes + 2 reads      (park and refetch every query, every step)
+```
+
+**That is the whole reason Q goes in the outer loop.** The inner loop is the one
+that runs often, so whatever the outer loop owns gets to stay put. Put Q outside
+and its state stays in registers for the entire inner loop; put K outside and
+every query's state commutes to HBM and back on every step.
+
+At this size the difference is 2 writes versus 6. At `N = 4096` with 64 tiles it
+is 64 writes versus `64 × (64 + 64)` — and that gap, nothing else, is the
+FlashAttention-1 → FlashAttention-2 improvement.
+
+Now the four steps in detail, Q outside.
 
 #### Query tile i=0 — the max changes, history gets repaired
 
