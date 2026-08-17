@@ -282,6 +282,29 @@ acc = acc * correction + (new tile's contribution)
 l   = l   * correction + (new tile's sum)
 ```
 
+**"New tile" means the K/V block that just arrived** — chunk `j` of the keys and
+values, the one currently sitting in SRAM. Every update has exactly two parts,
+and it is worth naming them because the same shape recurs everywhere below:
+
+```
+   acc  =   acc · correction      +      (new tile's contribution)
+            └──────┬──────┘              └──────────┬───────────┘
+            EVERYTHING from keys                 just key/value j,
+            0 .. j−1, compressed into            the block in SRAM
+            d numbers and repaired               right now
+```
+
+Spelled out, the new tile's two quantities are:
+
+```
+   contribution  =  exp(S_tile − m_new) @ V[j]     its weights × its values
+   sum           =  Σ exp(S_tile − m_new)          its weights, added up
+```
+
+where `S_tile = Q[i] @ K[j].T` are the scores for this tile alone. So the left
+term is the past (rescaled), the right term is the present (freshly computed),
+and once they're added the tile is discarded and never looked at again.
+
 Keep a running max `m`, a running sum `l`, and a running output accumulator `acc`.
 Each new tile rescales the accumulator by `exp(m_old - m_new)`. At the end, divide
 by `l`.
@@ -342,24 +365,42 @@ running state `(m, l, acc)` resets between query tiles** — rows never interact
 #### Query tile i=0 — the max changes, history gets repaired
 
 ```
-step (0,0):   s = 1    m~ = 1     m: -inf → 1
-              correction: none yet (first tile)
-              l   = 1.0000
-              acc = [1, 0, 0, 0]           ( = e⁰ · V[0] )
+step (0,0):   the new tile is key/value 0:   K[0]=[1,0,0,0]  V[0]=[1,0,0,0]
 
-step (0,1):   s = 4    m~ = 4     m:  1 → 4        ← THE MOMENT
+              s  = Q[0]·K[0] = 1        the score for this tile
+              m~ = 1                    its max (one element, so itself)
+              weight = e^(s − m~) = e^(1−1) = e⁰ = 1
+
+              nothing to repair yet — this is the first tile
+              l   = 1                              ( = the weight )
+              acc = 1 · V[0] = [1, 0, 0, 0]        ( = weight × its value )
+
+step (0,1):   the new tile is key/value 1:   K[1]=[2,0,2,0]  V[1]=[0,1,0,0]
+
+              s  = Q[0]·K[1] = 4        ← bigger than anything seen so far
+              m~ = 4
+              m:  1 → 4                 ← THE MOMENT: the max moved
 
               correction = e^(1−4) = e^−3 = 0.0498
                            everything computed so far is wrong by this factor
 
+              weight = e^(s − m_new) = e^(4−4) = e⁰ = 1     this tile's weight
+
               l   = 0.0498 · 1        +  1 · 1        = 1.0498
               acc = 0.0498 · [1,0,0,0] + 1 · [0,1,0,0] = [0.0498, 1, 0, 0]
                     └── history, shrunk ──┘  └─ new tile ─┘
+                        acc so far, repaired     weight × V[1]
+                                                 = 1 · [0,1,0,0]
 
 divide once, at the end:
               out = acc / l = [0.0498, 1, 0, 0] / 1.0498
                             = [0.0474, 0.9526, 0, 0]      ✓ matches O row 0
 ```
+
+Read the `acc` line as **past + present**: the left term is everything from
+earlier keys (here, just key 0) shrunk by the correction; the right term is the
+tile that just arrived, `weight × V[1]`. After the addition, key 1's tile is
+discarded — it is never read again, and nothing about it is stored.
 
 Query 0 puts **95%** of its attention on key 1, because 4 ≫ 1 — and it arrived
 at that without ever holding both scores at once.
@@ -367,16 +408,24 @@ at that without ever holding both scores at once.
 #### Query tile i=1 — the max never changes, history passes through
 
 ```
-step (1,0):   s = 0    m~ = 0     m: -inf → 0
-              l   = 1.0000
-              acc = [1, 0, 0, 0]
+step (1,0):   the new tile is key/value 0:   V[0]=[1,0,0,0]
 
-step (1,1):   s = 0    m~ = 0     m:  0 → 0        ← no change
+              s = Q[1]·K[0] = 0    m~ = 0    m: -inf → 0
+              weight = e^(0−0) = 1
+              l   = 1
+              acc = 1 · V[0] = [1, 0, 0, 0]
 
-              correction = e^(0−0) = e⁰ = 1.0000    ← a no-op
+step (1,1):   the new tile is key/value 1:   V[1]=[0,1,0,0]
+
+              s = Q[1]·K[1] = 0    m~ = 0    m:  0 → 0    ← no change
+
+              correction = e^(0−0) = e⁰ = 1.0000          ← a no-op
+              weight     = e^(0−0) = 1
 
               l   = 1 · 1        +  1 · 1        = 2.0000
               acc = 1 · [1,0,0,0] + 1 · [0,1,0,0] = [1, 1, 0, 0]
+                    └─ history ─┘   └─ new tile ─┘
+                     unchanged       weight × V[1]
 
               out = [1, 1, 0, 0] / 2 = [0.5, 0.5, 0, 0]   ✓ matches O row 1
 ```
