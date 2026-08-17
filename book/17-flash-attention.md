@@ -67,10 +67,77 @@ FlashAttention (Dao et al., 2022) never materializes `S`. To materialize is to
 write the whole thing out to memory, and the previous section's problem exists
 only because standard attention insists on materializing both `S` and `P`.
 
-The obstacle is softmax: it needs a sum over the whole row, so you seemingly can't
-process K/V in pieces. The pieces are **tiles**: rectangular slices of a matrix,
-small enough to fit in the chip's on-chip memory. The trick is that you *can*
-process tiles, if you're willing to **fix up your answer as you go**.
+### Why the naive version has no choice
+
+Start by seeing that standard attention is not stupid — it is *forced*.
+
+Softmax divides by `Σ exp(scores)`, a sum over the **whole row**. You cannot
+divide until every score exists. That single dependency dictates the three-phase
+structure:
+
+```
+phase 1:  compute ALL scores   →  write S    (can't normalize yet — no sum)
+phase 2:  read S, max, exp, sum →  write P    (now you can)
+phase 3:  read P, multiply by V →  write O
+```
+
+Each phase must finish before the next begins, and phases hand data to each
+other through memory. **`S` exists because you believed you had to wait.** The
+32 MiB is the cost of that belief.
+
+So the obstacle is real: softmax is a *global* operation over the row, and a
+global operation appears to require the whole row.
+
+### The trick, exactly
+
+You don't wait. You **compute a wrong answer immediately and repair it later** —
+and the repair costs one multiply.
+
+Here is why it is that cheap, and this is the whole lecture in three lines.
+Softmax's numerator is `exp(x − m)`. Suppose you normalized with the max you had,
+`m_old`, and a later tile reveals a bigger max `m_new`. Everything you computed
+is wrong. Ask *how* wrong:
+
+```
+   what you have:   exp(x − m_old)
+   what you want:   exp(x − m_new)
+
+   ratio  =  exp(x − m_new) / exp(x − m_old)
+          =  exp( (x − m_new) − (x − m_old) )
+          =  exp(m_old − m_new)          ← the x cancels
+```
+
+**The `x` cancels.** The correction does not depend on the score being corrected
+— it is the *same scalar* for every element you have already processed.
+
+That is the property everything else rests on. If the correction depended on `x`,
+you would need every old score to apply it, you would have to keep them, and you
+would be back to storing `S` with nothing gained. Because it doesn't, you can
+throw every processed tile away and keep only a summary:
+
+```
+   m     the running max        1 number
+   l     the running sum        1 number
+   acc   the running output     d numbers
+```
+
+Those few numbers are a *complete* record of everything seen so far. A new tile
+arrives → scale the summary by one scalar → add the tile → discard the tile.
+
+```
+   NAIVE   wait for all N scores, then normalize
+           ⇒ must hold all N scores          ⇒  S is N × N
+
+   FLASH   normalize with what you have now,
+           repair when you learn more        ⇒  state is O(d)
+```
+
+Stated in one sentence: **you are not avoiding the global sum — you are
+deferring the division, and deferral is affordable because the correction factor
+is identical for every element.**
+
+The pieces you process are **tiles**: rectangular slices of a matrix, small
+enough to fit in the chip's on-chip memory.
 
 ### Online softmax
 
@@ -99,9 +166,138 @@ by `l`.
 attention, computed in a different order. That's what makes FlashAttention safe to
 use everywhere.
 
+### Work it by hand: two tokens, four tile-steps
+
+Claims like "algebraically identical" should be checked, not believed, and at
+`N = 4096` you cannot check anything by hand. So shrink the universe until you
+can: **two tokens, `d = 4`, tiles of one token.**
+
+That gives `Br = Bc = 1`, so `Tr = Tc = 2` — two query tiles, two key tiles,
+and `Tr × Tc = 4` tile-steps in total. Small enough to compute in your head,
+big enough that the max genuinely changes.
+
+```
+Q = [1 0 1 0]      K = [1 0 0 0]      V = [1 0 0 0]
+    [0 1 0 1]          [2 0 2 0]          [0 1 0 0]
+     2 × 4              2 × 4              2 × 4
+```
+
+**Standard attention** would start by building the full score matrix
+`S = QKᵀ` — the thing FlashAttention refuses to build. At this size it's 2×2:
+
+```
+S = [1  4]     ← query 0 scores key 0 at 1, key 1 at 4
+    [0  0]     ← query 1 scores both at 0 (a tie)
+```
+
+and the answer it produces, for reference:
+
+```
+O = [0.0474  0.9526  0  0]
+    [0.5000  0.5000  0  0]
+```
+
+Now the same thing FlashAttention's way, never forming `S`. The four steps are
+one per cell of that matrix:
+
+```
+              j=0        j=1
+           ┌─────────┬─────────┐
+    i=0    │ step 1  │ step 2  │   ← query tile 0
+           │  s = 1  │  s = 4  │
+           ├─────────┼─────────┤
+    i=1    │ step 3  │ step 4  │   ← query tile 1
+           │  s = 0  │  s = 0  │
+           └─────────┴─────────┘
+```
+
+In the FA-2 order (query tile outer, key tiles inner) you sweep row 0
+completely, then row 0's state is finished and discarded, then row 1. **The
+running state `(m, l, acc)` resets between query tiles** — rows never interact.
+
+#### Query tile i=0 — the max changes, history gets repaired
+
+```
+step (0,0):   s = 1    m~ = 1     m: -inf → 1
+              correction: none yet (first tile)
+              l   = 1.0000
+              acc = [1, 0, 0, 0]           ( = e⁰ · V[0] )
+
+step (0,1):   s = 4    m~ = 4     m:  1 → 4        ← THE MOMENT
+
+              correction = e^(1−4) = e^−3 = 0.0498
+                           everything computed so far is wrong by this factor
+
+              l   = 0.0498 · 1        +  1 · 1        = 1.0498
+              acc = 0.0498 · [1,0,0,0] + 1 · [0,1,0,0] = [0.0498, 1, 0, 0]
+                    └── history, shrunk ──┘  └─ new tile ─┘
+
+divide once, at the end:
+              out = acc / l = [0.0498, 1, 0, 0] / 1.0498
+                            = [0.0474, 0.9526, 0, 0]      ✓ matches O row 0
+```
+
+Query 0 puts **95%** of its attention on key 1, because 4 ≫ 1 — and it arrived
+at that without ever holding both scores at once.
+
+#### Query tile i=1 — the max never changes, history passes through
+
+```
+step (1,0):   s = 0    m~ = 0     m: -inf → 0
+              l   = 1.0000
+              acc = [1, 0, 0, 0]
+
+step (1,1):   s = 0    m~ = 0     m:  0 → 0        ← no change
+
+              correction = e^(0−0) = e⁰ = 1.0000    ← a no-op
+
+              l   = 1 · 1        +  1 · 1        = 2.0000
+              acc = 1 · [1,0,0,0] + 1 · [0,1,0,0] = [1, 1, 0, 0]
+
+              out = [1, 1, 0, 0] / 2 = [0.5, 0.5, 0, 0]   ✓ matches O row 1
+```
+
+Scores tie, so attention splits 50/50 — the ordinary case.
+
+#### What the two rows show together
+
+Put the corrections side by side:
+
+| query tile | old max | new max | correction | effect on history |
+|---|---|---|---|---|
+| i=0 | 1 | 4 | `e⁻³ = 0.0498` | crushed to 5% |
+| i=1 | 0 | 0 | `e⁰ = 1.0000` | untouched |
+
+**The rescale is not a special case — it runs on every step.** When the max
+doesn't move the correction is exactly `1`, and multiplying by 1 does nothing.
+When it does move, the same line of code repairs the entire history. There is no
+branch, no "did the max change?" test — which is why the kernel's inner loop has
+no conditionals in its update path.
+
+And notice what row 1 proves: it never *needed* repairing, but **you could not
+have known that in advance.** Knowing the max wouldn't move requires having seen
+every score first, which is precisely what tiling forbids. So you pay the
+multiply unconditionally. It costs one FLOP per element; the alternative is
+materializing `S`.
+
+Three things to carry out of this example:
+
+- **One scalar repairs an unbounded history** — the `x` cancelled, as derived
+  above. Row 0's two-element history was fixed by a single `0.0498`; a
+  million-element history would have been fixed by the same single number. That
+  is why history costs O(1) to carry rather than O(N), and it is the reason the
+  naive algorithm's `S` can simply cease to exist.
+- **Corrections only ever shrink.** `0.0498 < 1`, and `e^(m_old − m_new) ≤ 1`
+  always, because `m_new` is a max. Nothing is scaled up, so nothing can
+  overflow. The stability of the whole scheme is that one inequality.
+- **`S` never existed.** That 2×2 matrix above is what standard attention writes
+  to memory; here each entry was a scalar, computed, used, and discarded. Four
+  numbers at this size — 32 MiB at `N = 4096`.
+
 ??? question "Does it really come out to the same denominator as one-shot softmax?"
-    Run both on the same row and compare. Scores `[3, 1, 4, 1, 5, 2]`, tiles of
-    two; `l` is the running sum of `exp(score − m)`:
+    The worked example above checks the whole output; this checks just the
+    denominator `l`, on a longer row, in case you want to see it isolated.
+    Scores `[3, 1, 4, 1, 5, 2]`, tiles of two:
 
     ```
     tile 1:  m = 3            l = e⁰ + e⁻²                        = 1.1353
@@ -115,10 +311,9 @@ use everywhere.
     l = e⁻² + e⁻⁴ + e⁻¹ + e⁻⁴ + e⁰ + e⁻³ = 1.5896
     ```
 
-    Identical. And the accumulator rescales by exactly the same `e^(m_old − m_new)`
-    factor each step, so `acc / l` is the same weighted average the one-shot
-    would compute — that's *why* the answer is exact, and why the rescaling
-    steps are not optional decoration.
+    Identical, and the accumulator rescales by the same factor each step — which
+    is *why* the answer is exact, and why the rescaling is not optional
+    decoration.
     [Full answer](qa.md#why-does-a-running-max-softmax-recompute-the-exact-same-denominator)
 
 ??? question "How can two orderings of floating-point math both be 'exact'?"
