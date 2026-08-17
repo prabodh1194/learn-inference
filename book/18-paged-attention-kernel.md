@@ -223,9 +223,28 @@ like.
 
 ### Parallelizing over context
 
-With one query, a naive kernel launches one block and leaves the GPU nearly idle
-at small batch sizes. The standard fix is to **split the context across blocks**,
-each computing a partial (max, sum, accumulator), then combine:
+"Nearly idle" deserves a number, because it is the entire reason this section
+exists. The natural parallel unit for attention is one thread block per
+(sequence, head). At batch 1 with Qwen3-0.6B's 16 query heads, that is
+**16 thread blocks** — on a 3090 with **82 SMs**:
+
+```
+   work available :  1 sequence × 16 heads  =  16 thread blocks
+   machine has    :                            82 SMs
+
+   occupancy      :  16 / 82  ≈  20%      ← 66 SMs with nothing to do
+```
+
+Four fifths of the GPU is idle, and no amount of kernel tuning fixes it: there
+simply is not enough work to hand out. Prefill never has this problem (thousands
+of query tokens, so thousands of tiles), and neither does decode at large batch
+— it is specifically the low-batch decode case, which is exactly the latency-
+sensitive case you care about.
+
+The fix is to manufacture more parallel work by **splitting the context across
+blocks**, each computing a partial (max, sum, accumulator), then combining. Split
+a 2048-token context eight ways and the same batch-1 request now offers
+`16 × 8 = 128` blocks — more than the machine has SMs, so the GPU fills:
 
 ??? question "Wait: 'block' here is a thread block, not the KV block from Lecture 09?"
     Both words are in play, and they mean different things. The **KV block** is
@@ -238,13 +257,26 @@ each computing a partial (max, sum, accumulator), then combine:
     [Full answer](qa.md#wait-block-here-is-a-thread-block-not-the-kv-block-from-lecture-09)
 
 ```
-block 0: tokens    0-1023  -> (m_0, l_0, acc_0)
-block 1: tokens 1024-2047  -> (m_1, l_1, acc_1)
-                              ↓ combine with the same rescaling rule
-                          final output
+   the cached context, split across thread blocks
+
+   ┌──────────────────┬──────────────────┐
+   │ tokens    0-1023 │ tokens 1024-2047 │
+   └────────┬─────────┴─────────┬────────┘
+            │                   │
+        block 0             block 1          run independently,
+            │                   │            in parallel, on
+            ▼                   ▼            different SMs
+      (m_0, l_0, acc_0)   (m_1, l_1, acc_1)
+            │                   │
+            └─────────┬─────────┘
+                      ▼
+              rescale each by exp(m_i − m_global),
+              add, divide by the combined l
+                      ▼
+                 final output
 ```
 
-The combination uses the *identical* online-softmax merge from Lecture 17,
+The combination uses the *identical* online-softmax merge from Lecture 17:
 rescale each partial by `exp(m_i - m_global)`, sum, divide. Having built that
 already, this is a small step rather than a new idea. In words: each block ran
 softmax with its own local max `m_i`; the block with the largest max, `m_global`,
@@ -252,6 +284,35 @@ had it right, but the others used a max they later learned was too small, so
 their accumulators are inflated by `exp(m_i - m_global)`. Shrink each partial
 back to what a global max would have produced, add the pieces, divide by the
 corrected sum: one attention output, assembled from independent slices.
+
+**Check it on numbers**, the same way Lecture 17's worked example checks the
+tile merge. Four cached tokens, `d = 2`, one query, split into two blocks of
+two. Scores come out `[1, 3, 2, 0]`:
+
+```
+one-shot (what a single block would compute):
+   m = 3      l = 1.5530      out = [0.3881, 0.9449]
+
+split across two blocks, each with its own local max:
+   block 0   scores [1, 3]   m_0 = 3   l_0 = 1.1353   acc_0 = [0.1353, 1.0000]
+   block 1   scores [2, 0]   m_1 = 2   l_1 = 1.1353   acc_1 = [1.2707, 1.2707]
+
+merge:  m_global = max(3, 2) = 3
+
+   block 0 rescale:  exp(3 − 3) = 1.0000    ← it had the right max, untouched
+   block 1 rescale:  exp(2 − 3) = 0.3679    ← its max was too small, shrink it
+
+   l   = 1.0000·1.1353 + 0.3679·1.1353            = 1.5530     ✓
+   acc = 1.0000·[0.1353,1] + 0.3679·[1.2707,1.2707] = [0.6028, 1.4675]
+
+   out = acc / l = [0.3881, 0.9449]                            ✓ identical
+```
+
+Note the shape of it: **the block that happened to hold the largest score is
+left alone, and every other block is shrunk.** No block needs to know anything
+about the others while it runs — only its own `(m, l, acc)` — and the merge
+needs only those three numbers per block, not the scores that produced them.
+That is what makes the split embarrassingly parallel.
 
 This is what vLLM calls the "split-KV" or FlashDecoding path, and it's why decode
 attention scales down to batch 1 without wasting the GPU.
