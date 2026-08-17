@@ -168,7 +168,45 @@ cheaper than a memory round-trip.
 
 ### First, the algorithm on its own
 
-Before any Triton, here is the whole forward pass as the paper states it
+**Four symbols first**, because the paper's notation is terse and nothing below
+parses without it. Two are block *sizes* (how big a tile is), two are tile
+*counts* (how many tiles there are):
+
+```
+   B = Block size (how many rows/columns in one tile)
+   T = Tile count (how many tiles cover the sequence)
+
+   Br  rows per query tile            Tr = N / Br   number of query tiles
+   Bc  columns per key/value tile     Tc = N / Bc   number of key/value tiles
+```
+
+The `r`/`c` are **r**ows and **c**olumns *of the score matrix* `S`: queries
+index its rows, keys index its columns. So one tile of `S` is `Br × Bc`.
+
+At this lecture's numbers — `N = 4096`, tiles of 64:
+
+```
+   Br = 64   →   Tr = 4096 / 64 = 64 query tiles
+   Bc = 64   →   Tc = 4096 / 64 = 64 key/value tiles
+
+   the two loops together visit  Tr × Tc = 64 × 64 = 4,096 tile-steps,
+   each computing a 64 × 64 patch of the 4096 × 4096 score matrix
+```
+
+```
+        S is 4096 × 4096                one tile is Br × Bc = 64 × 64
+        ┌───┬───┬───┬─ ... ─┐
+        │   │   │   │       │  ← Tr = 64 tiles down  (query blocks, i)
+        ├───┼───┼───┼       │
+        │   │███│   │       │     ███ = the one tile alive right now
+        ├───┼───┼───┼       │           at step (i, j) — 8 KiB in SRAM
+        │   │   │   │       │
+        └───┴───┴───┴─ ... ─┘
+          ↑
+        Tc = 64 tiles across  (key/value blocks, j)
+```
+
+With that in hand, here is the whole forward pass as the paper states it
 (FlashAttention-1, Algorithm 1). No GPU vocabulary, just two loops and the
 running state — read this until it makes sense, and the kernel afterwards is
 only this with the loops rearranged:
@@ -296,8 +334,9 @@ possible — you do not need the old tiles, only their summary.
 One thing the tidy picture hides, and you should see it because it is the
 counter-intuitive half.
 
-Each query block streams the *entire* key sequence past itself. With `Tr = 64`
-query blocks, K and V get read from HBM 64 times over:
+Each query block streams the *entire* key sequence past itself. There are
+`Tr = 64` query blocks, so K and V get read from HBM 64 times over — once per
+query tile:
 
 ```
   standard attention:  4 touches of the 32 MiB S      = 128 MiB
@@ -415,11 +454,11 @@ state crosses memory once per K/V block. In FA-2 the query block is the outer
 loop, so `m`, `l`, and `acc` stay in **registers** for that block's entire walk
 across the keys, and `O[i]` is written exactly once at the end.
 
-Count the writes for one query block against `Tc` K/V blocks:
+Count the writes for one query block, which meets all `Tc = 64` K/V blocks:
 
 ```
-FA-1:  Tc loads + Tc stores of (O, l, m)
-FA-2:   1 store of O
+FA-1:  Tc loads + Tc stores of (O, l, m)   =  64 + 64  =  128 round-trips
+FA-2:   1 store of O                       =              1 write
 ```
 
 **Nothing in the math changed** — same online softmax, same corrections, same
