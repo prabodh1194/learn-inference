@@ -8,17 +8,17 @@
 
 ## The problem
 
-Lecture 09 bought you a large increase in concurrent sequences, and charged you
-for it. To see the charge, recall the memory layout it left you with. A
-sequence's K/V no longer sits in one contiguous strip; it is scattered in
-fixed-size **blocks**, and a **block table** (a short list, one per sequence
-in flight) records which physical block holds which chunk. That scattered layout
-is exactly what let you pack far more concurrent sequences into the same VRAM.
+You finished the last two lectures holding two techniques that contradict each
+other:
 
-The catch: attention, as Lecture 17 wrote it, expects K/V as one contiguous
-span. So every single decode step your engine has to undo the paging before
-attention can run. That undo is your PyTorch gather, the three lines that
-reassemble a sequence from its scattered blocks:
+```
+   Lecture 09  paged the KV cache into scattered blocks   →  ~14× more sequences
+   Lecture 17  wrote attention assuming ONE contiguous span →  O(N) traffic
+```
+
+Both are wins. Together they fight, because attention cannot read a block table.
+So every decode step your engine currently undoes the paging first — a gather
+that copies the scattered blocks back into one strip:
 
 ```python
 gathered = cache[blocks]                        # materialize every block
@@ -26,72 +26,39 @@ flat = gathered.reshape(-1, *cache.shape[2:])   # copy again
 return flat[:seq_len]                           # and trim
 ```
 
-Concretely it copies every K and V value out of its scattered block, glues them
-into one long strip, and hands that strip to attention. Draw it for a sequence
-of three blocks:
+`cache[blocks]` **materializes**: it copies every cached byte into a brand-new
+contiguous strip, attention reads that strip, and the strip is thrown away at
+the end of the step.
 
 ```
-  the sequence thinks it has        VRAM actually holds it like this
-  one run of 38 tokens              (scattered, in whatever blocks were free)
+   blocks 4, 1, 9  ──copy──►  [ chunk 0 │ chunk 1 │ chunk 2 ]  ──►  attention
+   (scattered in VRAM)         a temporary strip in HBM             reads it
 
-  ┌─────────┐ tokens  0..15         block 1  ┌─────────┐  chunk 1
-  │ chunk 0 │                                └─────────┘
-  ├─────────┤ tokens 16..31         block 4  ┌─────────┐  chunk 0
-  │ chunk 1 │                                └─────────┘
-  ├─────────┤ tokens 32..37         block 9  ┌─────────┐  chunk 2
-  │ chunk 2 │  (6 real, 10 unused)           └─────────┘
-  └─────────┘
-                    block table for this sequence:  [4, 1, 9]
-                    "my chunk 0 is in block 4,
-                     my chunk 1 is in block 1,
-                     my chunk 2 is in block 9"
-
-  the gather then does this, every step:
-
-      block 4 ──copy──┐
-      block 1 ──copy──┼──>  ┌───────────────────────────┐  a brand-new
-      block 9 ──copy──┘     │ chunk 0 │ chunk 1 │ chunk2│  contiguous strip
-                            └───────────────────────────┘  in HBM
-                                         │
-                                         └──> attention reads the strip
-
-  every K/V byte of the sequence: read out, written back, read again —
-  and the strip is thrown away at the end of the step
+   every K/V byte: read out, written back, read again — every step,
+   every sequence, and the strip is discarded immediately
 ```
 
-Read the block table as the sequence's own private map. Its *logical* order
-(chunk 0, 1, 2) is tidy and contiguous; the *physical* blocks it points at
-(4, 1, 9) are in no particular order and never need to be. That mismatch is
-what paging bought, and what the gather is paying to hide.
+That is exactly the **round-trip** Lecture 17 spent its entire effort
+eliminating, reintroduced by the allocator. Paging scattered the data to save
+memory; FlashAttention assumed contiguous data to save traffic.
 
-`cache[blocks]` **materializes**: it copies the bytes out of their scattered
-blocks into a brand-new contiguous strip. `reshape` and the slice handle that
-strip again. Attention then reads it once more. Every byte of the
-whole cached sequence is touched multiple times, every step, for every sequence
-in the batch, and the strip you built was only ever a staging area to throw
-away.
-
-That is the **round-trip** Lecture 17 spent all its effort eliminating: bytes
-go out to the big slow memory (**HBM**, the GPU's main RAM, the memory this
-lecture's on-chip SRAM scratchpad is ~20× faster than) and come back again. Paging
-scattered the data to save memory; FlashAttention assumed contiguous data to
-save traffic. You have both techniques now, working at cross purposes. That's
-the fight the lecture opener promised.
-
-The fix is to teach the kernel to read block tables directly, so the scatter
-never has to be undone.
+The fix is one idea: **teach the kernel to read the block table itself**, so the
+scatter never has to be undone.
 
 ---
 
 ## The idea
 
-Two words to settle first, because they name the same thing from two lectures.
-FlashAttention loads K/V **in tiles**: a chunk of the sequence, a few thousand
-tokens wide, that the kernel pulls into fast on-chip memory, works on, and
-never writes back (Lecture 17). Paging stores K/V **in blocks**: fixed-size
-chunks, 16 tokens by default, held in scattered locations (Lecture 09). A tile
-and a block are the same shape of thing, a chunk of K/V handled differently.
-That overlap is the whole trick of this lecture.
+Two words name the same thing from two lectures, and noticing that is the whole
+trick:
+
+```
+   tile   (L17)  a chunk of K/V the kernel LOADS at once     unit of compute
+   block  (L09)  a chunk of K/V the allocator OWNS, 16 tok   unit of storage
+```
+
+Both are "a run of K/V tokens" — one chosen by the kernel, one by the allocator.
+Line them up and the fight ends.
 
 > Make the tile loop iterate over *blocks via the block table* instead of over
 > contiguous positions.
