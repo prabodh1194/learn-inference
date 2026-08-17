@@ -124,6 +124,76 @@ for (int offset = 16; offset > 0; offset /= 2)
 Version 1 to version 3 is often several×. Every step is a memory-access or
 divergence insight, not an arithmetic one, which by now should sound familiar.
 
+**See the difference.** All three compute the same sum in the same number of
+steps — `log₂(n)` — and do the same number of additions. What differs is *which
+threads* do them. Take 8 values and watch who is active (`#`) and who is idle
+(`.`) at each step:
+
+```
+  VERSION 1 — stride doubling, active threads interleaved
+
+  values   v0   v1   v2   v3   v4   v5   v6   v7
+  s=1      #    .    #    .    #    .    #    .     threads 0,2,4,6
+           └─┬──┘    └─┬──┘    └─┬──┘    └─┬──┘
+  s=2      #    .    .    .    #    .    .    .     threads 0,4
+           └────┬────┘         └────┬────┘
+  s=4      #    .    .    .    .    .    .    .     thread 0
+           └─────────┬──────────────┘
+                   result
+
+  the active threads are SPREAD OUT, so every warp has some working
+  and some idle → the warp splits, both sides run (divergence)
+```
+
+```
+  VERSION 2 — halving, active threads packed to the left
+
+  values   v0   v1   v2   v3   v4   v5   v6   v7
+  s=4      #    #    #    #    .    .    .    .     threads 0-3
+           └────┴────┴────┴──── + v4..v7
+  s=2      #    #    .    .    .    .    .    .     threads 0-1
+           └────┴──── + v2,v3
+  s=1      #    .    .    .    .    .    .    .     thread 0
+           └──── + v1
+                   result
+
+  the active threads are CONTIGUOUS, so whole warps are either fully
+  active or fully idle → no divergence, and they hit distinct banks
+```
+
+Same additions, same step count. The only change is *packing the workers
+together* — and that alone removes both the divergence and the bank conflicts.
+
+```
+  VERSION 3 — once ≤32 values remain, they are one warp's registers
+
+  lanes    0    1    2   ...  31        all in the same warp, already in step
+  offset16 val += val from lane+16      no shared memory
+  offset 8 val += val from lane+8       no __syncthreads()
+  offset 4 ...                          register-to-register, via shuffle
+  offset 2 ...
+  offset 1 val in lane 0 = the sum
+```
+
+The last five steps stop touching memory entirely: a warp is already
+synchronized by construction, so the threads can hand values straight between
+their registers.
+
+Two things about that third snippet, since it is the one most likely to not
+compile for you:
+
+- **It is not the whole reduction.** It only handles the final 32 values. You
+  still need version 2's shared-memory loop to get from `blockDim.x` down to
+  32, then this takes over. A common shape is: loop with `s > 32`, then one
+  warp-shuffle tail.
+- **`__shfl_down_sync(0xffffffff, val, offset)` reads another thread's
+  register.** Lane `i` receives the `val` held by lane `i + offset`. The first
+  argument is a **mask** of which lanes participate — `0xffffffff` is all 32
+  bits set, i.e. "the whole warp is here". It exists because on modern GPUs
+  threads in a warp can be at different instructions, so the hardware needs to
+  be told which lanes to expect. And the loop starts at **16** because that is
+  half a warp: the first exchange folds 32 values into 16.
+
 Two words in those comments are jargon worth unpacking. **Bank conflicts**:
 shared memory is built from 32 parallel banks, one per lane; when two threads
 in a warp touch the same bank at once, the hardware serves them one at a time,
