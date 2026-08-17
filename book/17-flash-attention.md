@@ -67,9 +67,54 @@ FlashAttention (Dao et al., 2022) never materializes `S`. To materialize is to
 write the whole thing out to memory, and the previous section's problem exists
 only because standard attention insists on materializing both `S` and `P`.
 
+### First, rule out the obvious answer
+
+If you know GPUs, your first thought is: *matmuls are tiled all the time — this
+is basic.* And it is. Every GEMM (general matrix multiply) on every GPU splits
+`A @ B` into tiles, loads them into SRAM, and accumulates partial results. It
+has worked that way for decades.
+
+More than that, **tiling a matmul is trivially correct**, and it is worth being
+precise about why:
+
+```
+   out[i,j] = Σ_k  A[i,k] · B[k,j]         a sum over k
+
+   split k into chunks:
+   out[i,j] = ( Σ_{k∈chunk1} ... ) + ( Σ_{k∈chunk2} ) + ...
+```
+
+A sum **decomposes**. Compute the pieces in any order, add them up, and you have
+the exact answer — no fix-ups, no bookkeeping beyond a running total. This is why
+tiled matmul is a first exercise rather than a paper.
+
+So if attention were only two matmuls, there would be nothing to discuss: tile
+both, fuse them, done. Look at what actually sits between them:
+
+```
+   S = Q @ K.T        matmul      → tiles fine, sums decompose      ✓
+   P = softmax(S)     softmax     → NOT a sum. needs the whole row  ✗
+   O = P @ V          matmul      → tiles fine, sums decompose      ✓
+```
+
+**A sum decomposes. A *normalized* sum does not.** You cannot compute `x / Σ`
+for part of a row, because `Σ` isn't known until the row is finished. That one
+operation in the middle is a barrier: it refuses to be tiled, so the first
+matmul cannot hand its output directly to the second, so `S` must be written out
+in full and read back.
+
+That reframes the whole problem. The contribution is **not** "tile the matmuls" —
+that part was always easy. It is:
+
+> **Make softmax decompose too**, so the barrier disappears and the two matmuls
+> can finally fuse into one kernel.
+
+FlashAttention is a *fusion* result. The numerical trick below exists only to
+unblock the fusion, and the tiling was never the hard part.
+
 ### Why the naive version has no choice
 
-Start by seeing that standard attention is not stupid — it is *forced*.
+Standard attention is not stupid — it is *forced* by exactly that barrier.
 
 Softmax divides by `Σ exp(scores)`, a sum over the **whole row**. You cannot
 divide until every score exists. That single dependency dictates the three-phase
@@ -110,10 +155,23 @@ is wrong. Ask *how* wrong:
 **The `x` cancels.** The correction does not depend on the score being corrected
 — it is the *same scalar* for every element you have already processed.
 
-That is the property everything else rests on. If the correction depended on `x`,
-you would need every old score to apply it, you would have to keep them, and you
-would be back to storing `S` with nothing gained. Because it doesn't, you can
-throw every processed tile away and keep only a summary:
+**That is the barrier falling.** Recall the problem: a sum decomposes, a
+normalized sum doesn't. This makes it decompose after all — not by computing the
+denominator early, but by making a *stale* denominator cheap to update. Softmax
+joins the two matmuls as an operation you can run a piece at a time:
+
+```
+   matmul   :  add the pieces                        ← decomposes naturally
+   softmax  :  add the pieces, and rescale by e^Δm   ← decomposes with one fix-up
+```
+
+One extra scalar multiply per tile is the entire price of dissolving the barrier,
+and with it gone the three phases collapse into one kernel.
+
+If the correction depended on `x`, none of this would work: you would need every
+old score to apply it, you would have to keep them, and you would be back to
+storing `S` with nothing gained. Because it doesn't, you can throw every
+processed tile away and keep only a summary:
 
 ```
    m     the running max        1 number
