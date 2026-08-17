@@ -437,8 +437,8 @@ and its state stays in registers for the entire inner loop; put K outside and
 every query's state commutes to HBM and back on every step.
 
 At this size the difference is 2 writes versus 6. At `N = 4096` with 64 tiles it
-is 64 writes versus `64 × (64 + 64)` — and that gap, nothing else, is the
-FlashAttention-1 → FlashAttention-2 improvement.
+is 64 writes versus `64 × (64 + 64)` — and closing that gap is the headline
+change from FlashAttention-1 to FlashAttention-2.
 
 Now the four steps in detail, Q outside.
 
@@ -691,11 +691,30 @@ Every line now has a reason:
 | `S` never stored | it is consumed by the next instruction, so it needs no address |
 | divide once at the end | normalization can be deferred; only the ratio matters |
 
-The historical footnote: FlashAttention-1 chose **Option A**, and
-FlashAttention-2's main improvement was switching to **Option B**. Same math,
-same tiles, same online softmax — the entire gain was moving the running state
+The historical footnote: FlashAttention-1 (2022) chose **Option A**, and
+FlashAttention-2 (2023) switched to **Option B**. Same math, same tiles, same
+online softmax — a large part of the gain came from moving the running state
 from HBM into registers by swapping two loops. Both are shown below so you can
 see the difference concretely.
+
+To be accurate, the loop swap is FA-2's most *legible* change rather than its
+only one. Three others ride along with it, and they compound:
+
+- **Fewer non-matmul operations.** FA-1 rescales the output by `1/l_new` on
+  every tile; FA-2 accumulates unnormalized and divides once at the end. This
+  matters more than the FLOP count suggests, because tensor cores make matmul
+  enormously faster than everything else — so non-matmul work is
+  disproportionately expensive, and deleting it is disproportionately good.
+- **Parallelism over sequence length**, not just batch × heads. FA-1 assigned
+  one thread block per (batch, head), which leaves most of the GPU idle when the
+  batch is small — exactly the inference regime. FA-2 also splits along the
+  sequence, so a single long sequence can fill the machine.
+- **Better warp partitioning** inside a thread block, avoiding shared-memory
+  round-trips between warps that FA-1's split forced.
+
+The loop order is the one worth learning first, because the other three follow
+naturally from it: once a query block owns the outer loop, keeping its state in
+registers and deferring the division both become the obvious thing to do.
 
 ### First, the algorithm on its own
 
@@ -959,9 +978,10 @@ FA-2:   1 store of O                       =              1 write
 
 **Nothing in the math changed** — same online softmax, same corrections, same
 exact result. What changed is which tile stays resident, and therefore how many
-times the running state crosses HBM. That is the entire FA-1 → FA-2 improvement,
-and it is the same lesson as the rest of the lecture: the arithmetic was never
-the problem.
+times the running state crosses HBM. That is the largest single piece of the
+FA-1 → FA-2 improvement (the others are listed back in "Deriving the kernel's
+shape"), and it is the same lesson as the rest of the lecture: the arithmetic
+was never the problem.
 
 Your kernel is the FA-2 arrangement, which is what the official kernels use
 today.
@@ -1063,8 +1083,14 @@ exists is the point.
   merely better, but provably the least HBM traffic possible. That's rare in
   systems work, and it's why FlashAttention became the default rather than one
   option among several.
-- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)**: better work
-  partitioning; explains where your version's remaining gap comes from.
+- **[FlashAttention-2](https://arxiv.org/abs/2307.08691)** (Dao, 2023): the
+  paper behind the loop order your kernel uses. Worth reading *after* you have
+  written the kernel, because its four changes will then read as things you
+  either did or noticed you were missing: swapping the loops so the query block
+  owns the outer loop, cutting non-matmul operations (deferring the `1/l`
+  division), parallelizing over sequence length so small batches still fill the
+  GPU, and partitioning work across warps to avoid shared-memory round-trips.
+  The last two are also where your version's remaining gap will come from.
 - **[Online normalizer calculation for softmax](https://arxiv.org/abs/1805.02867)**
   (Milakov & Gimelshein): the running-max trick in isolation. Short and clear.
 - **Kiely §2.5** (p.67–70), FlashAttention and PagedAttention as the two
