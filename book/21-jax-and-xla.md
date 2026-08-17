@@ -64,6 +64,38 @@ after one operation writes it, it lets the write happen over the old contents
 instead of allocating fresh memory; you wrote "a new cache", the machine wrote
 in place. Purity is a contract you offer so the compiler can be aggressive.
 
+Picture the two levels, because "functional but mutating" sounds contradictory
+until you see where each is true:
+
+```
+   what you WROTE                    what the machine RUNS
+
+   cache ──► forward ──► cache'      ┌─────────────┐
+   (two distinct values)             │  one buffer │◄── written over
+                                     └─────────────┘    in place
+
+   no mutation anywhere              nothing else reads the old
+                                     contents, so overwriting is safe
+```
+
+**But there is a catch across `jit` boundaries, and it will cost you memory if
+you miss it.** Inside one compiled function XLA proves this for itself. Between
+calls it cannot: your Python still holds a reference to the old cache, so JAX
+must assume you might use it and allocates a fresh buffer for the new one. At
+Lecture 05's sizes that means carrying two copies of a multi-gigabyte cache.
+
+The fix is to *promise* you won't touch the old one:
+
+```python
+@partial(jax.jit, donate_argnums=(2,))     # argument 2 (cache) may be reused
+def decode_step(params, token, cache):
+    return forward(params, token, cache)
+```
+
+`donate_argnums` marks an argument as dead on arrival — JAX is then free to
+write the output over its buffer. Touch the donated value afterwards and you get
+a loud error rather than silent corruption, which is the right trade.
+
 The relevant consequence for you: a KV cache in JAX is a value threaded through
 the computation, not an object you append to. That's a genuinely different
 formulation of Lecture 05, and expressing it twice is clarifying.
@@ -94,23 +126,71 @@ Lecture 04 rule, again.
 
 ### `scan` for the decode loop
 
-A Python loop over 512 decode steps unrolls into 512 copies of the graph, each
-one compiled separately. Compilation takes forever. `lax.scan` expresses the loop *inside* the graph:
+Why a plain Python loop fails here is worth understanding, because it is the
+same trap as Lecture 13's.
+
+Tracing runs your Python **for real, once**, recording operations as it goes. So
+a `for` loop doesn't become a loop in the graph — it becomes 512 *copies* of the
+body, written out end to end:
+
+```
+   Python loop, traced          lax.scan, traced
+   ┌──────────────┐             ┌──────────────┐
+   │  step 1 ops  │             │   body ops   │◄─┐
+   ├──────────────┤             └──────┬───────┘  │  one copy,
+   │  step 2 ops  │                    └──────────┘  with a loop
+   ├──────────────┤                                  marker
+   │      ...     │  ×512
+   ├──────────────┤             graph size: 1 body
+   │ step 512 ops │             compile time: constant
+   └──────────────┘
+   graph size: 512 bodies
+   compile time: minutes
+```
+
+One enormous graph, compiled once but slowly — and the compile time grows with
+your token limit, which is absurd. `lax.scan` puts the loop *inside* the graph
+instead:
 
 ```python
 def decode_body(carry, _):
-    token, cache = carry
+    token, cache = carry                              # unpack the state
     logits, cache = forward(params, token, cache)
     next_token = jnp.argmax(logits[-1])
     return (next_token, cache), next_token
+#          └──── carry ─────┘  └── output ──┘
 
 (final_token, final_cache), tokens = jax.lax.scan(
-    decode_body, (first_token, cache), None, length=max_tokens
+    decode_body,             # the body
+    (first_token, cache),    # initial carry
+    None,                    # xs: no per-step INPUT (we generate, not consume)
+    length=max_tokens,       # ...so say how many steps explicitly
 )
 ```
 
-The **carry** is loop state, your token and KV cache. This is the same structure
-as your PyTorch decode loop, made explicit enough for a compiler to reason about.
+**The body returns two things, and the difference between them is the whole
+API.** The `carry` is threaded to the next step; the output is *stacked* into an
+array you get at the end:
+
+```
+              carry ────────► carry ────────► carry ────────► final_carry
+   init  ──►  (tok,cache)     (tok,cache)     (tok,cache)
+                  │               │               │
+                  ▼               ▼               ▼
+   outputs      tok_1           tok_2           tok_3     ──► stacked:
+                                                              tokens[3]
+```
+
+So `final_cache` is the KV cache after the last step, and `tokens` is every
+token generated, already assembled — you never append to a list.
+
+The `None` third argument is where per-step *inputs* would go, if you had any
+(`scan` over a batch of data, one row per step). Decode has none — each step's
+input is the previous step's output — so it's `None`, and `length` tells `scan`
+how many times to run.
+
+This is the same structure as your PyTorch decode loop, made explicit enough for
+a compiler to reason about.
 
 ### Read the HLO
 
@@ -137,14 +217,34 @@ compilation is actually doing.
    compiler walks it like one object, and a new set of weights is just a new
    value). Load the same weights you've been using.
 2. **Verify numerically against PyTorch** (`tests/test_21_jax.py`). Same weights,
-   same input, same logits within fp32 tolerance (JAX computes in fp32, so
-   agreement should be at fp32 rounding error). Do this before anything else;
-   a silent transcription bug in RoPE or attention will waste hours later.
+   same input, same logits. Do this before anything else; a silent transcription
+   bug in RoPE or attention will waste hours later.
+
+    Be deliberate about dtype, or this step will fail for reasons that have
+    nothing to do with your code. JAX defaults to fp32 for *its own literals and
+    dtype promotion*, but arrays loaded from fp16 weights stay fp16, and matmul
+    precision on GPU is a separate setting again
+    (`jax.default_matmul_precision`). Your PyTorch engine has been running
+    fp16. So either load both in the same dtype and compare tightly, or expect
+    fp16-level disagreement (~1e-2) and set your tolerance accordingly. A
+    mismatch here is usually dtype, not a bug in your attention.
 3. Implement `scan`-based decode with the KV cache as carry.
 4. Dump and read the HLO. Find one fusion XLA performed that PyTorch eager
    (its default mode, which runs each op immediately without compilation)
    wouldn't.
-5. Benchmark against your PyTorch engine, **after warmup**.
+5. Benchmark against your PyTorch engine, **after warmup** — and **block before
+   you stop the clock**. JAX dispatches asynchronously, exactly like CUDA
+   (Lecture 04): calling `decode_step(...)` returns as soon as the work is
+   *queued*, not when it is done. Time it without blocking and you will measure
+   dispatch, get an implausibly fast number, and believe it:
+
+    ```python
+    out = decode_step(params, token, cache)   # returns immediately
+    out[0].block_until_ready()                # THIS is where you stop the clock
+    ```
+
+    `block_until_ready()` is JAX's `torch.cuda.synchronize()`. The first call
+    also pays compilation, so warm up first, then measure.
 
 **Fair-comparison note:** don't read too much into the headline number. Your JAX
 version has no paging, no continuous batching, no prefix caching. It's a
