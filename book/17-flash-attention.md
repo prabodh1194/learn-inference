@@ -716,6 +716,48 @@ The loop order is the one worth learning first, because the other three follow
 naturally from it: once a query block owns the outer loop, keeping its state in
 registers and deferring the division both become the obvious thing to do.
 
+??? question "If the loop order is that obvious, why didn't FlashAttention-1 do it?"
+    It is obvious *from where you are standing* — forward-pass inference, on
+    2023-era hardware, with the answer already known. FA-1 was standing
+    somewhere else, and three things pushed it the other way.
+
+    **It was designed for training, where the backward pass dominates.** The
+    backward pass computes `dK` and `dV`, and those accumulate **over
+    queries**: `dV[j] = Σ_i P[i,j]·dO[i]`. So in the backward pass it is the
+    *K/V* block that owns a running accumulator and wants to stay resident
+    while queries stream past — the mirror image of the forward pass. FA-1 used
+    one loop order for both directions, and the backward pass's preference won.
+    Inference-only forward attention was not the target in 2022.
+
+    **The paper optimized a metric the loop order doesn't move.** FA-1's
+    contribution is an *asymptotic* result: `O(N²d²/M)` HBM accesses, and a
+    proof that this is optimal for a range of SRAM sizes `M`. Both loop orders
+    achieve that bound. The state round-tripping you counted is a **constant
+    factor**, and constant factors are invisible to the analysis the paper was
+    built around. By its own success criterion, FA-1 was not leaving anything
+    on the table.
+
+    **Register budgets were tighter.** Holding `(m, l, acc)` in registers for
+    an entire inner loop means keeping a `Br × d` accumulator resident per
+    thread block. That became comfortable with the larger register files and
+    better compiler support of A100/H100-era toolchains; it was a harder sell
+    earlier.
+
+    The general lesson is worth more than the history: **an asymptotic win and
+    a constant-factor win are found by different kinds of looking.** FA-1 came
+    from complexity analysis — count the HBM accesses, prove a bound. FA-2 came
+    from profiling — run it, notice the machine is idle at small batch, notice
+    the non-matmul instructions cost more than their FLOP count suggests. That
+    is Lecture 15's discipline, and it is why this book makes you measure before
+    you optimize rather than reason your way to the answer.
+
+    (Your matmul instinct is right, incidentally: in `A@B` the output indexes by
+    A's rows, so A-outer with B streaming is the natural output-stationary
+    shape. Attention's forward pass is `P@V` with `P` built from `Q` — so the
+    output indexes by queries, and queries-outer is the matching choice. The
+    backward pass is what breaks the symmetry.)
+    [Full answer](qa.md#if-the-loop-order-is-that-obvious-why-didnt-flashattention-1-do-it)
+
 ### The original, as the paper wrote it
 
 You now have the algorithm twice — as arithmetic in the toy example, and as a

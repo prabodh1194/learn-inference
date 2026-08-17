@@ -1739,3 +1739,74 @@ What *does* change:
   becomes ~56 KiB of SRAM working set, and flat in `N` rather than quadratic.
 
 Which is the whole trade: more arithmetic, fewer storage decisions.
+
+---
+
+## If the loop order is that obvious, why didn't FlashAttention-1 do it?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+**Wrong intuition:** "Putting the query block in the outer loop is the natural
+choice — it's the same shape as any output-stationary matmul. FA-1 must have
+just missed it."
+
+The instinct behind the question is correct. In `A @ B`, the output's rows are
+A's rows, so each output row needs one A-row against all of B — A-outer with B
+streaming is the standard output-stationary GEMM shape. Attention's forward pass
+produces one output row per *query*, so queries-outer is the matching choice.
+
+FA-1 chose otherwise for reasons that are sound from where it was standing.
+
+**1. It was built for training, and the backward pass wants the opposite.**
+
+The forward pass accumulates over keys, per query:
+
+```
+out[i] = Σ_j  p[i,j] · V[j]          ← accumulator indexed by i (query)
+```
+
+The backward pass accumulates over queries, per key:
+
+```
+dV[j] = Σ_i  P[i,j] · dO[i]          ← accumulator indexed by j (key)
+dK[j] = Σ_i  dS[i,j] · Q[i]
+```
+
+**The direction of accumulation is mirrored.** Whatever owns the running sum
+wants to be the outer loop and stay resident. Forward says queries; backward
+says keys. FA-1 used one loop order for both and let the backward pass decide,
+since training is dominated by it. Inference — forward only, no `dK`/`dV` — was
+simply not the design target in 2022.
+
+**2. The paper was optimizing a metric the loop order does not move.**
+
+FA-1's headline result is asymptotic: `O(N²d²/M)` HBM accesses for SRAM size
+`M`, together with a proof that no exact attention algorithm does better across
+a range of `M`. That is an unusually strong claim for systems work, and it is
+what made FlashAttention the default rather than one option among several.
+
+Both loop orders meet that bound. The running-state round-trips are a **constant
+factor** — real, worth 128 round-trips per query block against 1, but invisible
+to asymptotic analysis. By the paper's own success criterion, nothing was being
+left on the table.
+
+**3. Register budgets were tighter.**
+
+Keeping `(m, l, acc)` in registers for a full inner loop means holding a
+`Br × d` accumulator resident per block. Larger register files and better
+compiler support on A100/H100-era toolchains made that comfortable; it was a
+harder trade earlier.
+
+**The transferable lesson.** Asymptotic wins and constant-factor wins are found
+by different kinds of looking:
+
+| | how it was found | what it produced |
+|---|---|---|
+| FA-1 | complexity analysis — count HBM accesses, prove a bound | the algorithm, and proof it is IO-optimal |
+| FA-2 | profiling — run it, watch the machine idle at small batch | 2× on the same hardware, same math |
+
+FA-2's four changes (loop swap, fewer non-matmul ops, parallelism over sequence
+length, warp partitioning) are all things you find by *measuring a working
+implementation*, not by analyzing it on paper. That is Lecture 15's discipline,
+and it is the reason this book insists on a before/after number for every
+change: the second kind of win is invisible to the first kind of reasoning.
