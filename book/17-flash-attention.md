@@ -136,8 +136,73 @@ Stated in one sentence: **you are not avoiding the global sum — you are
 deferring the division, and deferral is affordable because the correction factor
 is identical for every element.**
 
+### Tiles, and the four symbols that name them
+
 The pieces you process are **tiles**: rectangular slices of a matrix, small
-enough to fit in the chip's on-chip memory.
+enough to fit in the chip's on-chip memory. Four symbols describe them, they
+appear in every FlashAttention paper and kernel, and nothing later in this
+lecture parses without them — so pin them down now.
+
+**Where tiles come from.** You have `N` queries and `N` keys. You cannot hold
+all of either on chip, so you cut both into chunks and process one pair of
+chunks at a time. Two independent cuts, so two block sizes:
+
+```
+   the queries, N of them            the keys/values, N of them
+   ┌────┬────┬────┬────┐             ┌────┬────┬────┬────┐
+   │    │    │    │    │             │    │    │    │    │
+   └────┴────┴────┴────┘             └────┴────┴────┴────┘
+     ↑                                 ↑
+     Br queries per chunk               Bc keys per chunk
+     ⇒ Tr = N/Br chunks total           ⇒ Tc = N/Bc chunks total
+```
+
+So the naming is mechanical once you see it:
+
+| symbol | reads as | means | at N=4096, tiles of 64 |
+|---|---|---|---|
+| `Br` | **B**lock size, **r**ows | how many **queries** in one tile | 64 |
+| `Bc` | **B**lock size, **c**olumns | how many **keys/values** in one tile | 64 |
+| `Tr` | **T**ile count, **r**ows | how many query tiles = `N / Br` | `4096/64` = 64 |
+| `Tc` | **T**ile count, **c**olumns | how many key tiles = `N / Bc` | `4096/64` = 64 |
+
+**Why rows and columns?** Because of the score matrix `S = QKᵀ`. Queries index
+its rows, keys index its columns:
+
+```
+                    keys  ──────────►  (columns, Bc, Tc)
+                 ┌───┬───┬───┬─ ... ─┐
+         q       │   │   │   │       │
+         u  │    ├───┼───┼───┼       │
+         e  │    │   │███│   │       │    ███ = one tile of S
+         r  ▼    ├───┼───┼───┼       │          Br × Bc = 64 × 64
+         i       │   │   │   │       │          8 KiB, alive in SRAM
+         e       └───┴───┴───┴─ ... ─┘          for a few instructions
+         s
+    (rows, Br, Tr)
+```
+
+One tile of `S` is `Br × Bc`. The two nested loops visit every tile —
+`Tr × Tc` = 64 × 64 = **4,096 tile-steps** — each computing a 64×64 patch of
+the 4096×4096 score matrix, and each discarding it immediately.
+
+**How the sizes get chosen.** Not arbitrarily: `Br` and `Bc` are picked so the
+working set fits in SRAM. Everything resident at once is
+
+```
+   Q tile   Br × d      K tile   Bc × d
+   V tile   Bc × d      S tile   Br × Bc
+```
+
+At `Br = Bc = 64`, `d = 128`, fp16 that comes to 56 KiB against a ~100 KB
+budget — worked out in full later in this lecture. Bigger tiles mean fewer
+steps but risk overflowing SRAM; smaller tiles always fit but launch more
+steps. **The block sizes are a fitting problem; the tile counts just fall out
+of them.**
+
+In the toy example above, `N = 2` with tiles of one token gives
+`Br = Bc = 1`, hence `Tr = Tc = 2` and `Tr × Tc = 4` tile-steps — the four
+steps you walked through by hand.
 
 ### Online softmax
 
@@ -361,47 +426,91 @@ cheaper than a memory round-trip.
 
 ## The structure
 
+### Deriving the kernel's shape
+
+Before reading the algorithm, derive it. The structure is not a design choice —
+almost every line is forced by a constraint you already know, and seeing that is
+the difference between memorizing the kernel and understanding it.
+
+**Constraint 1: a query's output needs every key.** `out[i] = Σ_j p[i,j]·V[j]`,
+summed over all `N` keys. So every query tile must meet every key tile: two
+nested loops, `Tr × Tc` steps. There is no way around this — it *is* attention.
+
+**Constraint 2: only ~100 KB fits on chip.** So you may hold one `Q` tile, one
+`K` tile, one `V` tile, and their scores. Not more. That fixes what a single
+step is allowed to touch.
+
+**Constraint 3: softmax needs the whole row — but you now know the repair.**
+From "The trick, exactly": keep `(m, l, acc)` and rescale by a scalar when the
+max moves. That's what makes a partial answer legitimate.
+
+Now ask the one design question the constraints *don't* settle: **which loop
+goes outside?**
+
+```
+   OPTION A — keys outside, queries inside          OPTION B — queries outside
+   for j in keys:                                   for i in queries:
+       for i in queries:                                for j in keys:
+
+   Every (i,j) pair is visited either way. The math is identical.
+   What differs is what has to be re-fetched.
+```
+
+Follow the running state, because that is what decides it. Each query tile owns
+its own `(m, l, acc)` — row 0's max has nothing to do with row 1's.
+
+```
+   OPTION A: the inner loop walks queries, so you touch a different query's
+             state every step. Query i's state must be parked in HBM between
+             its turns and fetched back each time.
+
+             ⇒ Tc loads + Tc stores of (O, l, m), per query tile
+
+   OPTION B: the inner loop walks keys, so one query's state is live for the
+             whole inner loop. It stays in registers and never leaves.
+
+             ⇒ 1 store of O, at the end
+```
+
+**Option B wins, for the same reason as everything else in this lecture: it
+moves less data.** And it produces the kernel's shape directly:
+
+```
+   for each query tile i:            ← outer: because its state must stay live
+       load Q[i]                     ← once; it is the fixed point
+       m, l, acc = -inf, 0, 0        ← in registers, not memory
+
+       for each key tile j:          ← inner: keys stream past
+           load K[j], V[j]           ← transient, discarded after use
+           S = Q[i] @ K[j].T         ← computed on chip, never stored
+           ...rescale and accumulate...
+
+       write out[i] = acc / l        ← one write, after the loop
+```
+
+Every line now has a reason:
+
+| line | forced by |
+|---|---|
+| two nested loops | every query needs every key (constraint 1) |
+| tiles, not full matrices | SRAM is ~100 KB (constraint 2) |
+| `m, l, acc` carried | softmax's repair needs exactly these (constraint 3) |
+| queries **outer** | keeps that state in registers, not HBM |
+| `S` never stored | it is consumed by the next instruction, so it needs no address |
+| divide once at the end | normalization can be deferred; only the ratio matters |
+
+The historical footnote: FlashAttention-1 chose **Option A**, and
+FlashAttention-2's main improvement was switching to **Option B**. Same math,
+same tiles, same online softmax — the entire gain was moving the running state
+from HBM into registers by swapping two loops. Both are shown below so you can
+see the difference concretely.
+
 ### First, the algorithm on its own
 
-**Four symbols first**, because the paper's notation is terse and nothing below
-parses without it. Two are block *sizes* (how big a tile is), two are tile
-*counts* (how many tiles there are):
-
-```
-   B = Block size (how many rows/columns in one tile)
-   T = Tile count (how many tiles cover the sequence)
-
-   Br  rows per query tile            Tr = N / Br   number of query tiles
-   Bc  columns per key/value tile     Tc = N / Bc   number of key/value tiles
-```
-
-The `r`/`c` are **r**ows and **c**olumns *of the score matrix* `S`: queries
-index its rows, keys index its columns. So one tile of `S` is `Br × Bc`.
-
-At this lecture's numbers — `N = 4096`, tiles of 64:
-
-```
-   Br = 64   →   Tr = 4096 / 64 = 64 query tiles
-   Bc = 64   →   Tc = 4096 / 64 = 64 key/value tiles
-
-   the two loops together visit  Tr × Tc = 64 × 64 = 4,096 tile-steps,
-   each computing a 64 × 64 patch of the 4096 × 4096 score matrix
-```
-
-```
-        S is 4096 × 4096                one tile is Br × Bc = 64 × 64
-        ┌───┬───┬───┬─ ... ─┐
-        │   │   │   │       │  ← Tr = 64 tiles down  (query blocks, i)
-        ├───┼───┼───┼       │
-        │   │███│   │       │     ███ = the one tile alive right now
-        ├───┼───┼───┼       │           at step (i, j) — 8 KiB in SRAM
-        │   │   │   │       │
-        └───┴───┴───┴─ ... ─┘
-          ↑
-        Tc = 64 tiles across  (key/value blocks, j)
-```
-
-With that in hand, here is the whole forward pass as the paper states it
+Recall the four symbols from "Tiles, and the four symbols that name them":
+`Br`/`Bc` are how many queries/keys sit in one tile, and `Tr = N/Br`,
+`Tc = N/Bc` are how many such tiles there are. Here is the whole forward pass
+as the paper states it
 (FlashAttention-1, Algorithm 1). No GPU vocabulary, just two loops and the
 running state — read this until it makes sense, and the kernel afterwards is
 only this with the loops rearranged:
