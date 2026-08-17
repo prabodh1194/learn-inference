@@ -262,6 +262,17 @@ The [field notes](field-notes.md) record an operator choosing a quant specifical
 because **3090s accelerate INT4 in hardware**. FP8 needs Ada/Hopper or newer; a
 3090 (Ampere) doesn't have it.
 
+Two caveats on that, because "accelerates INT4" is easy to over-read. Ampere's
+INT4 tensor-core path is real but was **deprecated in later architectures**, so
+it is a reason specific to that generation rather than a durable one. And the
+mainstream INT4 methods you are most likely to run — GPTQ and AWQ in the W4A16
+setting — do **not** use it: they store 4-bit weights and *dequantize to FP16*
+in the kernel, exactly as the opening of this lecture describes. Their win is
+the halved (then quartered) weight traffic, not an INT4 matmul.
+
+The operator's point survives both caveats, and it is the durable one: the
+format that is fastest for you is a property of the silicon in front of you.
+
 The same operator kept **linear attention layers at full precision** while
 quantizing the rest, because those layers quantize poorly. "Quantize the model"
 is rarely the actual operation; mixed precision across layer types is normal.
