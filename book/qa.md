@@ -1689,3 +1689,53 @@ whole walk, so there is no reason to normalize until the end.
 A useful check on your own implementation: if you accumulate unnormalized, `acc`
 should look *wrong* if you print it mid-loop — growing without bound as tiles
 are added. That's expected. Only `acc / l_i` is meaningful.
+
+---
+
+## If S is never materialized, why does the arithmetic not change?
+
+**Lecture:** [17. FlashAttention](17-flash-attention.md)
+
+**Wrong intuition:** "FlashAttention skips building the N×N score matrix, so it
+must be doing less work — some scores must not get computed."
+
+Every score gets computed. Every one. `S = QKᵀ` at `N = 4096` is 16,777,216 dot
+products, and FlashAttention performs all 16,777,216 of them, exactly like
+standard attention does. It performs *slightly more* arithmetic overall, because
+of the rescaling.
+
+What disappears is not computation — it is a **storage decision**.
+
+Standard attention is written as three matrix operations:
+
+```
+S = QKᵀ          →  a kernel that must produce a complete S
+P = softmax(S)   →  a kernel that must consume a complete S
+O = PV           →  a kernel that must consume a complete P
+```
+
+Each is a separate kernel, and kernels communicate through HBM. So `S` has to
+exist, in full, at an address, because the *next kernel* needs to find it there.
+The 32 MiB allocation is a consequence of the decomposition, not of the math.
+
+FlashAttention fuses all three into one kernel. Now the scores produced by
+`Q[i] @ K[j].T` are consumed by the very next instructions in the same kernel,
+while they are still in registers. There is no handoff, so there is no need for
+an address, so there is no allocation.
+
+The clean way to hold it: **`S` is an intermediate value, not a result.** In
+`a*b + c*d`, the products `a*b` and `c*d` are computed and consumed without ever
+being variables you could point at. `S` is the same, just larger — and it looked
+like a tensor only because the operation was split across three kernels that
+each needed it to be one.
+
+What *does* change:
+
+- **Order.** Additions happen tile-by-tile rather than row-at-once, so
+  floating-point rounding differs in the last bits (see the "how can two
+  orderings both be exact" entry).
+- **Arithmetic count.** Slightly *up*, from the per-tile rescaling.
+- **Traffic and peak memory.** Down enormously — 32 MiB of scratch per head
+  becomes ~56 KiB of SRAM working set, and flat in `N` rather than quadratic.
+
+Which is the whole trade: more arithmetic, fewer storage decisions.

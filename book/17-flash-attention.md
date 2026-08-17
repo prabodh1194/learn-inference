@@ -199,6 +199,135 @@ return O    # exact softmax(QK^T)V — the N×N matrix was never built
 **Two loops, and everything between the load and the store happens on chip.**
 That is the entire kernel.
 
+### See it: what is actually on the chip
+
+The algorithm above is a *description* of a movement. Here is the movement
+itself, because "on chip" and "never stored" are labels until you can see the
+sizes.
+
+Take the lecture's numbers: `N = 4096`, `d = 128`, fp16, and tiles of
+`Br = Bc = 64`. First, how big the objects really are:
+
+```
+   the full tensors, in HBM                     the score matrix
+   Q  [4096 × 128] = 1 MiB                      S  [4096 × 4096] = 32 MiB
+   K  [4096 × 128] = 1 MiB                      ↑
+   V  [4096 × 128] = 1 MiB                      32× larger than the inputs
+   ──────────────────────                       that produced it
+   3 MiB of actual data
+```
+
+**That ratio is the whole problem.** Three megabytes of real input generates a
+thirty-two megabyte intermediate, which is then thrown away. Standard attention
+sends that 32 MiB across the memory bus four times (write S, read S, write P,
+read P) = **128 MiB of traffic to compute one head**.
+
+Now the chip. One SM's scratchpad holds ~100 KB. Here is what is resident during
+one `(i, j)` step, drawn to scale against that budget:
+
+```
+  ┌─────────────────────── SRAM, ~100 KB ────────────────────────┐
+  │                                                              │
+  │   Q tile [64×128]  ████████████████  16 KiB   ← stays put    │
+  │   K tile [64×128]  ████████████████  16 KiB   ← streams by   │
+  │   V tile [64×128]  ████████████████  16 KiB   ← streams by   │
+  │   S tile [64× 64]  ████████           8 KiB   ← born & dies  │
+  │   m, l  [64]       ▏                 <1 KiB   ← the memory   │
+  │                                                              │
+  │   working set = 56 KiB          fits, with room to spare     │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+**Everything the kernel needs at any instant is 56 KiB.** Not 32 MiB. The score
+matrix does exist — but only `64 × 64` of it at a time, 8 KiB, living for a few
+instructions inside that box and then overwritten by the next tile's scores.
+
+Now the movement. Fix one query block and watch the keys stream past it:
+
+```
+   SRAM (stays resident)          HBM (streams through)
+   ┌──────────────┐
+   │ Q[i]  16 KiB │ ◄──────────── loaded once
+   ├──────────────┤
+   │ m, l, acc    │      j=0   ◄── K[0],V[0]  32 KiB  ─┐
+   │  (registers) │      j=1   ◄── K[1],V[1]  32 KiB   │  64 blocks
+   │              │      j=2   ◄── K[2],V[2]  32 KiB   │  march past
+   │  updated     │       .                            │
+   │  64 times,   │       .                            │
+   │  never       │      j=63  ◄── K[63],V[63] 32 KiB ─┘
+   │  leaves      │
+   └──────┬───────┘
+          └──────────────► O[i]  16 KiB  written ONCE, at the end
+```
+
+Read that picture and the question answers itself. **Where did the 128 MiB go?
+It was never traffic — it was a matrix that only ever existed as a 8 KiB tile.**
+The bytes that used to cross the bus were the *scratch space*, and scratch space
+that never leaves the chip costs nothing to move.
+
+Three things are worth naming precisely, because this is where most explanations
+blur:
+
+- **`Q[i]` is resident.** Loaded once per query block, then it sits there while
+  the entire key sequence flows past it. It is the fixed point.
+- **`K[j]`, `V[j]` are transient.** Each arrives, gets used for one tile of
+  scores, and is discarded. They are the conveyor belt.
+- **`S` is neither.** It is not loaded and not stored — it is *computed* inside
+  SRAM from two things already there, consumed immediately, and overwritten.
+  It has no address in HBM. Asking where S is kept is like asking where the
+  sum is kept while you add a column of numbers in your head.
+
+And `m`, `l`, `acc` are the fourth thing: the *memory* of everything already
+seen, compressed to a few numbers per row. That is what makes the streaming
+possible — you do not need the old tiles, only their summary.
+
+??? question "If S is never materialized, why does the arithmetic not change?"
+    Because materializing was never part of the math — it was an artifact of
+    writing attention as three separate matrix operations, each of which had to
+    hand its result to the next through memory. Every multiply and every
+    addition in `softmax(QKᵀ)V` still happens, in the same quantity; they just
+    happen in a different order, on a tile at a time, with the intermediate
+    values living in registers instead of HBM. You removed a *storage decision*,
+    not a computation.
+    [Full answer](qa.md#if-s-is-never-materialized-why-does-the-arithmetic-not-change)
+
+#### The honest part: FA-2 re-reads K and V
+
+One thing the tidy picture hides, and you should see it because it is the
+counter-intuitive half.
+
+Each query block streams the *entire* key sequence past itself. With `Tr = 64`
+query blocks, K and V get read from HBM 64 times over:
+
+```
+  standard attention:  4 touches of the 32 MiB S      = 128 MiB
+  FlashAttention-2  :  K,V re-read once per q-block
+                       = 64 × 2 MiB (K+V)  +  Q 1 MiB  +  O 1 MiB
+                       = 130 MiB
+```
+
+At `N = 4096` with these tile sizes, the traffic is **about the same**. So why
+is it faster?
+
+Because those are not equivalent megabytes. The 128 MiB of standard attention is
+a *dependency chain*: write S, then read it back, then write P, then read it
+back — each step waiting on the last, with a 32 MiB allocation that must exist
+before the next kernel starts. The 130 MiB of FlashAttention is a **stream** of
+independent 32 KiB tile loads that the memory system pipelines and the L2 cache
+frequently serves without touching HBM at all (K and V are only 1 MiB each — they
+fit in the 6 MB L2, so the 64 re-reads mostly hit cache, not DRAM).
+
+And the peak memory tells the real story:
+
+```
+  standard      :  32 MiB allocated for S, per head, growing as N²
+  FlashAttention:  56 KiB of SRAM,        per SM,   flat in N
+```
+
+That is why the speedup grows with `N` (the `N²` allocation stops existing) and
+why the memory saving matters more than the time saving. At `N = 8192` standard
+attention needs 128 MiB of scratch per head; FlashAttention still needs 56 KiB.
+
 Read the update line by line, because each piece is doing one job:
 
 - **`S = Q[i] @ K[j].T`** — the only place scores exist. `[Br × Bc]`, a *tile*
