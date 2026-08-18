@@ -160,34 +160,65 @@ Splitting along `j` is free because the columns never interact. Splitting along
 The elegance of the MLP is that its two matmuls can be split on complementary
 axes, so you pay the `k`-axis cost exactly once, at the very end:
 
-```mermaid
-graph LR
-    X["x&nbsp;(1×1024)<br/>replicated"] --> G0C["GPU 0<br/>W1[:, 0:1536]"]
-    X --> G1C["GPU 1<br/>W1[:, 1536:3072]"]
+### Work it by hand: d = 2, two GPUs
 
-    G0C --> H0["h₀ (1×1536)<br/>+ SiLU, local"]
-    G1C --> H1["h₁ (1×1536)<br/>+ SiLU, local"]
+Before the real shapes, do one all the way through on numbers you can check.
+Hidden size `d = 2`, intermediate `d_ff = 4`, ReLU instead of SiLU, two GPUs.
 
-    H0 --> G0R["GPU 0<br/>W2[0:1536, :]"]
-    H1 --> G1R["GPU 1<br/>W2[1536:3072, :]"]
-
-    G0R --> P0["out₀ (1×1024)<br/>PARTIAL"]
-    G1R --> P1["out₁ (1×1024)<br/>PARTIAL"]
-
-    P0 --> AR{{"all-reduce<br/>out₀ + out₁"}}
-    P1 --> AR
-    AR --> OUT["out (1×1024)<br/>complete"]
-
-    classDef free fill:#e8f5e9,stroke:#4caf50
-    classDef part fill:#fff3e0,stroke:#ff9800
-    classDef comm fill:#ffebee,stroke:#e53935
-    class G0C,G1C,H0,H1,G0R,G1R free
-    class P0,P1 part
-    class AR comm
+```
+x  = [1  2]                W1 = [ 1  0   2  -1 ]      W2 = [ 1   0 ]
+                                [ 0  1  -2   3 ]           [ 0   1 ]
+                                                           [ 1   1 ]
+                                                           [ 2  -1 ]
 ```
 
-Green is free — no GPU needs anything from the other. Orange is where each GPU
-holds only half the answer. Red is the single collective, at the very end.
+**One GPU, for reference:**
+
+```
+h      = x @ W1  = [1  2  -2  5]
+act(h) = relu(h) = [1  2   0  5]        the -2 is clipped
+out    = act(h) @ W2 = [11  -3]
+```
+
+**Now split `d_ff = 4` down the middle.** GPU 0 takes columns 0–1 of `W1` and
+rows 0–1 of `W2`; GPU 1 takes columns 2–3 and rows 2–3.
+
+```
+                    GPU 0                          GPU 1
+
+W1 slice      [ 1  0 ]                        [  2  -1 ]
+              [ 0  1 ]                        [ -2   3 ]
+
+h  = x @ W1s   [1  2]                          [-2  5]
+act(h)         [1  2]                          [ 0  5]     ← relu, locally
+                                                             no neighbour needed
+
+W2 slice      [ 1  0 ]                        [ 1   1 ]
+              [ 0  1 ]                        [ 2  -1 ]
+
+partial       [1  2]                          [10  -5]
+```
+
+Neither partial is the answer — each is full width `(1×2)` but contains only
+its own half of the sum. Add them:
+
+```
+   [ 1   2 ]  +  [ 10  -5 ]  =  [ 11  -3 ]      ✓ matches the single-GPU result
+   └ GPU 0 ┘     └  GPU 1 ┘        └ exact, not approximate ┘
+```
+
+Three things to take from the numbers:
+
+- **`x` was replicated.** Both GPUs read the same `[1 2]`; nothing was sent to
+  make that happen (it arrived from the previous layer's all-reduce).
+- **The activation ran on a half.** GPU 1 clipped its `-2` without ever seeing
+  GPU 0's values, because ReLU looks at one element at a time.
+- **The partials are full-width, not half-width.** This surprises people: GPU 0
+  produces `[1 2]`, a complete-shaped output that is simply *wrong* until GPU 1's
+  contribution is added. That is what "partial sum" means, and it is why the
+  combine is an **add**, not a concatenate.
+
+---
 
 Draw it with real shapes so the arithmetic is visible. An MLP block is *not*
 two square matrices — it widens, then narrows. For Qwen3-0.6B the hidden size
@@ -247,22 +278,7 @@ A real MLP applies a nonlinearity between the two matmuls; Qwen3 uses SiLU.
 
     Identical operation, mirrored notation. **This lecture uses the code
     convention** — `x @ W1` — because that is what you will type and what the
-    shapes below assume.
-
-So the block runs: widen, activate, narrow.
-
-```
-   x  (1×1024)
-     │  @ W1  (1024×3072)
-     ▼
-   h  (1×3072)          ← "the middle", the wide one
-     │  act(·)          ← elementwise, shape unchanged
-     ▼
-   act(h)  (1×3072)
-     │  @ W2  (3072×1024)
-     ▼
-   out (1×1024)
-```
+    shapes above assume.
 
 If the
 activation needed the *whole* hidden state, the split would break here and you'd
@@ -298,20 +314,9 @@ GPU 1:  act(h_1) (1×1536)  ×  W2[1536:3072, :]   ->  out_1 (1×1024)  partial 
                               out = out_0 + out_1    (1×1024)
 ```
 
-Why summing partials is exactly right: a matrix product is a sum over the shared
-inner dimension, and splitting that dimension splits the sum into two groups of
-terms. Writing out one output element `j`:
-
-```
-full:    out[j]  =  Σ over k = 0..3071   act(h)[k] · W2[k, j]
-
-split:   out_0[j] = Σ over k = 0..1535   act(h)[k] · W2[k, j]
-         out_1[j] = Σ over k = 1536..3071 act(h)[k] · W2[k, j]
-
-         out_0[j] + out_1[j] = Σ over k = 0..3071  =  out[j]   ✓
-```
-
-Every term appears exactly once, in exactly one group. So `out_0 + out_1` equals
+This is the `k`-axis split from the start of the section, now with real widths:
+`Σ_k` runs over 0..3071, GPU 0 owns the terms for k = 0..1535 and GPU 1 the rest.
+Every term appears exactly once, in exactly one group, so `out_0 + out_1` equals
 the full result **algebraically exactly** — the all-reduce is correct, not an
 approximation. And that is why a column-then-row pair needs only *one*
 all-reduce: the two matmuls hand the split to each other directly, the
