@@ -218,6 +218,21 @@ matmul:
                      880 MB, resident
 ```
 
+Concretely, in one transformer block, everything not labelled `W` is an
+activation:
+
+```
+   x ──►[W_qkv]──► Q,K,V ──►[attention]──► ctx ──►[W_o]──► h ──►[W1]──► ...
+   ▲       ▲         ▲                      ▲       ▲       ▲     ▲
+   │       │         │                      │       │       │     │
+   act   WEIGHT     act                    act   WEIGHT    act  WEIGHT
+```
+
+So Q, K and V are activations — the ones you meet most often — but so are the
+block input, the attention output, the MLP's intermediate `h` (Lecture 22's
+"middle"), and every residual sum. The weights are only `W_qkv`, `W_o`, `W1`,
+`W2`.
+
 The consequences are what matter:
 
 ```
@@ -247,10 +262,55 @@ directly, and activations stay accurate. Dequantization happens in-kernel.
 
 **Weight + activation (W8A8)**: both quantized, so the matmul itself runs on
 INT8 tensor cores (the chip's specialist matrix-multiply hardware) instead of
-dequantizing back to FP16 first. Faster in principle — and much harder, for the
-reason above: activation ranges are only known at runtime, and they contain
-outliers that a per-tensor scale cannot absorb. This is what SmoothQuant below
-exists to fix.
+dequantizing back to FP16 first.
+
+*Quantizing an activation* uses the identical formula — there is no new
+mathematics:
+
+```
+   weights      w_int8 = round(w / scale_w) + zp_w      scale from the checkpoint
+   activations  x_int8 = round(x / scale_x) + zp_x      scale from ... where?
+```
+
+That last question is the entire difficulty. A weight tensor exists on disk, so
+you read its min and max once and bake the scale in forever. An activation does
+not exist until the token arrives, so you must either measure it or guess it:
+
+```
+   DYNAMIC   compute min/max of x at runtime, per token
+             ✓ always correct for the data you actually got
+             ✗ a full reduction over x before every matmul, on the hot path
+
+   STATIC    run calibration data offline, record the ranges seen, freeze them
+             ✓ free at runtime — the scale is just a constant
+             ✗ wrong the moment a real input exceeds what calibration saw
+```
+
+Then the second problem, which is what makes W8A8 genuinely hard rather than
+merely awkward. Activations have **outlier channels**: a few dimensions whose
+values run 10–100× larger than the rest, consistently, in the same places across
+tokens.
+
+```
+   a typical activation row, by channel
+
+   ▁▁▂▁▁▂▁▁█▁▁▁▂▁▁▁▁▁▂▁▁█▁▁▁▁▂▁▁▁    ← two channels dominate the range
+            ↑          ↑
+   scale must cover THESE, so every other channel is quantized on a grid
+   sized for values it never reaches — the same range-crushing you saw with
+   per-tensor weights, but far more extreme
+```
+
+Per-channel scaling fixed this for weights, but it cannot here: the reduction in
+a matmul runs *along* the activation's channel dimension, so a per-channel
+activation scale would not factor out of the sum. You are stuck with one scale
+per row.
+
+**SmoothQuant's** answer, below, is to move the problem: scale the outlier
+channels *down* in the activation and multiply the corresponding weight rows
+*up* by the same factor. The product is unchanged, but the difficulty has been
+shifted from the tensor that cannot take per-channel scales to the one that
+can.
 
 **KV cache quantization**: a different axis entirely. From Lecture 05 the cache can
 exceed the model's size; from Lecture 09 its capacity caps your batch size.
