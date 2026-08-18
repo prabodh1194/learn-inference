@@ -33,30 +33,61 @@ miss.
 
 ## The idea
 
-Three ways to split a model:
+You have a model too big for one GPU, or one that fits but decodes too slowly.
+Either way you now have several GPUs and one question: **what do you cut, and
+where?**
 
-| | Splits | Cost | Use |
-|---|---|---|---|
-| **Pipeline (PP)** | layers across GPUs | training: bubbles; inference: latency-neutral, can't shard KV | multi-node, low bandwidth |
-| **Tensor (TP)** | tensors *within* each layer | all-reduce every layer | **default within a node** |
-| **Expert (EP)** | MoE experts across GPUs | token routing (each token sent to the GPU holding its chosen expert) | MoE throughput (L23) |
+A transformer gives you three natural seams, and they are genuinely different
+decisions rather than three flavours of the same one:
 
-Two phrases to unpack. "Bubbles" are idle stretches: in a pipeline, a layer
-finishes its batch and then waits for work from the layer behind it, and the
-waiting is time the GPUs are paid for and not working. An **all-reduce** is a
-collective (Lecture 21's cooperative operations), specifically a group sum:
-every GPU contributes its partial result, and every GPU ends with the total. It
-is the plumbing of TP, and most of what "TP is expensive" means.
+```
+   the model                  cut it...
 
-A phase caveat on the PP row. Bubbles are a *training* problem: there, each
-micro-batch must wait for the one ahead of it, and stages idle. In *inference*
-the stages fill back-to-back, so PP is roughly latency-neutral — the real reason
-inference avoids it is that PP **can't shard the KV cache** (the in-flight
-sequences rise with the number of stages, cancelling the weight-memory win) plus
-a per-hop latency that compounds across racks. At most 1–2 stages, if at all.
+   ┌───────────┐   layer 1     ─── horizontally ───►  PIPELINE (PP)
+   ├───────────┤   layer 2                            GPU 0 gets layers 1-14
+   ├───────────┤   ...                                GPU 1 gets layers 15-28
+   ├───────────┤   layer 28
+   └───────────┘
 
-TP is the default for single-node inference because every GPU works on *every*
-token, no pipeline bubbles, and latency genuinely drops.
+   ┌─────┬─────┐               ─── vertically ─────►  TENSOR (TP)
+   │  W  │  W  │   every layer                        every GPU holds a SLICE
+   │ half│ half│                                     of every layer
+   └─────┴─────┘
+
+   ┌───┬───┬───┐               ─── by expert ──────►  EXPERT (EP)
+   │ e │ e │ e │   MoE only                           each GPU owns whole
+   └───┴───┴───┘                                      experts (Lecture 23)
+```
+
+**This lecture is about the vertical cut.** Here is why, in one line each:
+
+- **Pipeline** splits by layer. Cheap to communicate — one activation handoff
+  per stage boundary — but each GPU only works on part of the model, so a token
+  still walks through all of them in sequence. It does not make a single token
+  faster.
+- **Tensor** splits *inside* every layer, so all GPUs work on every token at
+  once. That is what actually reduces per-token latency — and it is why this is
+  the default within a machine.
+- **Expert** applies only to mixture-of-experts models, and is Lecture 23.
+
+The price of the vertical cut is that a slice of a layer produces a *partial*
+answer. The GPUs must combine their partials before the next layer can start,
+which they do with an **all-reduce**: every GPU contributes its piece, every GPU
+receives the total. That collective, once or twice per layer, is essentially the
+entire cost of TP — and most of the rest of this lecture is about how expensive
+it gets.
+
+??? note "Why not pipeline parallelism for inference?"
+    The usual objection to PP is *bubbles* — idle stretches where a stage waits
+    for work from the stage behind it. That is a **training** problem: there,
+    micro-batches queue behind each other and stages sit idle. In inference the
+    stages fill back-to-back, so PP is roughly latency-neutral.
+
+    The real reasons inference avoids it are different. PP **cannot shard the KV
+    cache**: each stage needs the cache for its own layers, and the number of
+    in-flight sequences rises with the number of stages, which cancels the
+    weight-memory win you bought. And each stage boundary adds a hop of latency
+    that compounds across machines. In practice: at most 1–2 stages, if any.
 
 ### How the split works
 
