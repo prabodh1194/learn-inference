@@ -51,8 +51,28 @@ scatter never has to be undone.
 
 **Change the addressing. Change nothing else.**
 
-That is the entire lecture, so start with it. Attention reads K/V somewhere in
-its inner loop. Today that read assumes one contiguous span:
+If you have written systems code, this will read as obvious: it is indirection
+through a lookup table, the same move as a page table, a symlink, or a foreign
+key. Good — the core substitution *is* that ordinary, and you should not be
+impressed by it. Say it plainly, then spend the rest of the lecture on the three
+places where the obvious move stops being obvious:
+
+```
+   1. a tile spans several blocks, at unrelated addresses
+      → "one load" becomes a gather you assemble on chip
+
+   2. the tile size L17 chose no longer fits in SRAM
+      → the block size and the tile size constrain each other
+
+   3. at batch 1 the GPU is ~80% idle regardless of addressing
+      → split-KV, which is NOT an addressing change at all
+```
+
+Item 3 is the one that actually changes the algorithm. Items 1 and 2 are where
+implementations get quietly wrong. The substitution below is just the setup.
+
+Attention reads K/V somewhere in its inner loop. Today that read assumes one
+contiguous span:
 
 ```python
 # FlashAttention: where does the next chunk live? Compute it.
@@ -212,10 +232,16 @@ Bandwidth here means bytes per second memory can hand over; on a
 memory-bound kernel, achieved bandwidth close to peak is what "done" looks
 like.
 
-### Parallelizing over context
+### Split-KV: the part that is not just addressing
 
-One query row per sequence is not much work, and at small batch that becomes a
-problem in its own right: **the GPU runs out of things to do.**
+Everything so far has been bookkeeping — the same attention, reading from
+different addresses. This section is different. It changes *how the work is
+divided*, and it needs a merge step that has no counterpart in Lecture 17's
+kernel. If you take one algorithmic idea from this lecture, take this one.
+
+The motivation is that one query row per sequence is not much work, and at small
+batch that becomes a problem in its own right: **the GPU runs out of things to
+do.**
 
 Put a number on it. The natural parallel unit for attention is one thread block
 per (sequence, head). At batch 1 with Qwen3-0.6B's 16 query heads, that is
