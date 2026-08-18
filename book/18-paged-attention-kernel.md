@@ -6,335 +6,147 @@
 
 ---
 
+
 ## The problem
 
-You finished the last two lectures holding two techniques that contradict each
-other:
-
-```
-   Lecture 09  paged the KV cache into scattered blocks   →  ~14× more sequences
-   Lecture 17  wrote attention assuming ONE contiguous span →  O(N) traffic
-```
-
-Both are wins. Together they fight, because attention cannot read a block table.
-So every decode step your engine currently undoes the paging first — a gather
-that copies the scattered blocks back into one strip:
+Lecture 09 scattered the KV cache into blocks. Lecture 17 wrote attention
+assuming one contiguous span. Both are wins; together they fight, so your engine
+currently reconciles them the expensive way — it un-scatters the cache before
+every attention call:
 
 ```python
-gathered = cache[blocks]                        # materialize every block
+gathered = cache[blocks]                        # copy every block
 flat = gathered.reshape(-1, *cache.shape[2:])   # copy again
-return flat[:seq_len]                           # and trim
+return flat[:seq_len]
 ```
 
-`cache[blocks]` **materializes**: it copies every cached byte into a brand-new
-contiguous strip, attention reads that strip, and the strip is thrown away at
-the end of the step.
-
-```
-   blocks 4, 1, 9  ──copy──►  [ chunk 0 │ chunk 1 │ chunk 2 ]  ──►  attention
-   (scattered in VRAM)         a temporary strip in HBM             reads it
-
-   every K/V byte: read out, written back, read again — every step,
-   every sequence, and the strip is discarded immediately
-```
-
-That is exactly the **round-trip** Lecture 17 spent its entire effort
-eliminating, reintroduced by the allocator. Paging scattered the data to save
-memory; FlashAttention assumed contiguous data to save traffic.
-
-The fix is one idea: **teach the kernel to read the block table itself**, so the
-scatter never has to be undone.
+That copies every cached byte into a temporary strip, reads it once, and throws
+it away — reintroducing exactly the HBM round-trip Lecture 17 existed to remove.
 
 ---
 
 ## The idea
 
-**Change the addressing. Change nothing else.**
-
-If you have written systems code, this will read as obvious: it is indirection
-through a lookup table, the same move as a page table, a symlink, or a foreign
-key. Good — the core substitution *is* that ordinary, and you should not be
-impressed by it. Say it plainly, then spend the rest of the lecture on the three
-places where the obvious move stops being obvious:
-
-```
-   1. a tile spans several blocks, at unrelated addresses
-      → "one load" becomes a gather you assemble on chip
-
-   2. the tile size L17 chose no longer fits in SRAM
-      → the block size and the tile size constrain each other
-
-   3. at batch 1 the GPU is ~80% idle regardless of addressing
-      → split-KV, which is NOT an addressing change at all
-```
-
-Item 3 is the one that actually changes the algorithm. Items 1 and 2 are where
-implementations get quietly wrong. The substitution below is just the setup.
-
-Attention reads K/V somewhere in its inner loop. Today that read assumes one
-contiguous span:
+Teach the kernel to read the block table itself. The read changes from address
+arithmetic to a table lookup:
 
 ```python
-# FlashAttention: where does the next chunk live? Compute it.
-k = tl.load(K + start_n * stride + offsets)          # address by arithmetic
-```
+# before: the next chunk is where arithmetic says it is
+k = tl.load(K + start_n * stride + offsets)
 
-Replace it with a read that asks the block table first:
-
-```python
-# PagedAttention: where does the next chunk live? Look it up.
-block_id = tl.load(block_table_ptr + block_idx)      # 4-byte index
+# after: ask where it lives, then read there
+block_id = tl.load(block_table_ptr + block_idx)
 k = tl.load(K_cache + block_id * block_stride + offsets)
 ```
 
-**Arithmetic becomes lookup.** Same online softmax, same running max, same
-accumulator, same rescaling — the algorithm from Lecture 17 is untouched. One
-extra tiny load tells the kernel where to read, and the gather disappears.
+Same online softmax, same running max, same accumulator. Only the address
+computation moves.
 
-Here is the hop that extra load makes:
+If you write systems code this is unremarkable — it is a page table. It is also
+cheap for a reason worth one line: the index is 4 bytes and the block it finds is
+64 KiB (`16 tokens × 4,096 B` per layer, from Lecture 05), so you move address
+bytes instead of payload bytes. A 32k-token sequence's whole table is 8 KiB.
 
-```
-   logical position          block table            physical KV blocks
-   (what the sequence        (this sequence's       (scattered in HBM,
-    thinks it has)            private map)           in any order)
+**The substitution is the easy part.** Three things about it are not, and they
+are the rest of the lecture.
 
-   ┌────────────┐           ┌──────┬───────┐        ┌──────────┐
-   │ tok  0..15 │  slot 0 ─>│  0   │   93  │───────>│ block 93 │
-   ├────────────┤           ├──────┼───────┤        ├──────────┤
-   │ tok 16..31 │  slot 1 ─>│  1   │   12  │───────>│ block 12 │
-   ├────────────┤           ├──────┼───────┤        ├──────────┤
-   │ tok 32..47 │  slot 2 ─>│  2   │   57  │───────>│ block 57 │
-   └────────────┘           └──────┴───────┘        └──────────┘
-    contiguous, by            4 bytes                NOT contiguous —
-    construction              per entry              and it no longer matters
-```
+---
 
-**Why this is nearly free.** The lookup reads 4 bytes; the block it points at is
-16 tokens of K/V. From Lecture 05, one token costs `2 × 8 heads × 128 dims ×
-2 bytes = 4,096 B` in a single layer, so:
+## 1. A tile is several blocks
+
+The kernel and the allocator picked different chunk sizes, for different
+reasons, and neither yields:
 
 ```
-   one block  =  16 tokens × 4,096 B  =  65,536 B  =  64 KiB
-
-   4 B of address  ──steers──>  64 KiB of payload      1 : 16,384
+   tile    BLOCK_N ≈ 64–128 tokens    kernel's choice, sized to fill SRAM
+   block   block_size = 16 tokens     allocator's choice, sized to limit waste
 ```
 
-And the table you are reading is small enough to sit on chip permanently. Even a
-32,768-token sequence needs only
+So one tile is four blocks, at four unrelated addresses. "One load" is really a
+gather, assembled on chip:
 
 ```
-   32,768 ÷ 16  =  2,048 entries  ×  4 B  =  8 KiB of block table
-```
-
-8 KiB of map steering megabytes of K/V. Compare that against what it replaced:
-the gather moved **every cached byte** out of its block, into a duplicate strip,
-and attention then read the duplicate. Now nothing moves but addresses.
-
-### One detail: tiles and blocks are different sizes
-
-You will hit this the moment you write the loop, so settle it now.
-
-```
-   tile   (L17)   what the kernel LOADS at once     BLOCK_N     64–128 tokens
-   block  (L09)   what the allocator OWNS           block_size  16 tokens
-```
-
-They are set by different people for different reasons — the allocator picked 16
-to bound fragmentation, the kernel picks its tile to fit SRAM — and neither
-overrules the other. So a tile spans **several blocks**, and the loop above runs
-once per block rather than once per tile:
-
-```
-   one tile of 64 tokens  =  4 blocks of 16
+   one tile of 64 tokens = 4 blocks
    ┌────────┬────────┬────────┬────────┐
-   │ blk 93 │ blk 12 │ blk 57 │ blk  8 │    4 lookups, 4 scattered locations,
-   └────────┴────────┴────────┴────────┘    assembled on chip into one tile
-      tbl[0]   tbl[1]   tbl[2]   tbl[3]
+   │ blk 93 │ blk 12 │ blk 57 │ blk  8 │   4 lookups, 4 scattered reads
+   └────────┴────────┴────────┴────────┘
 ```
 
-The only real constraint is that a tile be a **whole number of blocks**, so a
-tile boundary never lands mid-block. Then the kernel keeps the tile size it
-wants, the allocator keeps the block size it wants, and the table translates
-between them.
+The only constraint: a tile must be a whole number of blocks, so no tile
+boundary lands mid-block.
 
-!!! warning "Use the per-layer K/V figure, not the whole-model one"
-    The `4,096 B` above is one token's K/V **in one layer**, and that is the
-    number this kernel spends — one program instance handles one (query tile,
-    head) pair, inside a single layer, and never sees the other 27.
+## 2. The tile no longer fits
 
-    Lecture 05's headline figure of `114,688 B` per token is that same 4 KiB
-    × 28 layers: the cost of a token to the *whole model*. It is the right
-    number for cache-capacity questions and the wrong one here, by 28×. If a
-    tile ever looks far too big for SRAM, this mix-up is the first thing to
-    suspect.
-
-That per-layer figure also sets a real constraint on `BLOCK_N`. Since 4,096 B
-covers K and V together, a 64-token tile needs
+Lecture 17 chose `BLOCK_N = 64` because K and V tiles fit in ~100 KB of SRAM. At
+4,096 B per token per layer, they no longer do:
 
 ```
-   K  64 × 2,048 B  =  128 KiB
-   V  64 × 2,048 B  =  128 KiB
-                       ────────
-                       256 KiB   against a ~100 KB scratchpad
+   K  64 × 2,048 B = 128 KiB
+   V  64 × 2,048 B = 128 KiB
+                     ────────
+                     256 KiB   against ~100 KB
 ```
 
-which does not fit. Paged decode kernels answer that by using a smaller
-`BLOCK_N`, or by streaming blocks through rather than holding a whole tile
-resident. Decode's own shape helps too, for the reason the next section makes
-precise.
+Paged decode kernels answer with a smaller `BLOCK_N`, or by streaming blocks
+through rather than holding a whole tile. Decode can afford this because its
+query side is a single row — `Br = 1`, so the score patch is `1 × BLOCK_N`
+instead of `64 × 64`, and almost the whole scratchpad is free for K/V.
 
-The write side gets the same treatment. Every step the model computes fresh K/V
-for the batch's newest tokens, and a naive engine would stage them in a
-contiguous scratch buffer, then copy them into blocks. vLLM fuses the placement
-instead: a kernel that reshapes the freshly computed K/V and writes it straight
-into each sequence's assigned physical block — one scatter write, no staging
-copy. Same philosophy as the read side: bytes never make the round trip
-through a contiguous staging area.
+!!! warning "Use the per-layer K/V figure"
+    `4,096 B` is one token's K/V in **one layer**. Lecture 05's `114,688 B` is
+    that × 28 layers — the whole-model figure, right for cache capacity, wrong
+    here by 28×. If a tile looks absurdly large for SRAM, suspect this first.
 
-### Decode is the special case
+## 3. Split-KV — the only real algorithm change
 
-Prefill attends with many queries, one per prompt token, side by side.
-**Decode has exactly one query token** (the single new token, asking attention
-to look back over everything cached) attending over the whole cached context.
-That changes the shape of the problem:
+Everything above is bookkeeping. This is not: it changes how the work is
+divided, and needs a merge step with no counterpart in Lecture 17.
 
-- **No query tiling — one row.** `Br = 1`, so the score patch is `1 × BLOCK_N`
-  rather than `64 × 64`. That is why the SRAM budget above looks nothing like
-  Lecture 17's prefill case: the scores cost almost nothing, and essentially the
-  whole scratchpad is available for K/V.
-- **No causal masking within the tile.** The single query attends to everything
-  cached, all of which precedes it, so the diagonal-tile masking from Lecture 17
-  simply does not arise.
-
-    You do still mask, but for a different reason: the sequence's **last block
-    is usually partly empty.** A 37-token sequence with `block_size = 16` fills
-    two blocks and uses 5 slots of the third:
-
-    ```
-    block 0 [################]  16 valid
-    block 1 [################]  16 valid
-    block 2 [#####...........]   5 valid, 11 slots of stale garbage
-                   ↑
-            mask these to -inf, or they contribute real weights
-            to the softmax and silently corrupt the output
-    ```
-
-    Causal masking hides the *future*; this hides the *unwritten*. Same
-    operation, different reason, and this one applies to decode as much as
-    prefill.
-- **The kernel is pure streaming.** Every K/V byte is read exactly once, on its
-  way through, and never held. That is Lecture 02's memory-bound decode in
-  kernel form.
-
-Because it's pure bandwidth, the metric from Lecture 15 is the right one: measure
-achieved bandwidth against peak. A good decode attention kernel gets close.
-Bandwidth here means bytes per second memory can hand over; on a
-memory-bound kernel, achieved bandwidth close to peak is what "done" looks
-like.
-
-### Split-KV: the part that is not just addressing
-
-Everything so far has been bookkeeping — the same attention, reading from
-different addresses. This section is different. It changes *how the work is
-divided*, and it needs a merge step that has no counterpart in Lecture 17's
-kernel. If you take one algorithmic idea from this lecture, take this one.
-
-The motivation is that one query row per sequence is not much work, and at small
-batch that becomes a problem in its own right: **the GPU runs out of things to
-do.**
-
-Put a number on it. The natural parallel unit for attention is one thread block
-per (sequence, head). At batch 1 with Qwen3-0.6B's 16 query heads, that is
-**16 thread blocks** — on a 3090 with **82 SMs**:
+Decode gives one query row per sequence, and attention parallelizes over
+(sequence, head). At batch 1 with 16 query heads that is 16 thread blocks — on a
+3090 with **82 SMs**:
 
 ```
-   work available :  1 sequence × 16 heads  =  16 thread blocks
-   machine has    :                            82 SMs
-
-   occupancy      :  16 / 82  ≈  20%      ← 66 SMs with nothing to do
+   16 blocks / 82 SMs  ≈  20% occupancy      66 SMs idle
 ```
 
-Four fifths of the GPU is idle, and no amount of kernel tuning fixes it: there
-simply is not enough work to hand out. Prefill never has this problem (thousands
-of query tokens, so thousands of tiles), and neither does decode at large batch
-— it is specifically the low-batch decode case, which is exactly the latency-
-sensitive case you care about.
-
-The fix is to manufacture more parallel work by **splitting the context across
-blocks**, each computing a partial (max, sum, accumulator), then combining. Split
-a 2048-token context eight ways and the same batch-1 request now offers
-`16 × 8 = 128` blocks — more than the machine has SMs, so the GPU fills:
-
-??? question "Wait: 'block' here is a thread block, not the KV block from Lecture 09?"
-    Both words are in play, and they mean different things. The **KV block** is
-    a fixed-size chunk of cached data, 16 tokens, something you allocate and
-    free. The **thread block** is a group of threads that run together on one
-    SM (one of the chip's work groups, each with its own fast private memory),
-    a unit of execution. Splitting the context across thread blocks means
-    different groups of threads each handle a slice of the sequence. Same word,
-    unrelated meanings; the sentence around it tells you which is meant.
-    [Full answer](qa.md#wait-block-here-is-a-thread-block-not-the-kv-block-from-lecture-09)
+No addressing fix helps; there simply is not enough work. So manufacture some:
+split the context across blocks, let each compute a partial `(m, l, acc)`, then
+merge.
 
 ```
-   the cached context, split across thread blocks
-
-   ┌──────────────────┬──────────────────┐
-   │ tokens    0-1023 │ tokens 1024-2047 │
-   └────────┬─────────┴─────────┬────────┘
-            │                   │
-        block 0             block 1          run independently,
-            │                   │            in parallel, on
-            ▼                   ▼            different SMs
-      (m_0, l_0, acc_0)   (m_1, l_1, acc_1)
-            │                   │
-            └─────────┬─────────┘
-                      ▼
-              rescale each by exp(m_i − m_global),
-              add, divide by the combined l
-                      ▼
-                 final output
+   tokens 0-1023 ──► block 0 ──► (m₀, l₀, acc₀) ─┐
+                                                  ├─► rescale, add, divide
+   tokens 1024+  ──► block 1 ──► (m₁, l₁, acc₁) ─┘
 ```
 
-The combination uses the *identical* online-softmax merge from Lecture 17:
-rescale each partial by `exp(m_i - m_global)`, sum, divide. Having built that
-already, this is a small step rather than a new idea. In words: each block ran
-softmax with its own local max `m_i`; the block with the largest max, `m_global`,
-had it right, but the others used a max they later learned was too small, so
-their accumulators are inflated by `exp(m_i - m_global)`. Shrink each partial
-back to what a global max would have produced, add the pieces, divide by the
-corrected sum: one attention output, assembled from independent slices.
-
-**Check it on numbers**, the same way Lecture 17's worked example checks the
-tile merge. Four cached tokens, `d = 2`, one query, split into two blocks of
-two. Scores come out `[1, 3, 2, 0]`:
+The merge is Lecture 17's online softmax, one level up: rescale each partial by
+`exp(mᵢ − m_global)`, sum, divide. Check it on four tokens, `d = 2`, one query,
+split in two — scores `[1, 3, 2, 0]`:
 
 ```
-one-shot (what a single block would compute):
-   m = 3      l = 1.5530      out = [0.3881, 0.9449]
+   one-shot:   m = 3    l = 1.5530    out = [0.3881, 0.9449]
 
-split across two blocks, each with its own local max:
-   block 0   scores [1, 3]   m_0 = 3   l_0 = 1.1353   acc_0 = [0.1353, 1.0000]
-   block 1   scores [2, 0]   m_1 = 2   l_1 = 1.1353   acc_1 = [1.2707, 1.2707]
+   block 0  scores [1,3]   m₀ = 3   l₀ = 1.1353   acc₀ = [0.1353, 1.0000]
+   block 1  scores [2,0]   m₁ = 2   l₁ = 1.1353   acc₁ = [1.2707, 1.2707]
 
-merge:  m_global = max(3, 2) = 3
+   m_global = 3
+   block 0 × exp(3−3) = 1.0000      it held the max; untouched
+   block 1 × exp(2−3) = 0.3679      its max was too small; shrink
 
-   block 0 rescale:  exp(3 − 3) = 1.0000    ← it had the right max, untouched
-   block 1 rescale:  exp(2 − 3) = 0.3679    ← its max was too small, shrink it
-
-   l   = 1.0000·1.1353 + 0.3679·1.1353            = 1.5530     ✓
-   acc = 1.0000·[0.1353,1] + 0.3679·[1.2707,1.2707] = [0.6028, 1.4675]
-
-   out = acc / l = [0.3881, 0.9449]                            ✓ identical
+   l   = 1.5530                                    ✓
+   out = [0.6028, 1.4675] / 1.5530 = [0.3881, 0.9449]   ✓ identical
 ```
 
-Note the shape of it: **the block that happened to hold the largest score is
-left alone, and every other block is shrunk.** No block needs to know anything
-about the others while it runs — only its own `(m, l, acc)` — and the merge
-needs only those three numbers per block, not the scores that produced them.
-That is what makes the split embarrassingly parallel.
+No block knows anything about the others while it runs, and the merge needs only
+three numbers from each — not the scores. That is what makes it parallel. vLLM
+calls this split-KV, or FlashDecoding.
 
-This is what vLLM calls the "split-KV" or FlashDecoding path, and it's why decode
-attention scales down to batch 1 without wasting the GPU.
+**One masking note.** Decode needs no *causal* mask — the single query attends to
+everything cached. It still needs a *validity* mask: the last block is usually
+partly empty (37 tokens fills two blocks and 5 slots of a third), and those
+unwritten slots must go to `-inf` or they contribute real softmax weight.
+Causal masking hides the future; this hides the unwritten.
 
 ---
 
