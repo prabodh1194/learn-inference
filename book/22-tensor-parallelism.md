@@ -122,10 +122,43 @@ it gets.
 
 ### How the split works
 
-The objective here is to see exactly where the collective must sit — and that
-most of the split is free until the final output.
+Start from a fact about matmuls that makes the whole scheme possible.
 
-The elegance is that the two matmuls in an MLP shard complementarily:
+```
+   out[i,j] = Σ over k   x[i,k] · W[k,j]
+                ▲          ▲        ▲
+                │          │        └── column j of W
+                │          └── row i of x
+                └── the shared inner dimension
+```
+
+**Every output element depends only on one row of `x` and one column of `W`.**
+No output element needs any other output element. So in principle all of them
+could be computed at once — a matmul is embarrassingly parallel by construction,
+and always has been. A single GPU already exploits this across its thousands of
+cores.
+
+That means **TP is not finding parallelism. The parallelism was free.** What TP
+chooses is *which axis to spread across separate memory spaces* — and that
+choice is the entire subject, because the axes are not equivalent:
+
+```
+   split along j (columns of W)          split along k (the shared sum)
+
+   GPU 0 ← W[:, 0:1536]                  GPU 0 ← W[0:1536, :]
+   GPU 1 ← W[:, 1536:3072]               GPU 1 ← W[1536:3072, :]
+
+   each GPU computes COMPLETE            each GPU computes a PARTIAL sum:
+   outputs for its own columns           its terms of Σ_k, missing the rest
+
+   ✓ nothing to combine                  ✗ must all-reduce before use
+```
+
+Splitting along `j` is free because the columns never interact. Splitting along
+`k` cuts *through* the summation, so each GPU holds an incomplete answer.
+
+The elegance of the MLP is that its two matmuls can be split on complementary
+axes, so you pay the `k`-axis cost exactly once, at the very end:
 
 ```
 Column-parallel (first matmul):  split weights by COLUMN
