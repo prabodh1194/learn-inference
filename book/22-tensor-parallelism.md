@@ -439,6 +439,63 @@ N = 8:    2 × 7/8 × S  = 1.75 × S
 N = 16:   2 × 15/16 × S = 1.875 × S   ->  approaches 2S, never reaches it
 ```
 
+Draw the two terms together and the shape of TP becomes obvious:
+
+```
+   per-GPU cost
+        │
+   1.0  ●                                    ← compute/N: falls like 1/N
+        │ ╲
+        │  ╲
+   0.5  │   ●
+        │    ╲
+        │      ╲___
+        │          ●───────────●─────────●   ← flattens toward zero
+        │
+        │        ┌───────────────────────    ← communication: 2(N−1)/N · S
+   2S ──┼─ ─ ─ ─╱─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─      RISES toward a ceiling of 2S
+        │      ╱
+        │    ╱
+        │  ╱
+      0 ●─────────────────────────────────►
+        1    2    4    8    16   32    N
+```
+
+**Compute goes to zero; communication goes to `2S`.** Each extra GPU takes a
+smaller bite out of the first curve and pushes the second closer to its ceiling.
+There is no N at which communication stops costing you — that is the whole
+content of the `2S` limit.
+
+What that does to the *total* depends on which cost dominates, and this is where
+the earlier microsecond numbers matter. Adding a per-collective fixed cost — the
+launch and the barrier, `N−1` hops of it — the sum has a genuine minimum:
+
+```
+   total per-step cost (illustrative units, latency-dominated regime)
+
+   1.3 │                                              ●  N=32
+       │                                             ╱
+   1.0 ●  N=1                                       ╱
+       │╲                                          ╱
+       │ ╲                                    ●   ╱      N=16
+   0.7 │  ╲                                  ╱
+       │   ╲                                ╱
+   0.5 │    ●  N=2                    ●    ╱             N=8
+       │     ╲                       ╱
+   0.4 │        ●  N=4  ◄── minimum ╱
+       │
+       └────────────────────────────────────────────────►
+         1     2     4     8     16    32       N
+
+           adding GPUs helps ──►│◄── adding GPUs hurts
+```
+
+Past the minimum you are paying more in collectives than you are saving in
+compute, and **more GPUs make a single token slower.** Where that minimum sits
+is a property of your model size, batch size, and interconnect — not a constant
+— which is exactly why the build section has you measure the curve rather than
+trust a rule of thumb.
+
 **Put a number on `S`.** For this book's model, one all-reduce carries the
 layer's output activation: `batch × d × 2 bytes`, with `d = 1024` in fp16.
 
@@ -465,16 +522,8 @@ eats the win. The bandwidth table below matters for large models and long
 sequences, where `S` grows until the bytes do dominate; below that, latency
 rules and the table will mislead you.
 
-Each doubling of GPUs halves the compute on each GPU, but the all-reduce bytes
-edge merely closer to a floor of `2S`. The gap between the two curves is where
-the scaling stops:
-
-```
-time = compute/N + communication(N)
-```
-
-Past some N, communication dominates and adding GPUs stops helping. Where that
-happens depends on interconnect, the wires that connect the GPUs:
+Which regime you are in — bytes or barriers — depends on the interconnect, the
+wires between the GPUs:
 
 | Link | Bandwidth per GPU |
 |---|---|
@@ -497,14 +546,41 @@ Note also what this means for **rented** hardware: a Vast.ai listing advertising
 
 ### Where the rules of thumb break
 
-Conventional guidance says: low interconnect bandwidth → use pipeline parallelism
-instead of TP.
+Conventional guidance says: **low interconnect bandwidth → use pipeline
+parallelism instead of TP.**
+
+That advice is not arbitrary, and it is worth seeing why before watching it
+fail. The two strategies touch the wire at completely different rates:
+
+```
+   TP   all-reduce after EVERY layer          2 × 28 = 56 collectives
+        each one a barrier: all GPUs stop      per forward pass
+        and wait for the slowest
+
+   PP   hand the activation to the next        1 transfer per stage
+        stage, once                            boundary — 1 to 3 total
+```
+
+So the reasoning goes: if the link is slow, use the strategy that touches it 20×
+less often. On a thin wire, 56 synchronized round-trips sounds obviously worse
+than 2 one-way handoffs.
 
 The [field notes](field-notes.md) record an operator with **2× GH200 and no
 NVLink** (PCIe only, they quote 125 GB/s against NVLink's 900) who followed
 exactly that advice.
 **Pipeline parallel lost. TP2 won.** On the hardware profile where guides say it
 shouldn't.
+
+Why the reasoning failed is the interesting part, and you already have it: the
+rule silently assumes the collectives are **bandwidth**-bound. They are not, at
+these sizes — you counted it above, microseconds of wire time per forward pass
+even on PCIe. So the "20× fewer bytes" that PP buys is 20× of almost nothing,
+while PP's real costs are undiminished: it still cannot shard the KV cache, and
+its stages still run one after another rather than all at once.
+
+The rule is sound in the regime it came from — very large models, long
+sequences, `S` big enough that bytes genuinely dominate. Applied outside that
+regime it inverts.
 
 The same operator found `--max-num-seqs 16`, a scheduler concurrency limit from
 Lecture 08 (the cap on how many sequences share the GPU at once), mattered more
