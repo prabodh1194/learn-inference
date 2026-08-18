@@ -144,12 +144,29 @@ is `d = 1024` and the intermediate width is `d_ff = 3072`, three times wider:
 ```
       x           W1              h            W2          out
    (1×1024) → (1024×3072) → (1×3072) → (3072×1024) → (1×1024)
-                  ↑ widen        ↑           ↑ narrow
-                            activation
+                                 ▲
+                                 └── "the middle": h, the intermediate
+                                     hidden state, d_ff = 3072 wide.
+                                     3× wider than the input and output.
+
+   in  1024  ──widen──►  3072  ──narrow──►  1024  out
+                          ▲
+              this is the dimension TP cuts
 ```
 
-That middle width is the thing TP actually splits, and the fact that it's the
-*wide* dimension is why the split pays. Take two GPUs.
+**`h` is what TP splits** — not `x`, not `out`, but the wide vector between the
+two matmuls. Each GPU takes half of it: 1536 of the 3072.
+
+Splitting there is what makes the scheme work, for two reasons:
+
+- **It is the widest thing in the block**, so cutting it removes the most work
+  per GPU. Cutting a 1024-wide vector would buy less.
+- **It is purely internal.** `x` arrives from the previous layer and `out` goes
+  to the next, so both must exist in full on every GPU. `h` exists only inside
+  this block — nobody outside needs to see it whole, so no one has to be told
+  it was cut.
+
+Take two GPUs.
 
 **First matmul: split `W1` down its columns.** Each GPU holds a `1024 × 1536`
 slice — half the intermediate width:
