@@ -294,14 +294,24 @@ collectives per forward pass (2 × 28). That's the cost, and it's why interconne
 
 ### Why scaling isn't linear
 
-The objective here is to derive the communication cost per GPU, so "sublinear
-scaling" becomes a number you can predict rather than a surprise.
+Here is the asymmetry that decides how far TP scales:
 
-Compute per GPU divides by N. Communication does not shrink with it. The
-standard implementation is a **ring all-reduce**: the GPUs stand in a circle,
-each holds `S/N` of the data (`S` being the total bytes of the tensor being
-summed), each passes its share one step around the ring, then a second lap
-spreads the total back.
+```
+   add a GPU  ──►  compute per GPU     falls    (÷ N)
+              ──►  communication       does NOT
+```
+
+Halve the work and you halve the time, but the GPUs still have to talk — and
+past some N the talking dominates. This section turns that into a number you can
+predict instead of a surprise.
+
+One symbol first: **`S` is the size of the tensor being summed**, in bytes — the
+layer's output activation, the thing every all-reduce has to reconcile. All the
+cost below is measured in multiples of `S`.
+
+The standard implementation is a **ring all-reduce**: the GPUs stand in a
+circle, each holding `S/N` of the data. Each passes its share one step around
+the ring, then a second lap spreads the total back.
 
 Draw the circle with 4 GPUs, each starting with its own partial sum split into
 4 chunks:
@@ -340,6 +350,32 @@ N = 4:    2 × 3/4 × S  = 1.50 × S
 N = 8:    2 × 7/8 × S  = 1.75 × S
 N = 16:   2 × 15/16 × S = 1.875 × S   ->  approaches 2S, never reaches it
 ```
+
+**Put a number on `S`.** For this book's model, one all-reduce carries the
+layer's output activation: `batch × d × 2 bytes`, with `d = 1024` in fp16.
+
+```
+   batch  1:  S = 1 × 1024 × 2  =    2 KiB
+   batch 32:  S = 32 × 1024 × 2 =   64 KiB
+
+   wire time for 2S, all 56 collectives of a forward pass:
+
+                       batch 1        batch 32
+   NVLink 4 (900 GB/s)   ~0.3 µs        ~8 µs
+   PCIe 5   (128 GB/s)   ~1.8 µs       ~57 µs
+```
+
+Which is a genuinely surprising answer: **the bytes are nothing.** Even on PCIe,
+even summed over all 56 collectives, you are spending microseconds on a decode
+step that takes milliseconds.
+
+So on a small model TP is not limited by *bandwidth* at all — it is limited by
+the **fixed cost of each collective**: kernel launch, synchronization, and the
+round-trip in which every GPU must wait for the slowest. Fifty-six of those per
+forward pass, each a barrier where all GPUs stop and agree, is what actually
+eats the win. The bandwidth table below matters for large models and long
+sequences, where `S` grows until the bytes do dominate; below that, latency
+rules and the table will mislead you.
 
 Each doubling of GPUs halves the compute on each GPU, but the all-reduce bytes
 edge merely closer to a floor of `2S`. The gap between the two curves is where
