@@ -202,7 +202,42 @@ controls.
 
 ### Weights vs. activations vs. KV cache
 
-Three separate decisions, often confused:
+First, what those words mean, because the whole section turns on the difference.
+
+**Weights** are the model's learned parameters — the matrices trained once and
+then frozen. **Activations** are the values that flow *through* those matrices:
+computed fresh for every token, used immediately, thrown away. In a single
+matmul:
+
+```
+        x    ──────►  [  W  ]  ──────►    y
+
+     activation        weight          activation
+   this token only   every token,     this token only
+   ~2 KB, transient   forever         ~2 KB, transient
+                     880 MB, resident
+```
+
+The consequences are what matter:
+
+```
+                    weights                  activations
+   when known    training time            only at runtime
+   how often     loaded every step        recomputed every token
+   varies with   nothing                  the input
+   decode cost   880 MB/step (dominant)   small
+```
+
+Because weights are fixed you can inspect their range offline, pick scales
+carefully, even repair them (GPTQ, AWQ below). Activations you meet for the
+first time mid-request — you cannot study a distribution you have not seen yet,
+which is why activation quantization is the harder half.
+
+The **KV cache** is a third thing: activations you decided to *keep*. Keys and
+values are computed like any activation, but instead of being discarded they are
+stored for every future token — which is why they get their own row below.
+
+With that settled, three separate decisions:
 
 **Weight-only (W8A16, W4A16)**: quantize weights, compute in FP16. The notation
 is a pair: the weight precision, then the activation precision. W8A16 means
@@ -210,12 +245,12 @@ is a pair: the weight precision, then the activation precision. W8A16 means
 for inference. Decode is bound by *weight* traffic, so this attacks the bottleneck
 directly, and activations stay accurate. Dequantization happens in-kernel.
 
-**Weight + activation (W8A8)**: both quantized, so the matmul runs on INT8 tensor
-cores, the chip's specialist matrix-multiply hardware. Faster in principle, but
-activations have outliers that make them much harder to quantize than weights.
-Weights are fixed at training time and can be studied, measured, and adjusted
-once. Activations change with every token, so the ranges they need are only
-known in hindsight.
+**Weight + activation (W8A8)**: both quantized, so the matmul itself runs on
+INT8 tensor cores (the chip's specialist matrix-multiply hardware) instead of
+dequantizing back to FP16 first. Faster in principle — and much harder, for the
+reason above: activation ranges are only known at runtime, and they contain
+outliers that a per-tensor scale cannot absorb. This is what SmoothQuant below
+exists to fix.
 
 **KV cache quantization**: a different axis entirely. From Lecture 05 the cache can
 exceed the model's size; from Lecture 09 its capacity caps your batch size.
