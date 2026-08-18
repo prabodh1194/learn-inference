@@ -124,14 +124,57 @@ The objective here is to have a map of the whole path, so a measured delay has a
 place to look.
 
 ```
-tokenize -> queue -> schedule -> prefill -> decode xN -> detokenize -> SSE
+   once, at the start                 then, once PER TOKEN
+   ┌──────────────────────────┐   ┌──────────────────────────────────┐
+   tokenize → queue → schedule → prefill → ┌─────────────────────────┐
+                                           │ decode                  │
+                                           │   ↓                     │
+                                           │ detokenize (incremental)│ × N
+                                           │   ↓                     │
+                                           │ SSE flush ──► client    │
+                                           └─────────────────────────┘
 ```
+
+**The loop is the important part.** Detokenize and SSE are *inside* it, not
+after it. Each decode step produces one token, which is turned into text and
+pushed to the client immediately — that is what makes the response stream. Put
+detokenize and SSE after the loop instead and you have rebuilt the buffered
+server from the top of this lecture: same total time, no visible output until
+the end.
 
 The arrows are handoffs between components. The queue is where requests wait;
 schedule is the scheduler's choice of which sequences run this step; prefill and
-decode are the engine steps from Lecture 01; detokenize is the reverse of
-tokenization, turning token IDs back into text; and the SSE stream is what the
+decode are the engine steps from Lecture 01; and the SSE stream is what the
 client actually sees.
+
+??? warning "Incremental detokenization is not `decode(token)`"
+    Detokenizing one token at a time is the part people get wrong, and it fails
+    in a way that looks like a model bug.
+
+    A BPE token is not a character, and it is not even necessarily a whole
+    character. Multi-byte UTF-8 — emoji, CJK, accented letters — is routinely
+    split across two tokens. Decode each token in isolation and the first half
+    has no valid character in it:
+
+    ```
+    token 4712  ──► b'\xf0\x9f'      decode alone → "\ufffd"  (garbage)
+    token 9931  ──► b'\x91\x8b'      decode alone → "\ufffd"  (garbage)
+                    ────────────
+                    together    ──►  b'\xf0\x9f\x91\x8b'  =  "👋"
+    ```
+
+    Tokenizers also merge leading spaces into tokens, so naive per-token decode
+    produces wrong spacing even on pure ASCII.
+
+    The fix every engine uses: keep a small window of recent token IDs, decode
+    the window, and emit only the *new suffix* — the characters that appeared
+    since the last step. Bytes that do not yet form a complete character stay
+    buffered until the next token completes them. `transformers` exposes this
+    as an incremental detokenizer; vLLM has its own
+    (`detokenize_incrementally`) for exactly this reason.
+
+    Test it with an emoji in the output. A naive implementation shows `\ufffd`
+    where the emoji should be.
 
 Kiely §7.5.1 (p.205) makes a point worth taking seriously: **client-side
 overhead can dominate**. A 20ms TTFT is invisible behind a 200ms TLS handshake
@@ -148,9 +191,14 @@ client, or you're optimizing a number nobody experiences.
 2. Run the engine loop in a **separate process**, communicating over queues.
 3. Apply the model's chat template, `tokenizer.apply_chat_template`. Getting this
    wrong produces subtly worse output that looks like a model problem.
-4. Handle disconnection; free the sequence promptly.
-5. `uv run pytest tests/test_24_serving.py -v`
-6. Point a real client at it:
+4. **Detokenize incrementally**, not one token at a time in isolation. Keep a
+   window of recent token IDs, decode it, emit only the new suffix, and hold
+   back bytes that don't yet complete a character. Verify with a prompt that
+   makes the model emit an emoji or CJK text — naive per-token decode shows
+   `\ufffd` there and nowhere else, which is why it survives casual testing.
+5. Handle disconnection; free the sequence promptly.
+6. `uv run pytest tests/test_24_serving.py -v`
+7. Point a real client at it:
 
 ```bash
 curl -N localhost:8000/v1/chat/completions \
@@ -159,7 +207,7 @@ curl -N localhost:8000/v1/chat/completions \
 
 Then try the `openai` Python client against your server. It should just work.
 
-7. **Measure client-observed TTFT** and compare to your engine-internal TTFT. The
+8. **Measure client-observed TTFT** and compare to your engine-internal TTFT. The
    gap is your serving overhead, and it's the number your users actually feel.
 
 ---
