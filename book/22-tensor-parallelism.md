@@ -11,10 +11,41 @@
 
 ## The problem
 
-Two reasons to use more than one GPU:
+First, what "more than one GPU" means here, because packaging has made the
+word slippery. **A GPU is a separate memory space.** Two GPUs cannot read each
+other's tensors; combining anything requires a collective over a link. That is
+the property this whole lecture is about — not how many chips are in the box.
 
-**The model doesn't fit.** 70B in FP16 is 140GB: `70 × 10⁹ params × 2 bytes
-(fp16) = 140 GB`. No single GPU holds it.
+```
+   ONE GPU                        MULTI-GPU
+   1 CUDA device                  2+ CUDA devices
+   one address space              separate address spaces
+   a[i] just works                needs all-reduce / all-gather
+   no NCCL, no TP                 this lecture
+```
+
+A single **B200** is one GPU by that test: your code sees one device and 192 GB
+of unified memory, and you never write a collective — even though the package
+physically holds two dies joined by a ~10 TB/s interconnect. Multi-*die*,
+single-GPU. Two B200s in a box is multi-GPU; so is one GPU per node across a
+cluster, only slower.
+
+With that fixed, two reasons to use more than one:
+
+**The model doesn't fit.** 70B in FP16 is 140 GB: `70 × 10⁹ params × 2 bytes
+(fp16) = 140 GB`. Whether that needs multiple GPUs depends entirely on the card
+in front of you:
+
+```
+   RTX 3090     24 GB   →  needs 6+ GPUs
+   A100         80 GB   →  needs 2
+   H100         80 GB   →  needs 2
+   B200        192 GB   →  fits on ONE
+```
+
+This reason is receding as memory grows, and on current hardware plenty of
+models that once demanded TP now fit on one card. The second reason does not
+recede.
 
 **One GPU is too slow for one user.** Decode is memory-bound (Lecture 02), so a
 single user's tokens/sec is capped by *one* GPU's bandwidth: every token moves
