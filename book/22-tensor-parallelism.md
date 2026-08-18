@@ -160,15 +160,34 @@ Splitting along `j` is free because the columns never interact. Splitting along
 The elegance of the MLP is that its two matmuls can be split on complementary
 axes, so you pay the `k`-axis cost exactly once, at the very end:
 
-```
-Column-parallel (first matmul):  split weights by COLUMN
-    each GPU computes part of the hidden dimension
-    -> no communication needed
+```mermaid
+graph LR
+    X["x&nbsp;(1×1024)<br/>replicated"] --> G0C["GPU 0<br/>W1[:, 0:1536]"]
+    X --> G1C["GPU 1<br/>W1[:, 1536:3072]"]
 
-Row-parallel (second matmul):    split weights by ROW
-    each GPU computes a PARTIAL sum of the output
-    -> all-reduce to combine
+    G0C --> H0["h₀ (1×1536)<br/>+ SiLU, local"]
+    G1C --> H1["h₁ (1×1536)<br/>+ SiLU, local"]
+
+    H0 --> G0R["GPU 0<br/>W2[0:1536, :]"]
+    H1 --> G1R["GPU 1<br/>W2[1536:3072, :]"]
+
+    G0R --> P0["out₀ (1×1024)<br/>PARTIAL"]
+    G1R --> P1["out₁ (1×1024)<br/>PARTIAL"]
+
+    P0 --> AR{{"all-reduce<br/>out₀ + out₁"}}
+    P1 --> AR
+    AR --> OUT["out (1×1024)<br/>complete"]
+
+    classDef free fill:#e8f5e9,stroke:#4caf50
+    classDef part fill:#fff3e0,stroke:#ff9800
+    classDef comm fill:#ffebee,stroke:#e53935
+    class G0C,G1C,H0,H1,G0R,G1R free
+    class P0,P1 part
+    class AR comm
 ```
+
+Green is free — no GPU needs anything from the other. Orange is where each GPU
+holds only half the answer. Red is the single collective, at the very end.
 
 Draw it with real shapes so the arithmetic is visible. An MLP block is *not*
 two square matrices — it widens, then narrows. For Qwen3-0.6B the hidden size
@@ -214,7 +233,38 @@ A column split needs no communication: each GPU reads the same input row `x`
 half of the weights, so both sides compute independently.
 
 **Then the activation — and this is the step that makes the whole scheme work.**
-A real MLP is `W2 · act(W1 · x)`, not `W2 · (W1 · x)`; Qwen3 uses SiLU. If the
+A real MLP applies a nonlinearity between the two matmuls; Qwen3 uses SiLU.
+
+!!! note "Two conventions for the same thing"
+    Papers write `out = W2 · act(W1 · x)` — `x` is a *column* vector and the
+    weights multiply from the left. Code writes it transposed, because a batch
+    of tokens is naturally rows:
+
+    ```
+    math:   out = W2 · act(W1 · x)        x is (1024×1), a column
+    code:   out = act(x @ W1) @ W2        x is (1×1024), a row
+    ```
+
+    Identical operation, mirrored notation. **This lecture uses the code
+    convention** — `x @ W1` — because that is what you will type and what the
+    shapes below assume.
+
+So the block runs: widen, activate, narrow.
+
+```
+   x  (1×1024)
+     │  @ W1  (1024×3072)
+     ▼
+   h  (1×3072)          ← "the middle", the wide one
+     │  act(·)          ← elementwise, shape unchanged
+     ▼
+   act(h)  (1×3072)
+     │  @ W2  (3072×1024)
+     ▼
+   out (1×1024)
+```
+
+If the
 activation needed the *whole* hidden state, the split would break here and you'd
 need a gather before you could continue. It doesn't:
 
