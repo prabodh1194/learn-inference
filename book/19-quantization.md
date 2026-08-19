@@ -510,8 +510,9 @@ whether it's acceptable, which is precisely why you built it first.
 
 ## Next
 
-**[20. Raw CUDA](20-raw-cuda.md)**: one level lower, to see what Triton was
-doing on your behalf.
+**[19b. FP8](19b-fp8.md)**: the hardware-native 8-bit float — same goal,
+tensor-core rate instead of dequant overhead. Then **[20. Raw CUDA](20-raw-cuda.md)**
+for the level below Triton.
 
 **You will probably not beat Triton, and that's the point.** Pick one kernel,
 write it by hand, then use `ncu` to find out exactly where Triton wins. The

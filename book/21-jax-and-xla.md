@@ -295,6 +295,8 @@ CPU-to-GPU dispatch with its own overhead).
 
 ## Next
 
+**[21b. Model compilation](21b-model-compilation.md)**: the same compiler idea
+on the serving side — torch.compile and TensorRT-LLM. Then
 **[22. Tensor parallelism](22-tensor-parallelism.md)**: the payoff: sharding
 declared, then sharding by hand.
 

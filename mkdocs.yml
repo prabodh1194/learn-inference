@@ -125,9 +125,12 @@ nav:
       - 17 FlashAttention: 17-flash-attention.md
       - 18 Paged attention kernel: 18-paged-attention-kernel.md
       - 19 Quantization: 19-quantization.md
+      - 19b FP8: 19b-fp8.md
+      - 19c GGUF: 19c-gguf.md
       - 20 Raw CUDA: 20-raw-cuda.md
   - Part IV — Parallelism:
       - 21 JAX and XLA: 21-jax-and-xla.md
+      - 21b Model compilation: 21b-model-compilation.md
       - 22 Tensor parallelism: 22-tensor-parallelism.md
       - 23 MoE and expert parallelism: 23-moe-and-expert-parallelism.md
   - Part V — Production:
