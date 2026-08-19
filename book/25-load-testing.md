@@ -224,10 +224,5 @@ saturation signal.
 
 ## Next
 
-**[26. Versus vLLM](26-versus-vllm.md)**: benchmark against the real thing.
-
-**You will lose. That is the expected result.** The deliverable is not a win,
-it's a per-subsystem explanation of the gap, with profiler numbers.
-
-It also turns your skepticism outward: after this, you'll know exactly which
-five questions to ask about anyone else's benchmark.
+**[25b. Deployment environments](25b-deployment-environments.md)**: you
+benchmarked it; now deploy it without surprise.

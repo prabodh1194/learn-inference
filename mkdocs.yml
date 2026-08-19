@@ -134,7 +134,9 @@ nav:
       - 24 Serving: 24-serving.md
       - 24b Serving agents: 24b-serving-agents.md
       - 25 Load testing: 25-load-testing.md
+      - 25b Deployment environments: 25b-deployment-environments.md
       - 26 Versus vLLM: 26-versus-vllm.md
+      - 26b SGLang internals: 26b-sglang-internals.md
       - 27 Routing and disaggregation: 27-routing-and-disaggregation.md
       - 28 Autoscaling and cost: 28-autoscaling-and-cost.md
       - 28b Reasoning and test-time compute: 28b-reasoning-and-test-time-compute.md

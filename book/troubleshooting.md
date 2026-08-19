@@ -20,6 +20,31 @@ and the second one transfers to bugs you have not met yet.
 
 ---
 
+## Incident map
+
+Each incident has an ID so the indexes below can point at the same thing from
+multiple angles.
+
+| ID | Incident | Engine | Pattern |
+|----|----------|--------|---------|
+| I1 | `VLLM_ATTENTION_BACKEND` ignored by V1 engine | vLLM | 1 |
+| I2 | `enable_thinking` is cosmetic on Qwen3 | SGLang | 1 |
+| I3 | `SGLANG_EXTERNAL_MODEL_DIR` deprecated silently | SGLang | 1 |
+| I4 | `import vllm` fails inside cluster job scripts | vLLM | 2 |
+| I5 | SGLang subprocess cannot import custom model | SGLang | 2 |
+| I6 | FlashInfer JIT cannot find CUDA headers | vLLM | 3 |
+| I7 | `flash_attn.ops` fails to import on new GPU generation | vLLM | 3 |
+| I8 | Ray's LLM serving layer vs. the model you need | vLLM | 4 |
+| I9 | RL trainer's vLLM integration segfaults | vLLM | 4 |
+| I10 | Ray submit hangs in `PROVISIONING` (namespace not enabled) | platform | 4 |
+| I11 | Indexed assignment breaks CUDA graph capture | custom | 5 |
+| I12 | TP=2 crashes during graph capture on B200 | SGLang | 5 |
+| I13 | `--max-model-len` too small: HTTP 400 on long documents | vLLM | 6 |
+| I14 | `max_new_tokens` truncation manufactures a quality failure | eval | 6 |
+| I15 | `loss = 0`, `grad_norm = nan` on fresh classification head | training | 7 |
+
+---
+
 ## Symptom index
 
 | What you see | Pattern |
@@ -38,14 +63,52 @@ and the second one transfers to bugs you have not met yet.
 
 ---
 
+## Engine index
+
+Same incidents, grouped by where they bit — this is how you'd tell the story in
+an interview ("the vLLM stuff," "the SGLang stuff," "the training thing").
+
+### vLLM
+- **I1** `VLLM_ATTENTION_BACKEND` env var accepted, ignored, silent
+- **I4** `import vllm` works in shell, fails in cluster job
+- **I6** FlashInfer JIT compiles at runtime, needs dev headers the runtime image lacks
+- **I7** `flash_attn` wheel doesn't match B200 arch — plain `ImportError`
+- **I8** Ray + vLLM + transformers version graph has no solution
+- **I9** TRL's GRPOTrainer segfaults inside vLLM process
+- **I13** `--max-model-len 32768` rejects docs at 33K tokens
+
+### SGLang
+- **I2** `enable_thinking=False` does nothing; template strips prefix
+- **I3** `SGLANG_EXTERNAL_MODEL_DIR` deprecated, unread
+- **I5** Model runner subprocess doesn't inherit `PYTHONPATH`
+- **I12** TP=2 cross-device error during CUDA graph capture
+- **I14** (shared) Harness truncation masquerades as quality regression
+
+### Training (surfaced via serving)
+- **I15** Fresh classification head, bf16, uninitialised weights → silent `NaN`
+
+### Platform / harness
+- **I10** Ray submit hangs forever — namespace permission, not code
+- **I11** Custom model boolean indexing breaks graph capture
+- **I14** Judge reports `information_loss` on truncated outputs
+
+---
+
 ## Pattern 1: The knob that does nothing
+
+> **Scene.** Monday 3pm. You're debugging a JIT failure from FlashInfer (I6). You
+> set `VLLM_ATTENTION_BACKEND=FLASHINFER` to force the backend. Server starts
+> clean. Logs show it's still using the default backend. You try `FLASH_ATTN`,
+> `XFORMERS` — same. The variable is *accepted*. It just does nothing. Three
+> hours later you're reading vLLM source and find the V1 engine doesn't read
+> that variable at all.
 
 The worst failures in this list are not crashes. They are settings that are
 **accepted, ignored, and never mentioned again.** Nothing errors. The system
 starts. It simply does something other than what you asked, and you spend an
 afternoon debugging the consequence instead of the cause.
 
-### `VLLM_ATTENTION_BACKEND` is ignored by the V1 engine
+### I1: `VLLM_ATTENTION_BACKEND` is ignored by the V1 engine
 
 **What you see.** You want a specific attention backend — say, to dodge a JIT
 failure. You set `VLLM_ATTENTION_BACKEND`. The server comes up. It uses a
@@ -70,17 +133,17 @@ docs. `grep -rn VLLM_ATTENTION_BACKEND .venv/lib/python3*/site-packages/vllm/`
 answers in seconds what an afternoon of experiments will not: whether anything
 reads it at all, and on which code path.
 
-### `enable_thinking` is cosmetic on Qwen3
+### I2: `enable_thinking` is cosmetic on Qwen3
 
-**What you see.** Qwen3 emits garbled or missing `<think>` tags. You pass
+**What you see.** Qwen3 emits garbled or missing `think` tags. You pass
 `enable_thinking=False`. Nothing changes.
 
 **What it was.** Two separate problems wearing one costume.
 
-1. Qwen3's chat template **unconditionally injects** `<think>`. The kwarg does
+1. Qwen3's chat template **unconditionally injects** `think`. The kwarg does
    not gate it; the template does not consult it.
 2. SGLang strips the template prefix from the response, so the *opening*
-   `<think>` never reaches you — leaving output that looks like a malformed
+   `think` never reaches you — leaving output that looks like a malformed
    thinking block.
 
 **Why it happens.** A chat template is a Jinja program shipped inside the
@@ -88,7 +151,7 @@ tokenizer, not part of the serving engine. A kwarg only does something if the
 template author wrote a branch for it. "The API accepts this argument" and
 "the model's template respects this argument" are unrelated facts.
 
-**The fix.** Prefix `<think>\n` explicitly in the scripts that need it. For the
+**The fix.** Prefix `think\n` explicitly in the scripts that need it. For the
 judge model — where thinking is unwanted — pass
 `chat_template_kwargs: {"enable_thinking": false}` *and* state the required
 output format explicitly in the system prompt, so correctness does not depend
@@ -109,7 +172,7 @@ ground truth.
 > that looks like a model problem."* This is that sentence, in the wild —
 > see [24. Serving](24-serving.md#the-whole-path-and-where-time-goes).
 
-### `SGLANG_EXTERNAL_MODEL_DIR` was deprecated silently
+### I3: `SGLANG_EXTERNAL_MODEL_DIR` was deprecated silently
 
 **What you see.** You follow a guide, set `SGLANG_EXTERNAL_MODEL_DIR`, and your
 custom model is not found.
@@ -122,8 +185,7 @@ results and blog posts outlive the API they describe, and an unread env var
 fails silently by construction.
 
 **The fix.** Use the package variable — though on this project even that did
-not survive contact (see
-[pattern 2](#pattern-2-which-python-is-installed)).
+not survive contact (see [pattern 2](#pattern-2-which-python-is-installed)).
 
 **How to spot it next time.** Check the installed version's own source, not the
 internet. `grep -rn 'EXTERNAL_MODEL' .venv/.../sglang/` tells you which names
@@ -142,12 +204,16 @@ the code you are actually running still reads.
 
 ## Pattern 2: Which Python is "installed"?
 
+> **Scene.** You installed vLLM. It imports in your terminal. You submit a job
+> to the cluster and it dies on `import vllm` — same machine, same disk, same
+> `pip install`. The error doesn't tell you *which* Python. That's the bug.
+
 "I installed it" is not a fact about your machine. It is a fact about **one
 interpreter**. When another process runs a different interpreter, the package
 is not there — and the error message is the same `ModuleNotFoundError` you
 would get if you had never installed anything.
 
-### `import vllm` fails inside cluster job scripts
+### I4: `import vllm` fails inside cluster job scripts
 
 **What you see.** vLLM is installed. It imports fine in your shell. A job
 submitted to the cluster dies on `import vllm`.
@@ -184,7 +250,7 @@ import sys; print(sys.executable, sys.path)
 
 This single line resolves nearly every "but it's installed" bug immediately.
 
-### An SGLang subprocess cannot import your custom model
+### I5: An SGLang subprocess cannot import your custom model
 
 **What you see.** A custom model package that imports perfectly in your own
 process is invisible to SGLang's model runner.
@@ -223,12 +289,17 @@ Print `sys.executable`, `sys.path` and `os.environ` from inside the child.
 
 ## Pattern 3: The container is not the machine
 
+> **Scene.** vLLM runs fine. You change TP size and it crashes with
+> `cublasLt.h not found`. You didn't change code. You changed a *config*. The
+> error mentions a header file — at runtime. The container was fine until it
+> wasn't.
+
 Some Python packages are not really installed when you install them. They
 carry source that gets compiled **the first time you run it**, against
 **your** GPU and **your** CUDA toolkit. A runtime image that lacks a compiler
 or headers is fine right up to the moment something decides to build.
 
-### FlashInfer's JIT cannot find CUDA headers
+### I6: FlashInfer's JIT cannot find CUDA headers
 
 **What you see.** vLLM 0.22.1 runs, then crashes when you change TP size.
 FlashInfer's JIT reports it cannot find `cublasLt.h`, `nvrtc.h`, `curand.h`.
@@ -261,7 +332,7 @@ runtime. Two things follow, and both are counter-intuitive:
 a runtime failure's clothing. Ask what triggered a build now, and what changed
 to invalidate the cache.
 
-### `flash_attn.ops` fails to import on a new GPU generation
+### I7: `flash_attn.ops` fails to import on a new GPU generation
 
 **What you see.** vLLM 0.23.0 is installed and refuses to serve;
 `import flash_attn.ops` fails.
@@ -294,12 +365,17 @@ debugging anything upstream.
 
 ## Pattern 4: The version graph has no solution
 
+> **Scene.** You need Gemma 4. It needs `transformers==5.10.2`. Ray 2.55 needs
+> `vllm>=0.18` which needs `transformers<5`. The resolver sits there. You
+> upgrade, downgrade, pin, unpin — nothing resolves. The constraint graph is
+> *provably empty*. Another day of resolver attempts won't help.
+
 Serving stacks pin each other transitively. Once four projects each constrain
 the others, "upgrade until it works" can be **provably impossible** — and
 recognising impossibility early is worth more than another day of resolver
 attempts.
 
-### Ray's LLM serving layer versus the model you need
+### I8: Ray's LLM serving layer versus the model you need
 
 **What you see.** The managed `ray.serve.llm` / `LLMConfig` path will not
 resolve.
@@ -310,9 +386,9 @@ resolve.
    Ray 2.55.x        requires  vllm >= 0.18
    vllm >= 0.18      requires  transformers < 5
    the target model  requires  transformers == 5.10.2
-                               ────────────────────────
-                               transformers < 5  AND  == 5.10.2
-                               no solution exists
+                                ────────────────────────
+                                transformers < 5  AND  == 5.10.2
+                                no solution exists
 ```
 
 Ray also vendors its own vLLM fork, so imports do not align with upstream even
@@ -344,7 +420,7 @@ side resolves its own versions and neither constrains the other.
 out by hand. If it is contradictory rather than merely awkward, the answer is
 architectural — decouple — not another version bump.
 
-### An RL trainer's vLLM integration segfaults
+### I9: An RL trainer's vLLM integration segfaults
 
 **What you see.** `trl vllm-serve` segfaults; TRL 1.6 warns about vLLM 0.23
 compatibility.
@@ -366,19 +442,26 @@ your bug to fix. Check whether the two projects claim to support each other's
 versions before debugging further — and prefer a process boundary over a
 shared address space when both sides move fast.
 
-!!! note "When the platform is the problem"
-    One incident in this project was not technical at all: a managed serving
-    submission hung in `PROVISIONING` indefinitely because the required
-    namespace was not enabled for the project — an org-admin permission.
+### I10: When the platform is the problem
 
-    It is here for one reason: **an infinite hang with no error is a signal in
-    itself.** Crashes come from code that ran; silent hangs often come from
-    code that never started. Check that you are entitled to the resource
-    before profiling the thing that is not running.
+One incident in this project was not technical at all: a managed serving
+submission hung in `PROVISIONING` indefinitely because the required namespace
+was not enabled for the project — an org-admin permission.
+
+It is here for one reason: **an infinite hang with no error is a signal in
+itself.** Crashes come from code that ran; silent hangs often come from code
+that never started. Check that you are entitled to the resource before
+profiling the thing that is not running.
 
 ---
 
 ## Pattern 5: Capture demands static everything
+
+> **Scene.** Your custom model works in eager mode. You enable CUDA graphs and
+> it crashes *during capture*. The line? `residual[:, mask] = 0.0`. It's just
+> a masked assignment. But capture records commands, not decisions — and which
+> addresses get written depends on the *contents* of `mask`. That means a
+> device-to-host sync inside the captured region. Not allowed.
 
 [Lecture 13](13-cuda-graphs.md#the-constraint-that-shapes-everything) states the
 rule: a captured graph replays **exactly the same operations on exactly the same
@@ -388,7 +471,7 @@ addresses, and the sequence of commands.
 Both incidents here are that constraint being violated. The first violates a
 fourth thing the lecture does not list.
 
-### Indexed assignment breaks graph capture
+### I11: Indexed assignment breaks graph capture
 
 **What you see.** A custom model works in eager mode and crashes during CUDA
 graph capture. The offending line:
@@ -439,7 +522,7 @@ synchronisation cost.**
 `torch.nonzero`, early exit on an EOS check. Rewrite as arithmetic over a fixed
 address set — masks become multiplies, branches become `torch.where`.
 
-### TP=2 crashes during capture
+### I12: TP=2 crashes during capture
 
 **What you see.** SGLang with `tensor_parallel_size=2` fails with a
 cross-device tensor error on B200.
@@ -469,12 +552,12 @@ batch work, **throughput is the objective, not per-token latency**:
 
 ```
    TP=2    one model across 2 GPUs      halves per-token latency (in theory)
-                                        pays a collective every layer
-                                        needs cross-device capture to work
+                                         pays a collective every layer
+                                         needs cross-device capture to work
 
    DP      two independent instances    doubles throughput
-                                        zero collectives
-                                        each GPU captures its own graph
+                                         zero collectives
+                                         each GPU captures its own graph
 ```
 
 For throughput-bound work, data parallelism is not the fallback — it is the
@@ -489,11 +572,18 @@ cross-device capture.
 
 ## Pattern 6: A boot-time constant, a runtime bug
 
+> **Scene.** You set `--max-model-len 32768` at startup. Weeks later, a
+> 33,000-token document hits the server and gets a 400. The limit wasn't a
+> suggestion — it sized the KV cache. Or: your judge reports `information_loss`
+> on outputs that look fine. The harness defaulted to `max_new_tokens=2048`.
+> Long answers were cut mid-sentence. The model was fine; the *measurement*
+> was broken.
+
 Both of these are a number chosen once, at startup, that becomes a
 **correctness** problem much later — and in the second case, a number that
 silently corrupted an evaluation.
 
-### `--max-model-len` too small: HTTP 400 on long documents
+### I13: `--max-model-len` too small: HTTP 400 on long documents
 
 **What you see.** The server returns 400 on long documents.
 
@@ -515,7 +605,7 @@ request. When memory gets tight, engines preempt
 ([Lecture 09](09-paged-attention.md#preemption)); a limit set far above your
 real p99 spends VRAM that could have been batch capacity.
 
-### `max_new_tokens` truncation manufactured a quality failure
+### I14: `max_new_tokens` truncation manufactured a quality failure
 
 **What you see.** A judge model reports `information_loss` on outputs that look
 fine when you read them.
@@ -554,7 +644,12 @@ If that number is not zero, fix the harness before analysing the model.
 
 ## Pattern 7: Uninitialised memory meets low precision
 
-### `loss = 0`, `grad_norm = nan` on a fresh classification head
+> **Scene.** Training a 0.6B model with a sequence-classification head. Loss
+> is exactly `0`, gradient norm is `nan`, from step one. You assume bf16 is
+> fragile. It's the opposite: bf16's *wide range* is what let the garbage
+> survive long enough to do damage.
+
+### I15: `loss = 0`, `grad_norm = nan` on a fresh classification head
 
 **What you see.** Training a 0.6B model with a sequence-classification head:
 loss is exactly `0`, gradient norm is `nan`, from the first step.
@@ -574,10 +669,10 @@ sacrifices mantissa bits instead. So:
    value 7.2e11
 
    in fp16   max finite is 65504     →  overflows to inf IMMEDIATELY
-                                        you find out at once
+                                          you find out at once
 
    in bf16   max finite is ~3.4e38   →  perfectly representable
-                                        propagates as a FINITE number
+                                          propagates as a FINITE number
 ```
 
 The garbage survives the cast, and that is what makes it dangerous: it
@@ -657,3 +752,10 @@ space.
 And one worth stating on its own: **`NaN` and segfaults are both downstream
 symptoms.** The useful question is what was the last thing that was still
 finite, still in-process, still yours.
+
+---
+
+## Where to go deeper
+
+- **Patterns 1–4 (environment failures)** → [25b. Deployment environments](25b-deployment-environments.md) — the full checklist: interpreters, container images, version graphs, subprocess isolation.
+- **Patterns 1, 2, 5 (SGLang specifics)** → [26b. SGLang internals](26b-sglang-internals.md) — RadixAttention, default graph capture, model runner subprocess, template mechanics, TP vs DP.

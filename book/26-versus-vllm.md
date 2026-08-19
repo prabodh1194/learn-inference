@@ -205,11 +205,8 @@ skepticism is worth more than the benchmark.
 
 ## Next
 
-**[27. Routing and disaggregation](27-routing-and-disaggregation.md)**: scaling
-past one replica.
-
-Two problems appear that don't exist on one box: your prefix cache **fragments**
-across replicas, and prefill still interferes with decode.
+**[26b. SGLang internals](26b-sglang-internals.md)**: the other engine,
+read the same way.
 
 Find the crossover, at what prompt length does disaggregation start to win?
 Predict it first; on short prompts the KV transfer makes things *worse*.
