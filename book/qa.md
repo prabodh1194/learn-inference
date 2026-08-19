@@ -1810,3 +1810,37 @@ length, warp partitioning) are all things you find by *measuring a working
 implementation*, not by analyzing it on paper. That is Lecture 15's discipline,
 and it is the reason this book insists on a before/after number for every
 change: the second kind of win is invisible to the first kind of reasoning.
+
+---
+
+## Why does `SGLANG_EXTERNAL_MODEL_DIR` not work — is it really "deprecated"?
+
+**Lecture:** [troubleshooting](troubleshooting.md) · [26b. SGLang internals](26b-sglang-internals.md)
+
+The tempting story: "SGLang renamed the variable; the old one was deprecated
+and is now unread." That story is wrong in an instructive way: **the variable
+never existed.** SGLang only ever had `SGLANG_EXTERNAL_MODEL_PACKAGE`, which
+names a Python *package* (importable), not a *directory* of model code — it
+has existed since PR #13429 (~March 2025), and the *documentation* for it was
+only added much later (docs PR #21050).
+
+The confusion is a good example of why "deprecated" is the wrong default
+explanation for a knob that does nothing. Deprecation is a *known* API with a
+*known* replacement; an env var that never existed is a *belief* about an API.
+Both fail silently — an unread variable is unread either way — but they send
+you looking in different places. If it was deprecated, there is a migration
+path and a changelog entry; if it never existed, the guide you followed was
+wrong and the code you are running is the only ground truth.
+
+The other half of the failure is structural: even the *correct* variable,
+`SGLANG_EXTERNAL_MODEL_PACKAGE`, is read by the main process while the model
+runs in a **subprocess**. For the package to load there, it must be reachable
+on the child's `sys.path` (see the [I5](troubleshooting.md#i5-an-sglang-subprocess-cannot-import-your-custom-model)
+incident) — which is why the incident record names this "an extension point
+that looks like one problem but is two."
+
+**The misunderstanding that matters.** Two knobs that look identical — "an env
+var that was removed" and "an env var that never existed" — are distinguished
+only by reading the installed source. `grep -rn EXTERNAL_MODEL .venv/.../sglang/`
+answers in seconds which case you are in, and the answer decides whether there
+is a supported migration at all.

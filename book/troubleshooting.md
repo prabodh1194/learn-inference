@@ -29,7 +29,7 @@ multiple angles.
 |----|----------|--------|---------|
 | I1 | `VLLM_ATTENTION_BACKEND` ignored by V1 engine | vLLM | 1 |
 | I2 | `enable_thinking` is cosmetic on Qwen3 | SGLang | 1 |
-| I3 | `SGLANG_EXTERNAL_MODEL_DIR` deprecated silently | SGLang | 1 |
+| I3 | `SGLANG_EXTERNAL_MODEL_DIR` never existed; registry subprocess gap | SGLang | 1 |
 | I4 | `import vllm` fails inside cluster job scripts | vLLM | 2 |
 | I5 | SGLang subprocess cannot import custom model | SGLang | 2 |
 | I6 | FlashInfer JIT cannot find CUDA headers | vLLM | 3 |
@@ -79,7 +79,7 @@ an interview ("the vLLM stuff," "the SGLang stuff," "the training thing").
 
 ### SGLang
 - **I2** `enable_thinking=False` does nothing; template strips prefix
-- **I3** `SGLANG_EXTERNAL_MODEL_DIR` deprecated, unread
+- **I3** `SGLANG_EXTERNAL_MODEL_DIR` never existed — package var, registry subprocess gap
 - **I5** Model runner subprocess doesn't inherit `PYTHONPATH`
 - **I12** TP=2 cross-device error during CUDA graph capture
 - **I14** (shared) Harness truncation masquerades as quality regression
@@ -196,18 +196,38 @@ reads it at all, and on which code path.
 **What you see.** Qwen3 emits garbled or missing `think` tags. You pass
 `enable_thinking=False`. Nothing changes.
 
-**What it was.** Two separate problems wearing one costume.
+**What it was.** Three separate problems wearing one costume.
 
 1. Qwen3's chat template **unconditionally injects** `think`. The kwarg does
    not gate it; the template does not consult it.
 2. SGLang strips the template prefix from the response, so the *opening*
    `think` never reaches you — leaving output that looks like a malformed
    thinking block.
+3. When `enable_thinking=False` *is* respected, the template emits an **empty
+   thinking block** (`think\n\nthinking\n\n`) — and SGLang's `Qwen3Detector`
+   reasoning parser strips the opening `think` but leaks the closing
+   `thinking` into `content`. Output: `"thinking\n\nThe answer is 42."`
 
 **Why it happens.** A chat template is a Jinja program shipped inside the
 tokenizer, not part of the serving engine. A kwarg only does something if the
 template author wrote a branch for it. "The API accepts this argument" and
-"the model's template respects this argument" are unrelated facts.
+"the model's template respects this argument" are unrelated facts. The
+stripping is done by SGLang's reasoning parser (`reasoning_parser.py`,
+`Qwen3Detector`), which expects `think`…reasoning…`thinking` — a format the
+empty-block case doesn't match.
+
+**Peek at the system.** The request path is:
+`ChatCompletionRequest.normalize_reasoning_inputs()` (maps top-level
+`enable_thinking` → `chat_template_kwargs`) → `TemplateManager.apply_chat_template()`
+→ Jinja renders → model generates → `Qwen3Detector` strips tags.
+
+- **SGLang PR #33155** — "honor top-level enable_thinking field": before it,
+  bare `{"enable_thinking": false}` in the request body was **silently dropped
+  by Pydantic** (the field wasn't declared), so the kwarg never even reached
+  the template.
+- **SGLang #6675** — `enable_thinking=False` breaks structured JSON outputs.
+- **QwenLM/Qwen3.6#90** — vLLM has `--default-chat-template-kwargs` for
+  server-level defaults; SGLang lacks the equivalent.
 
 **The fix.** Prefix `think\n` explicitly in the scripts that need it. For the
 judge model — where thinking is unwanted — pass
@@ -235,12 +255,31 @@ ground truth.
 **What you see.** You follow a guide, set `SGLANG_EXTERNAL_MODEL_DIR`, and your
 custom model is not found.
 
-**What it was.** Deprecated in SGLang 0.5.6+, replaced by
-`SGLANG_EXTERNAL_MODEL_PACKAGE`. The old variable is simply unread.
+**What it was.** The name is wrong in a more interesting way than "deprecated":
+that variable **never existed**. SGLang only ever had
+`SGLANG_EXTERNAL_MODEL_PACKAGE` (since PR #13429, ~March 2025), which names a
+Python package, not a directory. The blog post you were following had drifted
+from the API.
 
 **Why it happens.** Fast-moving projects rename their extension points. Search
 results and blog posts outlive the API they describe, and an unread env var
-fails silently by construction.
+fails silently by construction. Worse: the *correct* variable,
+`SGLANG_EXTERNAL_MODEL_PACKAGE`, is read by the **main process** — but the
+model actually runs in a **subprocess**, and there the package must be
+importable via `sys.path`. The registry itself is the tip of a much deeper
+import chain (the full story is [I5](#i5-an-sglang-subprocess-cannot-import-your-custom-model)).
+
+**Peek at the system.** The extension mechanism:
+
+- `python/sglang/srt/model_loader/` — the loader builds model classes by
+  looking up a **registry** (`ModelRegistry`) by `__name__`, matching the
+  architecture string in the HF `config.json` (e.g. `Qwen2ForCausalLM`).
+- `ModelRegistry.register("sglang.srt.models")` registers the built-ins; when
+  `envs.SGLANG_EXTERNAL_MODEL_PACKAGE` is set, it calls
+  `ModelRegistry.register(external_pkg, overwrite=True)` instead, then imports
+  the package and collects every module that has an `EntryClass` attribute.
+- **Docs PR #21050** added the *documentation* for the env var long after the
+  code existed — the naming confusion goes all the way up.
 
 **The fix.** Use the package variable — though on this project even that did
 not survive contact (see [pattern 2](#pattern-2-which-python-is-installed)).
@@ -285,6 +324,23 @@ a set of interpreters, each with a `site-packages`. Activating a virtualenv is
 just prepending a directory to `PATH` for *your* shell; a job runner that
 invokes an absolute interpreter path never sees it.
 
+**Peek at the system.** This is compounded by the engine's own launcher
+habits. vLLM's `env_setup.py` and SGLang's `engine.py` both call
+`multiprocessing.set_start_method("spawn")` — the child process starts from a
+**fresh interpreter**, `sys.path` rebuilt, nothing inherited except the
+environment. `VIRTUAL_ENV` and `PATH` pointing at your venv are not enough;
+the child looks up `vllm` on its *own* `sys.path`, which starts with the
+parent's `sys.executable`'s site-packages. Two interpreters is bad enough;
+two interpreters *inside the engine* is three ways to be wrong.
+
+- **vLLM #15461** — the long-running saga of "collect_env doesn't detect
+  virtual environments", which is the same confusion fossilised: the tooling
+  that reports your environment also assumes one interpreter.
+
+**The fix.** Make the entrypoint select the interpreter explicitly:
+`uv run python main.py`, so the venv is active inside the job rather than
+merely in the shell that submitted it.
+
 ```
    your shell                    the job runner
    ──────────                    ──────────────
@@ -323,6 +379,26 @@ from the engine loop. That isolation is a feature, and it isolates your import
 path along with everything else. How a child process is spawned (`fork` vs
 `spawn`, whether the environment is copied, whether `sys.path` is rebuilt) is
 an implementation detail of the parent that you do not control.
+
+**Peek at the system.** The chain, in order:
+
+1. `engine.py` calls `mp.set_start_method("spawn", force=True)`. On Linux the
+   default would be `fork`, which copies the parent's memory *and* its
+   `sys.path` — and after CUDA initialises, fork is unsafe (the CUDA context
+   cannot be inherited by a fork child reliably). SGLang forces spawn for
+   safety.
+2. A **spawn** child is a fresh interpreter: it imports your entrypoint module
+   again, re-executes your `sys.path` manipulation, but **does not inherit the
+   parent's runtime `sys.path` or `PYTHONPATH`** — nothing from the parent's
+   process memory survives. Environment variables *do* pass through, but an
+   env var naming a package does not make the package importable.
+3. The runner then imports your model package through the *registry*
+   ([I3](#i3-sglang_external_model_dir-was-deprecated-silently)) — if the
+   package can't be found on the child's path, the error surfaces as
+   "architecture not registered", which looks nothing like an import error.
+
+So the debugging difficulty is structural: the error is reported far from the
+cause, and the cause (spawn semantics) is invisible in the error text.
 
 **The fix.** Stop fighting the boundary and put the code where the child will
 look anyway: patch SGLang's installed model source in place, so the runner
@@ -376,6 +452,27 @@ runtime. Two things follow, and both are counter-intuitive:
   at runtime. `-runtime` and `-devel` container tags encode an assumption —
   that compilation already happened — which JIT breaks.
 
+**Peek at the system.** The JIT is *per-shape*, and the shape key includes
+`num_kv_heads` — which changes with the TP degree. That is the concrete link
+between "I changed a config" and "it tried to compile":
+
+```
+   FlashInfer kernel cache key (per shard):
+   (batch_size, num_kv_heads, head_dim, page_size, dtype, KV_layout, ...)
+
+   TP=2:  num_kv_heads per GPU = 4
+   TP=4:  num_kv_heads per GPU = 2     ← different key → MISS → JIT
+```
+
+The cache itself lives under `~/.cache/flashinfer/` (subdirectories per
+compiler/config), so a fresh container also means a cold cache — the compile
+happens on the very first request that needs a kernel, not at startup.
+
+How vLLM decides: `has_flashinfer_cubin()` in `vllm/utils/flashinfer.py`
+probes for prebuilt cubins; if absent, vLLM itself kicks off FlashInfer's
+`flashinfer.jit` — and that's when the missing headers bite.
+**vLLM #42291** is the canonical report of this exact failure mode.
+
 **The fix.** Two options, both legitimate:
 
 1. **Lock the shapes** so the cached kernels stay valid (TP=4 for one model,
@@ -383,7 +480,9 @@ runtime. Two things follow, and both are counter-intuitive:
    wrapper that might re-resolve the environment.
 2. **Install the headers**: `ninja-build`, `cuda-nvrtc-dev-12-8`,
    `libcublas-dev-12-8` — making the runtime image capable of the compile it
-   was always going to attempt.
+   was always going to attempt. (vLLM's own Dockerfile does exactly this: the
+   *runtime* image installs the *devel* packages for FlashInfer and
+   flash-attn, precisely because they JIT at runtime.)
 
 **How to spot it next time.** If a stack trace mentions `.h` files, `nvcc`,
 `ninja` or a build directory, you are looking at a **compile** failure wearing
@@ -402,6 +501,23 @@ architecture and CUDA version.
 architectures it was built for and an ABI it expects. New silicon arrives
 before prebuilt wheels do, and the failure surfaces as a plain `ImportError` —
 which reads like a missing package rather than an incompatible binary.
+
+**Peek at the system.** The GPU generations matter more than the release
+number. `flash-attn` 2.8.3 (Aug 2025) ships kernels for SM70–SM110 (V100
+through Blackwell *datacenter*), which includes B200 = SM100. But consumer
+Blackwell (RTX 5090 = SM120) is a *different architecture* — and SM120 kernel
+support was only merged upstream in March 2026 (PRs #2329, #2330, #2333),
+with **no wheel released since**. A `pip install flash-attn` on an SM120
+machine therefore installs a wheel with no kernels for the card in front of
+it, and every `import flash_attn.ops` fails at link time.
+
+```
+   B200 / GB200        SM100   Blackwell datacenter    covered by 2.8.3  ✓
+   RTX 5090 / 5080     SM120   Blackwell consumer      not in any wheel ✗
+```
+
+The error message is the giveaway: `ImportError ... no kernel image is
+available for execution on the device` — "kernel image", not "package".
 
 **The fix.** Use a prebuilt wheel matching the architecture and ABI, or switch
 that cluster to SGLang, which did not need the extension.
@@ -457,6 +573,23 @@ breakage. Stack four such layers and the *intersection* of their constraints
 can be empty. No amount of resolver cleverness helps; the requirement is
 contradictory.
 
+**Peek at the system.** The specific chain in this incident was:
+
+- **Ray 2.55.x** requires `vllm>=0.18` — but Ray ships its *own fork* of vLLM
+  inside `ray.serve.llm`, so "vLLM" means two different codebases depending on
+  import path.
+- **vllm>=0.18** requires `transformers<5`.
+- The **target model** (Gemma 4) needs `transformers==5.10.2` — its
+  `model_type` (`gemma4`) only exists from transformers 5.5.
+
+So the empty intersection is not an accident of one version; it is a
+**release-cadence skew**: Gemma 4 shipped before Ray's managed layer was
+updated, and no patch-level bump on either side can fix it.
+
+- **ray-project/ray#60780** and **#62497** — managed-LLM integration reports
+  around exactly this friction.
+- **vllm-project/vllm#39216** — transformers 5.x compatibility tracking.
+
 **The fix — and this is the transferable part.** Stop trying to satisfy the
 constraint and **remove the coupling**. The managed integration was abandoned
 in favour of composing the pieces directly:
@@ -490,6 +623,32 @@ versions — a C-level crash, not a Python traceback.
 CUDA context and memory pool. When the contract between them shifts, you get a
 segfault rather than an error, because the failure is below Python.
 
+**Peek at the system.** How the two actually share state in "colocate" mode
+(`trl vllm-serve` with `WorkerExtension`):
+
+```
+   TRL process ──spawns──► vLLM engine workers (multiprocessing)
+                              │
+                              ├─ same NCCL communicator
+                              ├─ same CUDA context & memory pool
+                              │   (vLLM's MemoryPool: torch blocks owned by
+                              │    the engine, borrowed by TRL, freed on exit)
+                              └─ pynccl_comm updates model weights in place
+                                 (update_named_param: in-place copy into
+                                  the engine's KV cache and model buffers)
+```
+
+On shutdown, both sides free memory they believe is theirs — the classic
+double-free, invisible in Python, fatal at the CUDA level. Two documented
+variants of the same seam:
+
+- **huggingface/trl#3671** — GRPO + vLLM colocate + PEFT hangs with
+  `is_cpu` errors; the known workaround is
+  `NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1`, i.e. change the transport and the
+  bug moves.
+- **vllm-project/vllm#16993** — "SegFault on exit" from vLLM's own side of
+  the shared memory pool.
+
 **The fix.** Drop the built-in integration and compose explicitly: SGLang
 serving rollouts over HTTP, a separate large judge model scoring them, and a
 manual training step. More moving parts, each independently debuggable and
@@ -506,10 +665,23 @@ One incident in this project was not technical at all: a managed serving
 submission hung in `PROVISIONING` indefinitely because the required namespace
 was not enabled for the project — an org-admin permission.
 
-It is here for one reason: **an infinite hang with no error is a signal in
-itself.** Crashes come from code that ran; silent hangs often come from code
-that never started. Check that you are entitled to the resource before
-profiling the thing that is not running.
+**Peek at the system.** `PROVISIONING` is a **control-plane** state: the
+platform's scheduler is claiming a GPU node for you. Code never runs in this
+state — there is no log, no traceback, no process. The platform control plane
+and the data plane are separate systems; a hang here means the *first* of
+them couldn't finish a bookkeeping step (allocating the namespace's GPU
+quota), which no amount of application-level debugging can reach.
+
+**The fix.** Confirm entitlement first — with the platform owner, not with
+logs. The question is "is this *supposed* to be able to run here?", and that
+is answered by a permission check, not a profile.
+
+**How to spot it next time.** It is here for one reason: **an infinite hang
+with no error is a signal in itself.** Crashes come from code that ran; silent
+hangs often come from code that never started. Check that you are entitled to
+the resource before profiling the thing that is not running. A useful litmus:
+if *every* submission to that namespace hangs at the same stage, the problem
+is not your code.
 
 ---
 
@@ -563,6 +735,21 @@ So Lecture 13's three constraints have a fourth sibling: **no host
 synchronisation.** Shapes, addresses, command sequence — and nothing that
 requires the CPU to look at a value mid-graph.
 
+The full un-capturable list is a checklist worth keeping:
+
+```
+   data-dependent control flow
+   ├─ boolean indexing / indexed assignment   (this incident)
+   ├─ .item() or .cpu()                        → implicit device-to-host copy
+   ├─ if tensor > 0:  in Python                → needs a value on the host
+   ├─ torch.nonzero(...) / torch.argwhere      → output size is data-dependent
+   └─ early exit on an EOS check               → changes the command count
+```
+
+Any of these forces a synchronisation that capture cannot record — the graph
+is a frozen script of launches, and a launch whose arguments depend on a value
+the GPU just computed is not expressible in it.
+
 **The fix.** Replace the conditional write with an unconditional arithmetic
 one. Pre-allocate a tensor of ones with zeros at the masked indices, then:
 
@@ -592,6 +779,15 @@ graph capture on that platform.
 all-reduce. Capturing a graph that spans devices means recording operations
 whose completion depends on *another GPU*, which multiplies the ways capture
 can go wrong.
+
+**Peek at the system.** Count the collectives. A 28-layer transformer with
+TP=2 performs **two all-reduces per layer** — one after the attention output
+projection, one after the MLP down-projection — for **56 collectives per
+forward pass**. Each is an NCCL launch that synchronises two GPUs and, during
+capture, must itself be captured as a unit — and CUDA graphs do not play well
+with NCCL communicator state (the collective is a *cooperative* launch across
+devices whose ordering is managed by the peer, not by the capturing stream).
+On B200 the failure surfaced as a cross-device tensor error during capture.
 
 **The fix, and why it was the right call.** TP=1, and scale with **data
 parallelism** instead — multiple independent single-GPU instances.
@@ -654,14 +850,32 @@ reserves cache capacity per sequence, and paged engines carve VRAM into a block
 pool up front. Raising the limit means fewer sequences fit concurrently, so the
 value is a **real throughput trade**, not a formality.
 
-**The fix.** Restart with `--max-model-len 65536`.
+**Peek at the system.** Sizing is a concrete arithmetic problem:
 
-**How to spot it next time.** Measure your **input length distribution** before
-choosing the number — the p99, not the mean. And note the honest tension: too
-low and long requests are rejected; too high and concurrency drops for every
-request. When memory gets tight, engines preempt
+```
+   KV bytes per token = 2 (K+V) × n_layers × n_kv_heads × head_dim × bytes
+
+   Qwen3-0.6B (28 layers, 2 KV heads, d=128) in fp16:
+   2 × 28 × 2 × 128 × 2 B  =  28,672 B/token  ≈  28 KB/token
+
+   32K tokens  →  ~917 MB of KV cache for ONE sequence
+   64K tokens  →  ~1.8 GB
+   128K tokens →  ~3.7 GB
+```
+
+SGLang's `KVCache` allocates `(max_seqs, max_seq_len, n_kv_heads, head_dim)`
+per layer up front; vLLM's paged pool grows the same way. The paged
+architecture (Lecture 09) saves only the *unused tail* (at most
+`block_size − 1` tokens per sequence) — the per-token cost is identical, so a
+generous `max_model_len` is a real VRAM commitment even if no long request
+ever arrives. That is the honest tension: too low and long requests are
+rejected; too high and concurrency drops for every request. When memory gets
+tight, engines preempt
 ([Lecture 09](09-paged-attention.md#preemption)); a limit set far above your
 real p99 spends VRAM that could have been batch capacity.
+
+**The fix.** Restart with `--max-model-len 65536`, and pick the number from
+the p99 of your input length distribution — not the mean.
 
 ### I14: `max_new_tokens` truncation manufactured a quality failure
 
@@ -678,17 +892,22 @@ well-formed, *wrong* results rather than an error. A truncation limit is
 invisible in the output; a cut-off answer looks exactly like a model that
 stopped early.
 
-**The fix.** A hard rule of `max_new_tokens=16384` for evaluation runs.
-
-**How to spot it next time.** Before believing any quality regression, check
-whether outputs hit the length ceiling. One line settles it:
+**Peek at the system.** Engines expose the truth if you look: every output
+carries a `finish_reason`. `"length"` means "hit the token ceiling",
+`"stop"` means "ended on a stop token". On OpenAI-compatible endpoints the
+same field is `finish_reason` in the response `choices`. The whole class of
+bug collapses into one check:
 
 ```python
 truncated = sum(1 for o in outputs if o.finish_reason == "length")
 print(f"{truncated}/{len(outputs)} hit the token limit")
 ```
 
-If that number is not zero, fix the harness before analysing the model.
+**The fix.** A hard rule of `max_new_tokens=16384` for evaluation runs.
+
+**How to spot it next time.** Before believing any quality regression, run the
+`finish_reason` check above. If that number is not zero, fix the harness
+before analysing the model.
 
 > This is the single most useful entry on this page for interviews, because it
 > is about **trusting your measurement apparatus**. The
