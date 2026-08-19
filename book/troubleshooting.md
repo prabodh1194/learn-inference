@@ -118,20 +118,78 @@ different backend anyway.
 It is a V0-era control, still present, still settable, no longer wired to
 anything on the path that matters.
 
-**Why it happens.** Engines get rewritten. vLLM's V1 rearchitecture changed how
-backends are selected, and an env var that used to be load-bearing became
-vestigial. Nothing warns you, because from the process's point of view an
-unread environment variable is not an error — it is just an environment
-variable.
+**Why it happens — the V1 rearchitecture.** vLLM V1 replaced the old
+`VLLM_ATTENTION_BACKEND` env var with a structured **AttentionConfig** system.
+The old variable was deprecated in #26315 (Dec 2025) and fully removed in
+#32812 (Jan 2026). The literal string `VLLM_ATTENTION_BACKEND` no longer
+appears anywhere in the vLLM 0.26+ source tree — nothing reads it.
 
-**The fix.** Stop trying to steer the backend that way and remove the cause of
-the failure instead (see [pattern 3](#pattern-3-the-container-is-not-the-machine)).
+**How V1 automatic backend selection works.** When you don't specify a
+backend, V1 iterates through registered backends in **priority order** and
+picks the first one that validates against your configuration (model dtype,
+head size, compute capability, KV cache dtype, block size, attention type):
+
+```
+Priority (CUDA, standard attention):
+  1. FLASHINFER      — SM90+ decode, FlashInfer-native path
+  2. XQA             — SM90 TRT-LLM decode path (via FlashInfer)
+  3. TRTLLM_GEN      — SM100+ (Blackwell) decode, supports sinks
+  4. FLASH_ATTN_4    — SM100+ default prefill
+  5. FLASH_ATTN_3    — SM90 (Hopper) default prefill
+  6. FLASH_ATTN_2    — fallback prefill
+  7. TRITON_ATTN     — Triton backend, broad compatibility
+  8. TRITON_MLA      — MLA decode
+  9. FLASHMLA        — DeepSeek-style MLA decode
+ 10. ... (ROCm/CPU have separate lists)
+```
+
+Each backend implements `validate_configuration()` checking: compute capability,
+supported dtypes (fp16/bf16/fp32), KV dtypes, block sizes, head sizes, sink
+support, non-causal, sparse, multimodal prefix, DCP, attention types. The
+first compatible backend wins. If none validate, you get an error listing *all*
+backends and their rejection reasons.
+
+**The current mechanisms (what actually works):**
+
+| Method | Example |
+|--------|---------|
+| CLI flag | `vllm serve model --attention-backend FLASH_ATTN` |
+| Structured config | `vllm serve model -ac.backend FLASH_ATTN` or `-ac '{"backend": "FLASH_ATTN"}'` |
+| Python `attention_backend` kwarg | `LLM(model="...", attention_backend="FLASH_ATTN")` |
+| Python `AttentionConfig` | `LLM(model="...", attention_config=AttentionConfig(backend=AttentionBackendEnum.FLASH_ATTN))` |
+
+All four paths converge to the same validation logic. Explicit selection bypasses
+auto-selection and validates *only* your choice — if incompatible, you get a
+specific error (`Selected backend FLASHMLA is not valid: compute capability not
+supported`).
+
+**GitHub issues tracking this:**
+
+- **#50292** — "VLLM_ATTENTION_BACKEND env var is silently ignored —
+  `attention_backend=` kwarg is the only mechanism that works" (open). The
+  reporter caught it only because a controlled experiment showed zero effect
+  across paired comparisons.
+- **#50346** (open PR) — adds an actionable warning when the removed var is
+  set: `Environment variable VLLM_ATTENTION_BACKEND is no longer read by vLLM
+  and has no effect; use the --attention-backend CLI flag or the
+  attention_backend argument to LLM()/EngineArgs instead.` (merged after
+  0.26.0; backported to 0.26.1+).
+
+**The fix.** Stop trying to steer the backend via env var. Either:
+1. **Fix the root cause** of why the default backend fails (e.g., FlashInfer
+   JIT missing headers → install dev headers, Pattern 3), or
+2. **Use the supported mechanism** — `attention_backend="FLASH_ATTN"` in
+   `LLM()` / `EngineArgs`, or `--attention-backend` on CLI.
 
 **How to spot it next time.** When a documented knob appears to do nothing,
 **grep the installed source for the variable name** before you believe the
 docs. `grep -rn VLLM_ATTENTION_BACKEND .venv/lib/python3*/site-packages/vllm/`
 answers in seconds what an afternoon of experiments will not: whether anything
 reads it at all, and on which code path.
+
+> **Tip.** The V1 docs at `docs/design/attention_backends.md` (auto-generated
+> from the backend registry) list the exact priority tables and validation
+> rules for your hardware. Read that before forcing a backend.
 
 ### I2: `enable_thinking` is cosmetic on Qwen3
 
