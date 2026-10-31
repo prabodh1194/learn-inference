@@ -136,8 +136,10 @@ the `n_kv_heads × head_dim` term directly, and the two compose.
 > of its traffic that scales with context and batch — at the long contexts
 > where serving actually hurts, that's a direct 2× on the part that grows.
 > (At short context the weights dwarf the cache and the same halving buys ~3%
-> of the traffic; the crossover is the ~8k line from Lecture 01.)
-> [Full answer](qa.md#the-gqa-video-says-the-kv-cache-dwarfs-the-weights-the-book-says-weights-are-92-of-decode-traffic)
+> of the traffic; the crossover is the ~8k line from Lecture 01 — and on
+> frontier MoEs with compressed KV it shifts out past 200k.)
+> [Full answer](qa.md#the-gqa-video-says-the-kv-cache-dwarfs-the-weights-the-book-says-weights-are-92-of-decode-traffic) ·
+> [Frontier crossover](qa.md#the-books-kv-crossover-is-8k-tokens-frontier-models-hover-near-200k-is-that-the-same-line)
 
 ---
 

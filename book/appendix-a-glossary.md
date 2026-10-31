@@ -232,3 +232,80 @@ GPU busy-percentage, which is a poor scaling signal. *(L28)*
 
 **Cost per million tokens**: the unifying metric. Dominated by **fleet
 utilization** at low load, not by engine quality. *(L28)*
+
+---
+
+## Training systems
+
+**$6ND$ rule**: training compute per token is $2ND$ (forward) $+ 2ND$ (input
+gradient $B_x$) $+ 2ND$ (weight gradient $B_w$) $= 6ND$ FLOPs ($3\times$ prefill).
+*(L30)*
+
+**$16\Psi$ rule**: mixed-precision AdamW model state per parameter is $2\text{ B}$
+(BF16 weights) $+ 2\text{ B}$ (BF16 grads) $+ 4\text{ B}$ (FP32 master weights)
+$+ 4\text{ B}$ (FP32 $m$) $+ 4\text{ B}$ (FP32 $v$) $= 16\Psi$ bytes. *(L30)*
+
+**MFU vs. HFU**: Model FLOPs Utilization counts only the $6ND$ mathematical work
+in the numerator; Hardware FLOPs Utilization includes activation-recomputation
+FLOPs ($8ND$). *(L30)*
+
+**Activation checkpointing (gradient checkpointing)**: discarding intra-layer
+activations during forward and recomputing them during backward from saved layer
+boundaries ($2sbhL$ bytes), trading $+33\%$ FLOPs for a $10\times$–$20\times$
+cut in activation memory. *(L31)*
+
+**Sequence packing**: concatenating multiple variable-length documents into one
+fixed-length training bin with block-diagonal causal masking (`cu_seqlens`) and
+reset `position_ids`, eliminating padding waste. *(L32)*
+
+**ZeRO-1 / ZeRO-2 / ZeRO-3 (FSDP)**: sharding optimizer states ($12\Psi/D$),
+plus gradients ($(2\Psi+12\Psi)/D$), plus weights ($16\Psi/D$) across $D$
+data-parallel GPUs. ZeRO-1 and ZeRO-2 move $4\Psi$ bytes (same as DDP); ZeRO-3
+moves $6\Psi$ bytes. *(L33)*
+
+**Sequence Parallelism (SP)**: sharding the $10sbh$ norm/residual activations
+outside TP regions along the sequence axis using `all-gather` and `reduce-scatter`
+at zero extra communication volume over plain TP. *(L34)*
+
+**1F1B / Zero-Bubble / DualPipe**: pipeline schedules that bound in-flight
+activation memory at $\min(p, m)$ micro-batches (1F1B), split $B_x$ from $B_w$
+to fill warmup/drain bubbles (Zero-Bubble), and overlap bidirectional MoE
+`all-to-all` traffic behind compute (DualPipe). *(L34)*
+
+**Auxiliary-loss-free load balancing**: steering MoE top-$K$ selection with a
+non-differentiable per-expert bias $s_{i,t} + b_i$ updated by a sign thermostat,
+while keeping the gating multiplier $s_{i,t}$ untainted. *(L35)*
+
+---
+
+## Post-training & alignment
+
+**SFT prompt masking**: setting `labels = -100` on prompt tokens so cross-entropy
+gradients only flow from assistant response tokens. *(L36)*
+
+**LoRA / QLoRA**: freezing base weights $W_0$ (in BF16 or 4-bit NF4) and training
+low-rank adapters $\frac{\alpha}{r} B A$ with $B=0, A \sim \mathcal{N}(0, \sigma^2)$.
+Eliminates $98\%$ of optimizer state while leaving activation memory unchanged.
+*(L36)*
+
+**Bradley-Terry model**: pairwise preference model $P(y_w \succ y_l \mid x) = \sigma(r(x, y_w) - r(x, y_l))$.
+*(L37)*
+
+**PPO (4-model RLHF)**: online actor-critic RL requiring Actor ($16\Psi$), Critic
+($16\Psi$), Reference ($2\Psi$), and Reward Model ($2\Psi$) $= 36\Psi$ bytes. *(L37)*
+
+**DPO**: closed-form reparameterization $r(x,y) = \beta \log(\pi_\theta / \pi_{\text{ref}}) + \beta \log Z(x)$
+that cancels $Z(x)$ inside Bradley-Terry, eliminating the Reward Model, Critic,
+and rollouts ($18\Psi$ bytes). *(L38)*
+
+**GRPO**: online RL that replaces PPO's $16\Psi$ Critic with the empirical mean
+and standard deviation of a group of $G$ sampled completions per prompt,
+$\hat{A}_i = (r_i - \mu_r)/\sigma_r$, plus Schulman's unbiased non-negative $k_3$
+KL estimator. *(L39)*
+
+**RLVR**: Reinforcement Learning with Verifiable Rewards (math checkers, unit
+tests), eliminating neural reward models and reward hacking. *(L39, L40)*
+
+**HybridEngine (co-located RL)**: time-sharing GPUs between vLLM rollout
+generation and FSDP gradient updates by resharding weights and sleeping/waking
+vLLM's KV cache pool every step. *(L41)*

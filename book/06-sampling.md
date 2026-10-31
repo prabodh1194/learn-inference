@@ -238,8 +238,8 @@ greedy path as a bug**, not as noise to average away.
   book skips: **epsilon sampling** (drop tokens below a probability floor),
   **η-sampling** (threshold from the local entropy), **min-p** (relative to the
   top token), and **locally typical sampling** (keep tokens whose log-prob is
-  near the entropy; it *raises* perplexity on purpose). The Q&A unpacks the
-  family.
+  near the entropy; it *raises* perplexity on purpose). The
+  [Q&A unpacks the family](qa.md#whats-the-difference-between-epsilon-sampling-sampling-and-min-p).
 - **vLLM `vllm/sampling_params.py`**: the production surface area. Note how many
   parameters exist beyond these four, and that they're applied in a defined order
   for the same reason.

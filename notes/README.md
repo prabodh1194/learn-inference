@@ -65,3 +65,5 @@ and it's why writing them as you go matters more than writing them well.
 | 2 | [02-kernels](02-kernels/) | M2.1–M2.6 — profiling, Triton, flash/paged attention, CUDA |
 | 3 | [03-parallelism](03-parallelism/) | M3.1–M3.5 — JAX, sharding, TP, MoE |
 | 4 | [04-production](04-production/) | M4.1–M4.6 — serving, load testing, vs. vLLM, P/D |
+| 5 | [05-training](05-training/) | L30–L35 — 6ND/16Ψ ledger, activations, packing, ZeRO/FSDP, PP, FP8 |
+| 6 | [06-post-training](06-post-training/) | L36–L41 — SFT, LoRA, PPO, DPO, GRPO, R1 distillation, RL systems |

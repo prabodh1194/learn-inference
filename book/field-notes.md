@@ -176,6 +176,36 @@ the *system*, not the model, unless you pin the harness too.
 
 ---
 
+## The output-head logit tensor is the hidden OOM in training: **L31**
+
+Engineers enabling `gradient_checkpointing` on Qwen3 / Llama-3 ($V = 128\text{k}$–$152\text{k}$)
+routinely hit `CUDA out of memory` at the very end of the forward pass. The 28
+transformer layers' checkpointed activations take under $1\text{ GiB}$, while a
+single unfused `logits.float()` tensor at `batch=4, seq_len=4096` allocates
+$9.27\text{ GiB}$ for forward and another $9.27\text{ GiB}$ for backward. Chunked
+or fused linear cross-entropy (`Liger-Kernel`) eliminates the spike immediately.
+
+## Discovery vs. imitation in reasoning post-training: **L40**
+
+DeepSeek-R1's Section 4.2 ablation is the sharpest published comparison of
+direct RL vs. distillation on a small model: running 10,000 steps of large-scale
+GRPO directly on `Qwen-32B-Base` landed at **47.0% AIME**, whereas simple SFT
+distillation on R1's traces reached **72.6% AIME** (+25.6 points) at a tiny
+fraction of the compute. Discovering reasoning paths in a $V^T$ haystack needs a
+frontier model's priors; once found, copying those traces via SFT gives dense
+per-token supervision.
+
+## Online RL training is 80% an inference problem: **L41**
+
+Operators running GRPO / RLVR pipelines (`veRL`, `OpenRLHF`) on long-CoT tasks
+($4\text{k}$–$32\text{k}$ rollout length) report that **70%–85% of step wall-clock
+time is spent inside vLLM / SGLang generating rollouts**, not inside FSDP
+computing gradients. Turning on prefix caching across the $G$ group completions
+per prompt (L10) and tuning vLLM's KV cache utilization after FSDP weight sync
+moves RL training throughput far more than any trainer-side kernel.
+
+---
+
 ## How to use this
 
 When a lecture predicts something, check whether the field notes agree on

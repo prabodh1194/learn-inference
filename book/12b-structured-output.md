@@ -62,7 +62,9 @@ state = grammar_fsm.advance(state, token)
 Why `-inf` works: the next step turns scores into probabilities (softmax,
 Lecture 06), and a score of `-inf` becomes exactly 0%, no rounding, no
 exceptions. Invalid output becomes **impossible**, not unlikely. That's a much
-stronger guarantee than prompting, and it composes with any sampling parameters.
+stronger guarantee than prompting, and it composes with any sampling parameters
+without changing relative preferences among legal tokens
+([why?](qa.md#does-logit-masking-change-the-models-relative-preferences)).
 
 A tiny grammar in action (a schema like `{ "city": "..." }`):
 
@@ -125,7 +127,8 @@ cannot count: schemas with unbounded nesting (`{"a":{"a":{...}}}`) need a
 an FSA — and that stack is part of the per-sequence state that must survive
 preemption (next section). Constraints like "all keys unique" or "every `$ref`
 is defined before use" are beyond even context-free: no masking scheme can
-enforce them at all. The schema is a contract; the grammar only guarantees
+enforce them at all ([why?](qa.md#why-cant-the-state-machine-enforce-all-keys-unique)).
+The schema is a contract; the grammar only guarantees
 *syntax*, and required keys mean distinct FSM states, not just balanced braces.
 
 ### The interaction people miss

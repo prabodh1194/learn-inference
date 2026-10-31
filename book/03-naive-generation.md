@@ -206,6 +206,7 @@ nondeterministic thread order, so a tie-adjacent top logit can flip run to run
 across machines (or CUDA versions). Your oracle works because you hold device
 and code fixed; if greedy ever differs between two machines, that nondeterminism
 is the reason, not a logic bug.
+[Full answer](qa.md#i-ran-greedy-decoding-twice-and-got-different-output-is-my-code-wrong)
 
 **4. Measure: the actual point of the lecture:**
 

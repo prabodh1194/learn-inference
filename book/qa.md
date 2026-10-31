@@ -1844,3 +1844,392 @@ var that was removed" and "an env var that never existed" — are distinguished
 only by reading the installed source. `grep -rn EXTERNAL_MODEL .venv/.../sglang/`
 answers in seconds which case you are in, and the answer decides whether there
 is a supported migration at all.
+
+---
+
+## Why does the 6ND formula use 440.4M parameters, while the memory ledger uses 596.0M?
+
+**Lecture:** [30. The training ledger](30-training-arithmetic.md)
+
+**Wrong intuition:** "A model has one parameter count; using 440.4M in the FLOP
+formula and 596.0M in the memory formula is inconsistent."
+
+They count two different physical things: **matrix-multiply work** vs **bytes
+held in VRAM**.
+
+Qwen3-0.6B has $440.4\text{M}$ parameters inside its 28 transformer blocks, plus
+a token embedding matrix of shape $151{,}936 \times 1024 = 155.6\text{M}$
+parameters (which is **tied** to the output language-modeling head):
+
+```
+28 transformer blocks :  440,401,920 params
+tied token embedding  :  155,648,000 params
+-------------------------------------------
+total stored in VRAM  :  596,049,920 params
+```
+
+On the input side, an embedding layer is an array index (`table[token_id]`),
+not a matrix multiplication — it does **zero FLOPs**. In the Kaplan / Hoffmann
+(*Chinchilla*) scaling-law convention, $N$ in $C \approx 6ND$ denotes
+non-embedding parameters ($440.4\text{M}$), or if you include the output-head
+logit projection explicitly, $440.4\text{M} + 155.6\text{M} = 596.0\text{M}$. By
+contrast, the GPU's memory allocator and AdamW cannot skip the embedding table:
+every one of those $155.6\text{M}$ embedding weights has a gradient, an FP32
+master weight, a first moment $m$, and a second moment $v$. So VRAM always pays
+for the full $\Psi = 596.0\text{M}$ parameters ($16 \times 596.0\text{M} = 8.88\text{ GiB}$).
+
+---
+
+## Why use BF16 for matmuls if we still keep FP32 master weights?
+
+**Lecture:** [30. The training ledger](30-training-arithmetic.md)
+
+**Wrong intuition:** "If we have to keep a 4-byte FP32 copy of the weights
+anyway, mixed precision didn't really save precision — we might as well run the
+whole training step in FP32."
+
+That confuses **once-per-step elementwise state** with **per-token matrix
+multiplication and activation storage**.
+
+In a training step over $D = 16{,}384$ tokens:
+- The **forward and backward matmuls** do $6ND \approx 43.3\text{ TFLOP}$ of
+  arithmetic and save gigabytes of forward activations across 28 layers
+  (Lecture 31). Running those in BF16 uses tensor cores at $2\times$–$8\times$
+  the throughput of FP32 and cuts activation memory in half.
+- The **AdamW update** $w_{\text{fp32}} \leftarrow w_{\text{fp32}} - \eta \cdot m / (\sqrt{v} + \epsilon)$
+  touches each parameter **once per optimizer step** ($\sim 5$ FLOPs/param,
+  $<0.01\%$ of the step's compute).
+
+So FP32 is used only where small increments $\Delta w \sim 10^{-4}$ are added to
+$w \sim 1.0$ (where BF16's $2^{-7} = 0.0078125$ spacing would round the update
+to zero), while BF16 is used everywhere $O(N D)$ compute and $O(L b s h)$
+activations live.
+
+---
+
+## If FlashAttention doesn't save the sxs matrix P, how does its backward pass work?
+
+**Lecture:** [31. Activations, checkpointing, and gradient accumulation](31-activation-memory.md) · [17. FlashAttention](17-flash-attention.md)
+
+**Wrong intuition:** "Backpropagation through $O = PV$ and $P = \text{softmax}(S)$
+mathematically requires the $s \times s$ probability matrix $P$. If you didn't
+save $P$ in forward, you can't compute $\nabla_Q, \nabla_K, \nabla_V$."
+
+You *do* need $P_{ij}$ during backward — you just don't need to **store it in
+HBM** between forward and backward!
+
+During the forward pass, FlashAttention saves only the output $O$ and the 1-D
+per-row log-sum-exp vector $L_i = m_i + \log \ell_i$ (which takes $4 b n_h s$
+bytes: **1 MiB** per layer at $b=4, s=4096$, instead of **4 GiB** for $S$ and $P$).
+When the backward kernel runs, each thread block loads the tiles $Q_i, K_j$ from
+HBM into on-chip SRAM, recomputes the score tile $S_{ij} = Q_i K_j^\top / \sqrt{d}$,
+and reconstructs the exact softmax tile on the fly in registers using the saved
+$L_i$:
+
+$$P_{ij} = \exp(S_{ij} - L_i)$$
+
+It then immediately multiplies $P_{ij}$ with $\nabla_{O_i}$ and $V_j$ inside SRAM
+to accumulate $\nabla_Q, \nabla_K, \nabla_V$, and discards $P_{ij}$ again. Just
+like in Lecture 17, doing extra tensor-core FLOPs inside SRAM is much faster
+than reading and writing $112\text{ GiB}$ of attention matrices across HBM.
+
+---
+
+## How do you compute cross-entropy without materializing the 9.27 GiB logit tensor?
+
+**Lecture:** [31. Activations, checkpointing, and gradient accumulation](31-activation-memory.md)
+
+**Wrong intuition:** "Cross-entropy is a single line at the end of the model
+(`F.cross_entropy(lm_head(h), labels)`), so its memory footprint is negligible
+compared to 28 transformer layers."
+
+For large-vocabulary models ($V = 151{,}936$ in Qwen3, $128{,}256$ in Llama 3),
+that single line is the **largest single tensor in the entire training step**. At
+$b = 4, s = 4096$, the hidden state $H$ entering the head is
+$4 \times 4096 \times 1024 \times 2\text{ B} = 32\text{ MiB}$, while the FP32
+logit tensor `logits = lm_head(H).float()` is
+$4 \times 4096 \times 151{,}936 \times 4\text{ B} = 9.27\text{ GiB}$ (plus
+another $9.27\text{ GiB}$ for $\nabla_{\text{logits}}$!).
+
+Two techniques eliminate it:
+1. **Chunked cross-entropy:** slice the $N_{\text{tok}} = b \cdot s = 16{,}384$
+   hidden rows into 16 chunks of $1{,}024$ tokens. For each chunk, compute the
+   $1{,}024 \times 151{,}936$ logits, compute the loss and $\nabla_H$ chunk
+   immediately, and free the chunk's logits before the next chunk runs. Peak
+   logit memory drops by $16\times$ ($9.27\text{ GiB} \to 0.58\text{ GiB}$).
+2. **Fused linear cross-entropy (`Liger-Kernel`):** tile the vocabulary
+   dimension $V$ in Triton using online softmax (Lecture 17) to compute both the
+   loss $-\log p_{y_t}$ and the gradient $\nabla_z = p - \mathbf{e}_{y_t}$ in
+   SRAM without ever writing the $[b, s, V]$ tensor to HBM.
+
+---
+
+## How does FlashAttention enforce block-diagonal document masks without an SxS mask?
+
+**Lecture:** [32. Data pipelines, sequence packing, and loss masking](32-data-and-packing.md)
+
+**Wrong intuition:** "To stop packed Document B from attending to Document A in
+the same $4{,}096$-token sequence, you have to pass a 2-D boolean mask of shape
+$(4096, 4096)$ to attention."
+
+Passing a $(4096, 4096)$ mask tensor would re-materialize the quadratic memory
+traffic FlashAttention was built to eliminate, and the kernel would still waste
+compute iterating over masked-out off-diagonal tiles.
+
+Instead, variable-length FlashAttention (`flash_attn_varlen_func`) takes a 1-D
+array of cumulative document offsets `cu_seqlens`, e.g. `[0, 512, 1400, 2048]`
+for three packed documents of lengths `512`, `888`, and `648`. The kernel's
+thread block for document $d$ reads `start = cu_seqlens[d]` and
+`end = cu_seqlens[d+1]` and bounds its inner key/value loop strictly to
+`[start, end)`. Off-diagonal tiles between different documents are never even
+loaded from HBM.
+
+---
+
+## Why does averaging micro-batch losses bias gradients toward short completions?
+
+**Lecture:** [32. Data pipelines, sequence packing, and loss masking](32-data-and-packing.md)
+
+**Wrong intuition:** "The mean of the micro-batch means equals the mean of the
+whole batch, so `loss = F.cross_entropy(logits, labels) / grad_accum_steps` is
+exact."
+
+The mean of means equals the global mean **only when every micro-batch has the
+exact same denominator $N_m$**.
+
+In SFT and RL post-training, prompt tokens are masked with `ignore_index = -100`,
+and completion lengths vary wildly. PyTorch's `F.cross_entropy(..., reduction="mean")`
+divides micro-batch $m$'s sum of token losses by $N_m$, the count of non-`-100`
+tokens in *that* micro-batch:
+
+$$\frac{1}{M}\sum_{m=1}^M \left(\frac{1}{N_m}\sum_{t=1}^{N_m} \ell_{m,t}\right) \neq \frac{\sum_{m=1}^M \sum_{t=1}^{N_m} \ell_{m,t}}{\sum_{m=1}^M N_m}$$
+
+If micro-batch 1 has $N_1 = 100$ valid tokens and micro-batch 2 has $N_2 = 10$
+valid tokens, every token in micro-batch 2 is divided by $2 \times 10 = 20$
+while every token in micro-batch 1 is divided by $2 \times 100 = 200$. Short
+completions get $10\times$ the gradient weight per token! Always sum the unreduced
+token losses (`reduction="sum"`) and divide by the total valid token count
+$\sum_{m=1}^M N_m$ across the entire accumulation step (and across DP ranks).
+
+---
+
+## How can ZeRO-1 save memory with zero extra network traffic?
+
+**Lecture:** [33. Data parallelism, ZeRO-1/2/3, and FSDP](33-zeRO-and-fsdp.md)
+
+**Wrong intuition:** "Sharding optimizer state across GPUs means GPUs have to
+send extra messages to share updates, so ZeRO-1 must trade network bandwidth for
+VRAM."
+
+It costs **zero** extra bytes because standard DDP was already sending those
+bytes!
+
+In standard DDP, a ring `all-reduce` of BF16 gradients ($2\Psi$ bytes) consists
+of two phases:
+1. A `reduce-scatter` ($2\Psi$ bytes moved), after which GPU $r$ holds the fully
+   summed gradient for parameter shard $r$.
+2. An `all-gather` ($2\Psi$ bytes moved), after which every GPU holds the full
+   summed gradient for all parameters — and then all $D$ GPUs redundantly execute
+   the exact same `optimizer.step()` on all $\Psi$ parameters.
+
+ZeRO-1 simply runs `optimizer.step()` **between** the two phases:
+1. Run the `reduce-scatter` on gradients ($2\Psi$ bytes).
+2. Each GPU updates only its $1/D$ shard of FP32 master weights, $m$, and $v$.
+3. Run the `all-gather` on the updated BF16 weights ($2\Psi$ bytes) instead of
+   on the gradients.
+
+Total traffic on the wire: $2\Psi + 2\Psi = 4\Psi$ bytes — identical to DDP,
+while freeing $\frac{D-1}{D}$ of the $12\Psi$ optimizer state!
+
+---
+
+## Why does DeepSeek-V3 use ZeRO-1 instead of ZeRO-3 at scale?
+
+**Lecture:** [33. Data parallelism, ZeRO-1/2/3, and FSDP](33-zeRO-and-fsdp.md)
+
+**Wrong intuition:** "ZeRO-3 shards weights, gradients, and optimizer states
+($16\Psi / D$), so it is strictly better than ZeRO-1 at large scale."
+
+Look at **when** communication happens under gradient accumulation across $K$
+micro-batches:
+- **ZeRO-1** keeps the $2\Psi$ weights resident, so all $K$ forward+backward
+  micro-batches run with **zero data-parallel communication**; the single
+  `reduce-scatter` + `all-gather` ($4\Psi$ bytes) runs **once per optimizer step**.
+- **ZeRO-3 / FSDP** discards non-local weights after every layer, so it must
+  `all-gather` weights in forward ($2\Psi$) and again in backward ($2\Psi$) on
+  **every single micro-batch** $k = 1, \dots, K$, plus `reduce-scatter`
+  gradients: $(4K + 2)\Psi$ bytes per step!
+
+Once Pipeline Parallelism and Expert Parallelism already fit the $2\Psi$ weights
+in VRAM, ZeRO-1 captures the $75\%$ optimizer-state reduction ($12\Psi / D$) at
+a fraction of ZeRO-3's network traffic.
+
+---
+
+## How does Sequence Parallelism avoid saving the all-gathered input for backward?
+
+**Lecture:** [34. TP + SP, Pipeline schedules, and 3D parallelism](34-3d-parallelism-and-schedules.md)
+
+**Wrong intuition:** "In Sequence Parallelism, rank $r$ holds $[s/t, b, h]$ at
+the norm, then runs an `all-gather` to form the full $[s, b, h]$ input $X$ before
+the Column-Parallel matmul $Y_r = X W_r$. Since backward needs $X$ to compute
+$\nabla_{W_r} = X^\top \nabla_{Y_r}$, rank $r$ still has to save the full
+$[s, b, h]$ tensor!"
+
+If you saved the gathered $[s, b, h]$ tensor, SP wouldn't save the input
+activation memory! Instead, immediately after the forward matmul $Y_r = X W_r$
+finishes, the full gathered buffer $X$ is **deallocated**, and rank $r$ keeps
+only its local $[s/t, b, h]$ slice in VRAM ($t\times$ smaller). During the
+backward pass, while the GPU computes the input gradient $\nabla_X$, an
+asynchronous `all-gather` on a secondary stream reconstructs the full $[s, b, h]$
+tensor just in time for $\nabla_{W_r} = X^\top \nabla_{Y_r}$, and frees it again
+immediately after.
+
+---
+
+## Why do FP8 activations use 1x128 tiles while weights use 128x128 blocks?
+
+**Lecture:** [35. Low-precision training (FP8) and modern optimizers](35-fp8-training-and-optimizers.md)
+
+**Wrong intuition:** "1×128 per-token tile scaling has finer granularity than
+128×128 block scaling, so weights should use 1×128 tiles too."
+
+In training, the weight matrix $W \in \mathbb{R}^{d_{\text{in}} \times d_{\text{out}}}$
+is multiplied in **two orthogonal directions** (Lecture 30):
+- Forward ($Y = XW$) contracts along rows ($d_{\text{in}}$).
+- Input-backward ($\nabla_X = \nabla_Y W^\top$) contracts along columns ($d_{\text{out}}$).
+
+A tensor core requires a single scale factor per tile **along the contraction
+dimension**. If $W$ were quantized with $1 \times 128$ tiles along $d_{\text{in}}$,
+those scales would lie *across* the contraction axis during $\nabla_X = \nabla_Y W^\top$,
+forcing you to dequantize and re-quantize $W^\top$ every step. A symmetric
+**$128 \times 128$ block scale** on $W$ is aligned with **both** $d_{\text{in}}$
+and $d_{\text{out}}$ simultaneously!
+
+---
+
+## If base weights are frozen in LoRA, why doesn't activation memory drop?
+
+**Lecture:** [36. Supervised fine-tuning (SFT), LoRA, and QLoRA](36-sft-and-lora.md)
+
+**Wrong intuition:** "`requires_grad=False` on 98.3% of the parameters means
+PyTorch doesn't need to save activations for 98.3% of the network."
+
+`requires_grad=False` on $W_0$ only skips computing $\nabla_{W_0}$. Because you
+attached LoRA adapters $(A_\ell, B_\ell)$ to **every layer $\ell = 1, \dots, 28$**,
+computing $\nabla_{A_1}, \nabla_{B_1}$ in Layer 1 requires:
+1. Saving the forward input $X_\ell$ at every adapted linear projection across
+   all 28 layers.
+2. Backpropagating the activation gradient $\nabla_X$ from Layer 28 all the way
+   down to Layer 1 through every attention block, RMSNorm, and SwiGLU
+   non-linearity — which requires all of their forward activations too!
+
+LoRA crushes **optimizer and gradient memory** ($14\Psi \to 0.24\Psi$), which leaves
+**activations** as the dominant consumer of VRAM.
+
+---
+
+## Why does PPO take the min of unclipped and clipped terms?
+
+**Lecture:** [37. Reward modeling and RLHF with PPO](37-reward-models-and-ppo.md)
+
+**Wrong intuition:** "If we want $\rho_t(\theta) \in [1-\varepsilon, 1+\varepsilon]$,
+why not just write $\text{clip}(\rho_t(\theta), 1-\varepsilon, 1+\varepsilon) \hat{A}_t$
+without the $\min(\cdot, \cdot)$?"
+
+Because without the $\min$, the clip would block **recovery** when $\rho_t$
+starts on the wrong side of the interval!
+
+Suppose $\hat{A}_t > 0$ (good token, so we want $\rho_t$ to increase) and an
+earlier mini-batch update accidentally pushed $\rho_t$ down to $0.5 < 1 - \varepsilon$.
+If the objective were bare $\text{clip}(\rho_t, 0.8, 1.2)\hat{A}_t$, then at
+$\rho_t = 0.5$ the clip would already be flat at $0.8$ with **zero gradient**,
+preventing $\rho_t$ from climbing back toward $1.0$! Taking
+$\min(\rho_t \hat{A}_t, \text{clip}(\rho_t, 0.8, 1.2)\hat{A}_t)$ leaves the
+objective unclipped at $\rho_t = 0.5$ (so it can recover) and only flattens the
+ceiling once $\rho_t > 1.2$ ("pessimistic lower bound").
+
+---
+
+## If DPO solves the same equation as PPO, why does online RL beat DPO on reasoning?
+
+**Lecture:** [38. Direct Preference Optimization (DPO)](38-dpo-and-offline-preference.md)
+
+**Wrong intuition:** "DPO's Theorem 1 proves its optimum is mathematically
+identical to PPO's KL-constrained optimum, so offline DPO and online RL must
+reach the same accuracy."
+
+The theorem holds in the limit of infinite data covering the full support of
+$\pi_\theta$. In practice, **offline DPO never samples from $\pi_\theta$**: it
+trains on a static dataset $\mathcal{D} = \{(x, y_w, y_l)\}$ collected once at
+the start. As $\pi_\theta$ updates over thousands of steps, its distribution
+drifts away from $\mathcal{D}$: the model starts assigning high probability to
+new incorrect reasoning chains that never appeared as $y_l$ in $\mathcal{D}$, so
+offline DPO never penalizes them. Online RL (GRPO / PPO) samples fresh rollouts
+from $\pi_\theta$ at every step, confronting the model with its **current**
+failure modes.
+
+---
+
+## What happens in GRPO when all G samples get the same reward?
+
+**Lecture:** [39. Group Relative Policy Optimization (GRPO)](39-grpo-and-reinforcement-learning.md)
+
+**Wrong intuition:** "If all $G = 8$ sampled answers to a math problem are
+correct ($r = [1, 1, \dots, 1]$), GRPO reinforces all 8 answers strongly."
+
+Check the formula $\hat{A}_i = \frac{r_i - \mu_r}{\sigma_r + \epsilon}$: when
+$r = [1, 1, \dots, 1]$, the mean is $\mu_r = 1.0$, so the numerator is
+$r_i - \mu_r = 0.0$ for every single answer! All $G$ advantages are **zero** —
+and the exact same thing happens when all $G$ answers are wrong ($r = [0, 0, \dots, 0] \implies \hat{A}_i = 0.0$).
+
+GRPO is strictly a **contrastive** algorithm within each prompt's group: it only
+learns when a prompt produces a mix of better and worse answers inside the group
+of $G$ rollouts. Prompts that are already mastered ($8/8$) or completely out of
+reach ($0/8$) contribute zero policy-gradient signal, which is why modern GRPO
+trainers (like DAPO) filter or resample homogeneous groups.
+
+---
+
+## What is the difference between Forward KL and Reverse KL in distillation?
+
+**Lecture:** [40. Reasoning pipelines and knowledge distillation](40-reasoning-pipelines-and-distillation.md)
+
+**Wrong intuition:** "KL divergence just measures distance between the teacher
+$p_T$ and student $p_S$; the order of arguments $D_{\text{KL}}(p_T \,\|\, p_S)$
+vs $D_{\text{KL}}(p_S \,\|\, p_T)$ is a minor convention."
+
+KL divergence is asymmetric, and for an under-parameterized student ($0.6\text{B}$
+learning from $671\text{B}$) the two directions produce opposite behaviors:
+- **Forward KL** $D_{\text{KL}}(p_T \,\|\, p_S) = \sum_y p_T(y) \log \frac{p_T(y)}{p_S(y)}$
+  weights the log-ratio by $p_T(y)$. Wherever the teacher puts non-zero mass
+  ($p_T(y) > 0$), if the student puts $p_S(y) \to 0$, the loss blows up to
+  $+\infty$. This forces the small student to spread its mass across **every**
+  mode of the teacher (**zero-avoiding / mode-covering**), often placing its mean
+  in the low-probability valley between modes.
+- **Reverse KL** $D_{\text{KL}}(p_S \,\|\, p_T) = \sum_y p_S(y) \log \frac{p_S(y)}{p_T(y)}$
+  weights the log-ratio by $p_S(y)$. If the student sets $p_S(y) = 0$ on one of
+  the teacher's modes, $0 \log 0 = 0$ — there is **no penalty** for dropping modes,
+  and infinite penalty for putting mass where $p_T(y) = 0$. The small student
+  locks sharply onto a single valid mode of the teacher (**mode-seeking**).
+
+---
+
+## Why must co-located RL trainers sleep vLLM's KV cache during the backward pass?
+
+**Lecture:** [41. RL infrastructure: where the inference engine meets the trainer](41-rl-systems-inference-meets-training.md)
+
+**Wrong intuition:** "Once vLLM finishes generating the rollout tokens, it is
+idle during the FSDP backward pass, so its memory is automatically available to
+PyTorch."
+
+vLLM does not return its KV cache blocks to `cudaFree` between requests! As you
+saw in Lecture 09, vLLM pre-allocates `gpu_memory_utilization` (typically $80\%$–$90\%$
+of physical HBM) at engine startup into its own persistent `PagedKVCache` tensor
+so it never pays `cudaMalloc` overhead during serving. To PyTorch's FSDP trainer
+running in the same GPU context, that $80\%$ of VRAM is **already occupied**.
+Unless vLLM explicitly unmaps the physical pages of its KV cache pool (vLLM's
+`sleep(level=1)` API using CUDA virtual memory `cuMemUnmap`) before the Learner
+phase starts — and FSDP offloads or unmaps its optimizer states before vLLM
+wakes back up — the two engines collide and OOM immediately.
+

@@ -45,6 +45,18 @@ LECTURES = [
     ("27", "Routing / disagg", "test_27_routing.py"),
     ("28", "Autoscaling / cost", "test_28_cost.py"),
     ("28b", "Reasoning / TTC", "test_28b_reasoning.py"),
+    ("30", "Training ledger", "test_30_training_ledger.py"),
+    ("31", "Activation memory", "test_31_activations.py"),
+    ("32", "Sequence packing", "test_32_packing.py"),
+    ("33", "ZeRO and FSDP", "test_33_zero.py"),
+    ("34", "3D / PP schedules", "test_34_pipeline.py"),
+    ("35", "FP8 training / MoE", "test_35_fp8_train.py"),
+    ("36", "SFT and LoRA", "test_36_sft_lora.py"),
+    ("37", "Reward / PPO RLHF", "test_37_ppo_rlhf.py"),
+    ("38", "DPO alignment", "test_38_dpo.py"),
+    ("39", "GRPO / RLVR", "test_39_grpo.py"),
+    ("40", "Distillation / R1", "test_40_distillation.py"),
+    ("41", "RL systems loop", "test_41_rl_systems.py"),
 ]
 
 GREEN, RED, GREY, DIM, RESET = "\033[32m", "\033[31m", "\033[90m", "\033[2m", "\033[0m"

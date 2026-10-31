@@ -135,4 +135,14 @@ corrected.
 
 ---
 
-**That's the book.** Go make something fast.
+**That completes the inference half of the book.** Next, cross the aisle into how weights are trained and aligned.
+
+## Next
+
+**[30. The training ledger: $6ND$ and the $16\Psi$ wall](30-training-arithmetic.md)**:
+Part VI begins. Derive why training multiplies compute by $3\times$ and model
+state memory by $8\times$ before a single token is processed.
+
+```bash
+uv run python book/code/training_ledger.py
+```

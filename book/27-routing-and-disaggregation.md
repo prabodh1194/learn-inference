@@ -44,12 +44,13 @@ a replica has right now, in-flight requests, queue depth, whichever simple
 proxy you trust:
 
 ```python
-def route(request, replicas):
-    prefix_hash = hash_prefix(request.prompt_ids)
-    warm = [r for r in replicas if r.has_prefix(prefix_hash)]
-    if warm:
-        return min(warm, key=lambda r: r.load)   # warmest AND least loaded
-    return min(replicas, key=lambda r: r.load)
+class Router:
+    def route(self, prefix_hash: str) -> int:
+        warm = [r for r in self.replicas
+                if prefix_hash in r.prefixes and r.load < self.load_threshold]
+        if warm:
+            return min(warm, key=lambda r: r.load).id   # warm AND under threshold
+        return min(self.replicas, key=lambda r: r.load).id
 ```
 
 The tension is immediate and unavoidable: **the replica with your cache may be the

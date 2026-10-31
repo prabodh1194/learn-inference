@@ -189,16 +189,18 @@ candidates is one compute-bound prefill; generating them is N memory-bound
 decodes.** Verifiable tasks flip the economics entirely: the expensive part is
 sampling, the cheap part is picking, so spend the sampling budget on diversity
 and let the verifier do the judging.
+([Full answer](qa.md#why-is-scoring-cheap-and-generating-expensive-in-best-of-n).)
 
 ---
 
 ## The code
 
 ```python
-def reasoning_cost(active_params, tokens, bytes_per_param, bandwidth, usd_per_hour):
-    # active_params, NOT total: decode reads only the experts the router picked.
-    # For a dense model the two are the same; for an MoE they differ by ~18×.
-    bytes_moved = tokens * active_params * bytes_per_param
+def reasoning_cost(params, tokens, bytes_per_param, bandwidth, usd_per_hour):
+    # Pass active_params for `params`, NOT total: decode reads only the experts
+    # the router picked. For a dense model the two are the same; for an MoE
+    # they differ by ~18×.
+    bytes_moved = tokens * params * bytes_per_param
     seconds = bytes_moved / bandwidth
     return seconds / 3600 * usd_per_hour
 ```
@@ -227,8 +229,9 @@ trusting it:
 3. Compute, for Qwen3-0.6B on a 3090 at $0.25/hr: the cost of a 10,000-token
    trace, and of 64-vote majority voting over 1,000-token traces. Compare both
    to a 1-token answer.
-4. Compute the `params × tokens` budget for a 32B distilled model vs a 671B
-   model, and state the trade as "the 32B may think ~21× longer at equal cost".
+4. Compute `params_tokens_tradeoff` for a 32B distilled model vs a 671B dense
+   baseline (~21×), and contrast it with DeepSeek-V3's 37B active parameter
+   count (~1.16× per decoded token, 21× in VRAM capacity).
 5. **Predict first:** at what trace length does a reasoning answer's *KV cache*
    exceed the weight read? Check against Lecture 05's ~8k crossover.
 

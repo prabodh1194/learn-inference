@@ -74,6 +74,7 @@ gather, assembled on chip:
 
 The only constraint: a tile must be a whole number of blocks, so no tile
 boundary lands mid-block.
+([Q&A: thread block vs KV block](qa.md#wait-block-here-is-a-thread-block-not-the-kv-block-from-lecture-09).)
 
 ## 2. The tile no longer fits
 

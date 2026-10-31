@@ -97,7 +97,10 @@ This book indexes two excellent sources rather than duplicating them:
 
 ## Status
 
-**All 34 lectures are written**, front matter through appendices.
+**All 58 lectures are written** across seven parts — from inference foundations
+and building a vLLM-style engine (Parts I–V) to pre-training systems and
+post-training alignment with SFT, LoRA, PPO, DPO, GRPO, and R1 distillation
+(Parts VI–VII).
 
 The **code** is a different matter, and deliberately so: `engine/`, `kernels/`,
 `jaxlm/`, and `serve/` are stubs for *you* to fill in. The demos in `book/code/`

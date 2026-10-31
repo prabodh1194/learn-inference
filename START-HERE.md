@@ -73,7 +73,7 @@ answers in `notes/00-baseline/README.md`.
 uv run python book/code/recomputation.py
 ```
 
-**99.7% of the K/V work is thrown away.** That's what you're about to fix.
+**99.6% of the K/V work is thrown away.** That's what you're about to fix.
 
 ---
 
@@ -222,6 +222,28 @@ uv run python bench/cost_model.py
 
 ---
 
+## Part VI — Training systems
+
+**42.** [L30 — The training ledger](book/30-training-arithmetic.md) → `uv run python book/code/training_ledger.py`
+**43.** [L31 — Activations and checkpointing](book/31-activation-memory.md) → `uv run python book/code/activation_budget.py`
+**44.** [L32 — Data pipelines and packing](book/32-data-and-packing.md) → `uv run python book/code/packing_waste.py`
+**45.** [L33 — Data parallelism, ZeRO, and FSDP](book/33-zeRO-and-fsdp.md) → `uv run python book/code/zero_memory.py`
+**46.** [L34 — TP + SP, Pipeline schedules, and 3D](book/34-3d-parallelism-and-schedules.md) → `uv run python book/code/pipeline_bubble.py`
+**47.** [L35 — FP8 training and modern optimizers](book/35-fp8-training-and-optimizers.md) → `uv run python book/code/fp8_trainingsim.py`
+
+---
+
+## Part VII — Post-training & alignment
+
+**48.** [L36 — SFT, LoRA, and QLoRA](book/36-sft-and-lora.md) → `uv run python book/code/lora_memory.py`
+**49.** [L37 — Reward modeling and PPO](book/37-reward-models-and-ppo.md) → `uv run python book/code/rlhf_memory.py`
+**50.** [L38 — Direct Preference Optimization (DPO)](book/38-dpo-and-offline-preference.md) → `uv run python book/code/dpo_math.py`
+**51.** [L39 — GRPO and verifiable rewards](book/39-grpo-and-reinforcement-learning.md) → `uv run python book/code/grpo_step.py`
+**52.** [L40 — Reasoning pipelines and distillation](book/40-reasoning-pipelines-and-distillation.md) → `uv run python book/code/distillation_loss.py`
+**53.** [L41 — RL infrastructure: inference meets training](book/41-rl-systems-inference-meets-training.md) → `uv run python book/code/rl_loop_profile.py`
+
+---
+
 ## The three habits
 
 Worth more than any single lecture:
@@ -247,7 +269,7 @@ uv run pytest tests/test_05_kv_cache.py -v             # what exactly is failing
 uv run pytest -m "not cuda" -q | grep NotImplementedError | sort -u
 ```
 
-Reference: [`book/README.md`](book/README.md) (full TOC) ·
+Reference: [`book/index.md`](book/index.md) (full TOC) ·
 [`book/field-notes.md`](book/field-notes.md) (what practitioners actually
 measure) · [`book/appendix-a-glossary.md`](book/appendix-a-glossary.md) ·
 [`tests/README.md`](tests/README.md)

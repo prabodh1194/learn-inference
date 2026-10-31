@@ -126,6 +126,59 @@ overload.
 
 ---
 
+## Training systems
+
+**[Training Compute-Optimal Large Language Models (Chinchilla)](https://arxiv.org/abs/2203.15556)** · Hoffmann et al., 2022 · **L30**
+Why $C \approx 6ND$ and why $D \approx 20N$ is optimal for training cost alone
+(before inference cost shifts the balance toward over-training small models).
+
+**[Mixed Precision Training](https://arxiv.org/abs/1710.03740)** · Micikevicius et al., 2018 · **L30**
+Why FP32 master weights are required when forward/backward run in 16-bit floats.
+
+**[Reducing Activation Recomputation in Large Transformer Models](https://arxiv.org/abs/2205.05198)** · Korthikanti et al., 2022 · **L31, L34**
+The exact per-layer activation memory formula ($34sbh + 5as^2b$), selective
+activation checkpointing, and Sequence Parallelism ($g$ and $\bar{g}$).
+
+**[ZeRO: Memory Optimizations Toward Training Trillion Parameter Models](https://arxiv.org/abs/1910.02054)** · Rajbhandari et al., 2019 · **L33**
+ZeRO-1, ZeRO-2, and ZeRO-3 memory and communication derivations.
+
+**[Zero Bubble Pipeline Parallelism](https://arxiv.org/abs/2401.10241)** · Qi et al., 2024 · **L34**
+Splitting backward into $B_x$ and $B_w$ so $B_w$ fills pipeline warmup/drain bubbles.
+
+**[DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437)** · DeepSeek-AI, 2024 · **L23, L34, L35**
+$1\times 128$ tile / $128\times 128$ block FP8 training, DualPipe, Multi-Token
+Prediction, and auxiliary-loss-free MoE load balancing.
+
+---
+
+## Post-training & alignment
+
+**[LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)** · Hu et al., 2021 · **L36**
+Low-rank adapters, $B=0$ initialization, and $\alpha/r$ scaling.
+
+**[QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)** · Dettmers et al., 2023 · **L36**
+4-bit NormalFloat (NF4) and double quantization.
+
+**[Training language models to follow instructions with human feedback (InstructGPT)](https://arxiv.org/abs/2203.02155)** · Ouyang et al., 2022 · **L37**
+The classic SFT $\to$ Bradley-Terry Reward Model $\to$ PPO pipeline.
+
+**[Direct Preference Optimization (DPO)](https://arxiv.org/abs/2305.18290)** · Rafailov et al., 2023 · **L38**
+Closed-form extraction of the optimal policy that cancels the partition function $Z(x)$.
+
+**[DeepSeekMath: Pushing the Limits of Mathematical Reasoning](https://arxiv.org/abs/2402.03300)** · Shao et al., 2024 · **L39**
+Introduces GRPO (deleting PPO's Critic via group-relative baselines) and the
+unified gradient paradigm across SFT, RFT, DPO, PPO, and GRPO.
+
+**[DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL](https://arxiv.org/abs/2501.12948)** · DeepSeek-AI, 2025 · **L28b, L39, L40**
+R1-Zero emergent reasoning via verifiable rewards, the 4-stage R1 pipeline, and
+why distilling R1 into a 32B model beats direct RL on the 32B model by 25.6 AIME points.
+
+**[HybridFlow: A Flexible and Efficient RLHF Framework (veRL)](https://arxiv.org/abs/2409.19256)** · Sheng et al., EuroSys 2025 · **L41**
+Co-locating vLLM rollout engines and FSDP trainers via 3D-HybridEngine weight
+resharding and KV pool sleep/wake.
+
+---
+
 ## Books and long-form
 
 **Philip Kiely, *Inference Engineering*** (Baseten, 2026)

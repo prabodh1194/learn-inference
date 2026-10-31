@@ -282,7 +282,8 @@ import chain (the full story is [I5](#i5-an-sglang-subprocess-cannot-import-your
   code existed — the naming confusion goes all the way up.
 
 **The fix.** Use the package variable — though on this project even that did
-not survive contact (see [pattern 2](#pattern-2-which-python-is-installed)).
+not survive contact (see [pattern 2](#pattern-2-which-python-is-installed) and
+[Q&A](qa.md#why-does-sglang_external_model_dir-not-work-is-it-really-deprecated)).
 
 **How to spot it next time.** Check the installed version's own source, not the
 internet. `grep -rn 'EXTERNAL_MODEL' .venv/.../sglang/` tells you which names

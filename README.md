@@ -21,7 +21,7 @@ uv run python book/code/roofline.py      # should print 62.4 ops:byte
 uv run python scripts/progress.py        # where you are
 ```
 
-The [book](book/README.md) is the lectures; [Lecture 00](book/00-intro.md) is
+The [book](book/index.md) is the lectures; [Lecture 00](book/00-intro.md) is
 the reading entry point.
 
 **Model throughout:** `Qwen3-0.6B` — small enough to iterate on a laptop, real
@@ -106,6 +106,26 @@ Deliberately *after* building — you compare engineering judgment, not learn vo
 - [ ] Land a PR (`good first issue` on vLLM/SGLang)
 - [ ] Reproduce a recent inference paper against your own engine
 
+### Phase 6 — Training systems
+> Cross the aisle: why training costs $6ND$ FLOPs and $16\Psi$ bytes, and how to scale it.
+
+- [ ] **L30** The training ledger ($6ND$ FLOPs, $16\Psi$ AdamW state, MFU vs HFU)
+- [ ] **L31** Activations, FlashAttention backward, checkpointing, and the logit trap
+- [ ] **L32** Data pipelines, sequence packing (`cu_seqlens`), and token-weighted loss
+- [ ] **L33** Data parallelism, ZeRO-1/2/3, and FSDP
+- [ ] **L34** TP + Sequence Parallelism, 1F1B / Zero-Bubble / DualPipe schedules
+- [ ] **L35** FP8 tile/block training, Muon, and auxiliary-loss-free MoE balancing
+
+### Phase 7 — Post-training & alignment
+> From base document completer to aligned reasoner — and back into the inference engine.
+
+- [ ] **L36** Supervised fine-tuning (SFT), prompt masking, LoRA, and QLoRA
+- [ ] **L37** Reward modeling (Bradley-Terry) and PPO RLHF (the $36\Psi$ 4-model wall)
+- [ ] **L38** Direct Preference Optimization (DPO) and reference-free variants
+- [ ] **L39** Group Relative Policy Optimization (GRPO) and verifiable rewards (RLVR)
+- [ ] **L40** Reasoning pipelines (R1-Zero $\to$ R1) and knowledge distillation
+- [ ] **L41** RL infrastructure: where the inference engine (Parts I–V) meets the trainer
+
 ---
 
 ## Layout
@@ -115,6 +135,7 @@ engine/     Phase 1 — the PyTorch engine, grown milestone by milestone
 kernels/    Phase 2 — Triton, then raw CUDA
 jaxlm/      Phase 3 — JAX model, scan decode, sharding
 serve/      Phase 4 — HTTP, routing, disaggregation
+train/      Phases 6–7 — training systems & post-training alignment
 bench/      ⚠️ built FIRST — used by every phase
 notes/      the learning record: prose + runnable code
 ```

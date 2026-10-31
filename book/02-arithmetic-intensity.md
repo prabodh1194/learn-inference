@@ -183,6 +183,12 @@ distribution: every score becomes a positive number and they all add up to 1.
 | Q, K, V | N × d | Nd each | 2Nd each |
 | S, P | N × N | N² each | 2N² each |
 
+??? question "Is every token 2 bytes?"
+    No — **2 bytes is one fp16 number**, not one token. After embedding, a token
+    is a vector of thousands of numbers (57,344 numbers across K and V in all
+    28 layers, which at 2 bytes each is the 112 KiB/token KV figure).
+    [Full answer](qa.md#is-every-token-2-bytes)
+
 Each step reads its inputs from memory, computes, and writes its output back.
 Add the traffic up step by step.
 

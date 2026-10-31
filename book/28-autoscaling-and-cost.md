@@ -91,6 +91,7 @@ experts), so **B ≈ 5,400**. A solo user at batch 1 on that machine pays ~5,400
 the per-token cost the provider's economics assume. Utilization and batch size are
 the two levers that dwarf everything in Part III — and batch 1 is the regime a
 personal server lives in.
+([Full derivation](qa.md#what-batch-size-do-you-need-to-stop-being-memory-bandwidth-bound).)
 
 ### Autoscaling and its costs
 
@@ -128,7 +129,7 @@ growing is the honest saturation signal from Lecture 25.
     waiting on memory most of that time. "Busy" means the compute units were
     not idle; it says nothing about how much arithmetic they did. Queue depth
     tracks actual progress, which is why it, and not busyness, is the scaling
-signal.
+    signal.
     [Full answer](qa.md#how-can-the-gpu-report-95-busy-and-be-nearly-idle-at-the-same-time)
 
 ### The knee is your capacity number
@@ -178,9 +179,10 @@ direction, is informative. One tell to look for: hosted APIs commonly charge
 3–5× more per token for output than input, which is exactly what a memory-bound
 decode predicts — they're pricing the batch-1 hyperbola you just computed, and a
 solo user always pays it. A second: model size and token budget trade off at
-roughly `params × tokens`, so a 32B model that thinks for 21× more tokens costs
-as much to serve as a 671B model that answers in one — the economics behind
-distilling to a smaller model that reasons longer.
+roughly `active_params × tokens` for decode bandwidth and `total_params` for
+VRAM capacity — Lecture 28b unpacks why distilling a 671B/37B-active MoE into a
+32B dense reasoner is a 21× capacity win even though per-token decode traffic is
+within ~1.16×.
 
 ---
 

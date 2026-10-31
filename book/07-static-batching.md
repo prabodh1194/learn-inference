@@ -138,6 +138,7 @@ prompt tokens → **64.0%**; decode allocates 14,336 slots for 5,584 useful
 output tokens → **61.0%**. The 2.57× is the same tally as a ratio
 (14,336 / 5,584). Seeded, so it reproduces exactly. And it's a *ceiling*,
 because the real scheduler in Lecture 08 lands under it.
+([Full derivation of the 61% and 64% figures](qa.md#where-do-the-61-and-64-waste-numbers-in-lecture-07-come-from).)
 
 Those two numbers are the same equation, and it's worth writing down because
 it converts every future waste figure into a speedup without a benchmark:

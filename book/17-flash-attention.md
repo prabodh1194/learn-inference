@@ -962,6 +962,7 @@ Then the state goes back to HBM and the next `(i, j)` pair picks it up.
     accumulate-then-divide version skips that multiply-back and is slightly
     cheaper, which is why real kernels prefer it. The arithmetic is identical;
     it is only a question of where you put the division.
+    [Full answer](qa.md#why-divide-inside-the-loop-instead-of-once-at-the-end)
 
 Now the same algorithm as a Triton kernel:
 
