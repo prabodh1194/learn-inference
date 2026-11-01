@@ -13,19 +13,19 @@ training set. What if you do not have human-written solutions for a million hard
 math and coding prompts, or what if your SFT model already solves a problem 1
 time out of 8 and you want it to succeed 8 times out of 8?
 
-Before building online reinforcement learning (PPO in Lecture 37, DPO in Lecture
-38, GRPO in Lecture 39), there is a much simpler bridge that needs no policy
-gradient at all: sample $N$ candidate answers per prompt from your current
+Before we build online reinforcement learning (PPO in Lecture 37, DPO in Lecture
+38, GRPO in Lecture 39), we can use a much simpler bridge that needs no policy
+gradient at all. We sample $N$ candidate answers per prompt from our current
 model, score them with a verifier or reward model, keep the winners, and run
 standard SFT cross-entropy on those winners.
 
 WebGPT, Claude, Llama 2, DeepSeek-R1 Stage 3, and Qwen3 Stage 3 all rely on this
 **Rejection Sampling (RS)** loop. To use it well, we need to answer three
-questions. How far does picking the best of $N$ samples move the output
-distribution in KL divergence? When filtering an $M \times N$ table of candidate
+questions. How far does picking the best of $N$ samples move our output
+distribution in KL divergence? When we filter an $M \times N$ table of candidate
 answers, why does taking the top $K$ answers overall hurt reasoning compared to
-taking the best answer per prompt? And how do synthetic data pipelines generate
-millions of prompts without collapsing onto repetitive phrasing?
+taking the best answer per prompt? And how do we generate millions of prompts
+without collapsing onto repetitive phrasing?
 
 ---
 
@@ -195,22 +195,22 @@ Modern synthetic data pipelines avoid collapse by combining three mechanisms.
 First, to keep prompts diverse, **persona-driven synthesis** (Ge et al., 2024;
 Tülu 3) mines $200{,}000+$ specific personas from web text (such as *"a marine
 acoustic engineer modeling sonar refraction"*) and conditions each prompt
-generation call on a different persona. That forces the generated questions to
+generation call on a different persona. That forces our generated questions to
 span the full input domain.
 
 Second, to keep answers accurate, **multi-teacher generation and verification**
 samples candidate answers from a pool of strong models (such as `DeepSeek-R1` or
-`QwQ-32B`) at high temperature and filters them through deterministic verifiers
-(unit tests, symbolic math checkers) or rubric-based judges before any completion
-enters the SFT set.
+`QwQ-32B`) at high temperature and filters them with unit tests or rubric judges
+before any completion enters the SFT set.
 
-Third, for safety and helpfulness where no unit test exists, **Constitutional AI
-and RLAIF** (Bai et al., 2022) use a written list of principles. Starting from an
-initial answer $y_0 \sim \pi_{\text{SFT}}(\cdot \mid x)$, the model critiques
-$y_0$ against a principle $c_k$ and writes a revised answer
-$y_1 \sim \pi(\cdot \mid x, y_0, \text{critique}, c_k)$ for SFT. It then judges
-pairs of candidate answers $(y_a, y_b)$ against those same principles to build
-preference pairs for Lectures 37 and 38 without waiting on human labelers.
+Third, when we train for safety and helpfulness where no unit test exists,
+**Constitutional AI and RLAIF** (Bai et al., 2022) use a written list of
+principles. We start from an initial answer $y_0 \sim \pi_{\text{SFT}}(\cdot \mid x)$.
+The model critiques $y_0$ against a principle $c_k$ and writes a revised answer
+$y_1 \sim \pi(\cdot \mid x, y_0, \text{critique}, c_k)$ for SFT. We then use the
+model to judge pairs of candidate answers $(y_a, y_b)$ against those same
+principles and build preference pairs for Lectures 37 and 38 without waiting on
+human labelers.
 
 ---
 

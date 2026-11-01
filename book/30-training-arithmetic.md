@@ -149,7 +149,7 @@ depend on it directly:
     Hoffmann et al.), $N$ counts non-embedding parameters; if you explicitly
     include the output-head logit projection, $N$ rises to $596.0\text{M}$. By
     contrast, **VRAM must hold every parameter tensor**, and the optimizer
-    maintains state for the embedding table too — so the memory ledger always
+    maintains state for the embedding table too. The memory ledger therefore always
     uses the full $\Psi = 596{,}049{,}920$ parameters.
     [Full answer](qa.md#why-does-the-6nd-formula-use-4404m-parameters-while-the-memory-ledger-uses-5960m)
 

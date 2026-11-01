@@ -90,11 +90,11 @@ $d_h = 128$, so $n_h d_h = 2048 = 2h$ and $n_{kv} d_h = 1024 = h$. The SwiGLU
 MLP expands to intermediate width $d_{\text{ff}} = 3072 = 3h$. Let $b$ be the
 batch size and $s$ be the sequence length.
 
-Walk through one transformer layer from input to output and count what backward
+Inspect one transformer layer from input to output and count what backward
 must keep in memory.
 
 First, each block runs two RMSNorms, one before attention and one before the
-MLP. Backward through $y = x \cdot w / \sqrt{\text{mean}(x^2) + \epsilon}$ needs
+MLP. Differentiating $y = x \cdot w / \sqrt{\text{mean}(x^2) + \epsilon}$ needs
 the input vector $x$ at both norms, which takes $2 \times (2 s b h) = 4 s b h$
 bytes.
 
@@ -103,7 +103,7 @@ $V = X W_V$ all read the same post-norm input $X$. To compute the weight
 gradients $\nabla_{W_Q}$, $\nabla_{W_K}$, and $\nabla_{W_V}$, we save that shared
 input $X$ once, adding $2 s b h$ bytes.
 
-Third, the backward pass through attention needs the $Q$, $K$, and $V$ tensors
+Third, the attention backward pass needs the $Q$, $K$, and $V$ tensors
 themselves to compute $\nabla_Q$, $\nabla_K$, and $\nabla_V$. Here $Q$ has shape
 $(b, s, 2048)$ for $4 s b h$ bytes, while $K$ and $V$ each have shape
 $(b, s, 1024)$ for $4 s b h$ bytes together.
@@ -119,9 +119,9 @@ $\text{up} = X W_{\text{up}}$ share the second post-norm input $X$, adding
 another $2 s b h$ bytes.
 
 Sixth, the SwiGLU layer computes $\text{SiLU}(g) \odot u$ and multiplies that
-gated result by $W_{\text{down}}$. Backward through the elementwise product
-needs both $g$ and $u$, each of shape $(b, s, d_{\text{ff}})$, and backward
-through $W_{\text{down}}$ needs the gated product itself. Saving all three
+gated result by $W_{\text{down}}$. Differentiating the elementwise product
+needs both $g$ and $u$, each of shape $(b, s, d_{\text{ff}})$, and differentiating
+$W_{\text{down}}$ needs the gated product itself. Saving all three
 tensors of width $d_{\text{ff}} = 3h$ takes:
 
 $$3 \times (2 s b d_{\text{ff}}) = 6 s b (3h) = 18 s b h \text{ bytes}$$

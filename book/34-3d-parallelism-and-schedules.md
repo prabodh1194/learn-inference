@@ -8,7 +8,7 @@
 
 ## The problem
 
-In Lecture 22 (Tensor parallelism), we split each layer's weight matrices across
+In Lecture 22 (Tensor parallelism), we split each layer's weight matrices over
 $t$ GPUs using Column-Parallel followed by Row-Parallel linear layers, linked by
 one `all-reduce` per sub-block. For inference, that was the whole story.
 
@@ -18,7 +18,7 @@ the inputs to the column-parallel projections sit *outside* the tensor-parallel
 regions, so every TP rank holds an identical copy of them. At $t = 8$, those
 replicated buffers take **77% of your remaining activation memory**. Second,
 **Pipeline Parallelism (PP) introduces idle bubbles and an in-flight activation
-explosion**. In inference, forward-only micro-batches stream through pipeline
+explosion**. In inference, forward-only micro-batches stream down pipeline
 stages without stopping. In training, all $m$ micro-batches must finish both
 forward and backward before `optimizer.step()`, so GPUs sit idle while the
 pipeline fills and drains.
@@ -268,7 +268,7 @@ uv run pytest tests/test_34_pipeline.py -v
 
 Adding Sequence Parallelism to Tensor Parallelism **divides the entire layer's
 activation footprint by $t$** ($34/t$ instead of $10 + 24/t$) with zero
-additional network bytes. When you also pipeline layers across nodes, **1F1B
+additional network bytes. When you also pipeline layers over multiple nodes, **1F1B
 decouples bubble reduction (large $m$) from activation memory (bounded by $p$)**.
 
 ---
@@ -296,7 +296,7 @@ decouples bubble reduction (large $m$) from activation memory (bounded by $p$)**
 ## Next
 
 **[34b. Context parallelism, expert parallelism, and the 5D playbook](34b-context-and-expert-parallelism.md)**:
-how Zig-Zag Ring Attention balances causal long-context FLOPs across GPUs and how Expert Parallelism shards MoEs across nodes.
+how Zig-Zag Ring Attention balances causal long-context FLOPs over GPUs and how Expert Parallelism shards MoEs over nodes.
 
 ```bash
 uv run python book/code/context_parallel_balance.py

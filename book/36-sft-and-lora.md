@@ -286,8 +286,7 @@ batching (Lecture 12b) when serving many adapters at once.
 
 ## Next
 
-**[36b. Rejection sampling, Best-of-N, and synthetic data engines](36b-rejection-sampling-and-synthetic-data.md)**:
-derive the exact $\ln N - \frac{N-1}{N}$ KL cost of Best-of-$N$, compare per-prompt vs. global rejection sampling, and build synthetic data pipelines.
+Next up is **[Lecture 36b: Rejection sampling, Best-of-N, and synthetic data engines](36b-rejection-sampling-and-synthetic-data.md)**, where we derive the exact $\ln N - \frac{N-1}{N}$ KL cost of Best-of-$N$, compare per-prompt and global rejection sampling, and build synthetic data pipelines.
 
 ```bash
 uv run python book/code/rejection_sampling.py

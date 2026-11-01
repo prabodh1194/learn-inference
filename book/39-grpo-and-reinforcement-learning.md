@@ -105,7 +105,7 @@ PPO vs GRPO:
     Then $r_i - \mu_r = 0$ for every completion $i \in \{1, \dots, G\}$, so
     $\hat{A}_i = 0$ across the entire group! That prompt contributes **zero
     policy-gradient signal** on that step (only the $\beta\,\mathbb{D}_{\text{KL}}$
-    term remains). This is an important practical property of GRPO: questions
+    term stays active). This is an important practical property of GRPO: questions
     that are too easy ($100\%$ pass rate) or impossibly hard ($0\%$ pass rate
     within $G$ samples) automatically zero themselves out, concentrating gradient
     updates on the "frontier" problems where the model succeeds on some tries

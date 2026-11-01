@@ -191,7 +191,7 @@ collide between two merged models.
 **TIES-Merging (Trim, Elect Sign, Disjoint Merge, Yadav et al. 2023)** resolves
 both magnitude noise and sign conflicts in three deterministic steps. In **Step
 1 (Trim)**, we keep only the top-$k\%$ largest-magnitude coordinates in each task
-vector $\tau_m$ and set the small noisy shifts to $0$, giving $\hat{\tau}_m$. In
+vector $\tau_m$ and set the small noisy shifts to $0$ to form $\hat{\tau}_m$. In
 **Step 2 (Elect Sign)**, for each parameter coordinate $i$, we sum the trimmed
 shifts over all $M$ models and take the sign of that total mass as the winning
 sign $\gamma_i$.
