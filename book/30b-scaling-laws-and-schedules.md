@@ -1,170 +1,36 @@
-# Lecture 30b: Scaling Laws, Learning Rate Schedules & Mid-Training
+# 30b. Scaling laws, schedules, and mid-training
 
-[Lecture 30](30-training-arithmetic.md) established that one training token through a dense model of $N$ parameters costs $6N$ FLOPs, whereas one inference token costs $2N$ FLOPs. That $3:1$ ratio per token hides a much larger asymmetry over a model's life: a model is trained once on $D_{\text{train}}$ tokens, then served to millions of users across $D_{\text{infer}}$ tokens.
-
-This lecture derives the mathematics of how frontier labs allocate parameters $N$, training tokens $D_{\text{train}}$, batch size $B$, and learning rate schedules $\eta(t)$ across pretraining and **mid-training** (the annealing and context-extension stage between raw web pretraining and post-training).
-
----
-
-### 1. Chinchilla Compute-Optimal Scaling
-
-Hoffmann et al. (2022) modeled the pretraining cross-entropy loss $L(N, D)$ after training a model of $N$ parameters on $D$ tokens as the sum of an irreducible entropy $E$ of natural text and two power-law approximation errors:
-
-$$L(N, D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta}$$
-
-Empirical fits on the Chinchilla sweep yielded $E = 1.69$, $A = 406.4$, $B = 410.7$, $\alpha = 0.34$, and $\beta = 0.28$.
-
-Suppose you have a fixed pretraining compute budget $C = 6ND$ FLOPs and zero concern for inference cost. What choice of $(N^*, D^*)$ minimizes $L(N, D)$ subject to $6ND = C$?
-
-#### Full Derivation via Substitution
-
-Solve the constraint $6ND = C$ for $D$:
-
-$$D = \frac{C}{6N}$$
-
-Substitute $D = \frac{C}{6N}$ into $L(N, D)$:
-
-$$L(N) = E + A N^{-\alpha} + B \left(\frac{C}{6N}\right)^{-\beta} = E + A N^{-\alpha} + B \left(\frac{C}{6}\right)^{-\beta} N^{\beta}$$
-
-Differentiate $L(N)$ with respect to $N$ and set $\frac{dL}{dN} = 0$:
-
-$$\frac{dL}{dN} = -\alpha A N^{-\alpha - 1} + \beta B \left(\frac{C}{6}\right)^{-\beta} N^{\beta - 1} = 0$$
-
-Multiply both sides by $N^{\alpha + 1}$:
-
-$$\beta B \left(\frac{C}{6}\right)^{-\beta} N^{\alpha + \beta} = \alpha A$$
-
-Solve for $N^{\alpha + \beta}$:
-
-$$N^{\alpha + \beta} = \frac{\alpha A}{\beta B} \left(\frac{C}{6}\right)^{\beta}$$
-
-Raise both sides to the power $\frac{1}{\alpha + \beta}$:
-
-$$N^*(C) = \left(\frac{\alpha A}{\beta B}\right)^{\frac{1}{\alpha + \beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha + \beta}}$$
-
-By symmetry, substituting $N^*(C)$ back into $D^*(C) = \frac{C}{6 N^*(C)}$ gives:
-
-$$D^*(C) = \left(\frac{\beta B}{\alpha A}\right)^{\frac{1}{\alpha + \beta}} \left(\frac{C}{6}\right)^{\frac{\alpha}{\alpha + \beta}}$$
-
-Plugging in the empirical exponents $\alpha = 0.34$ and $\beta = 0.28$ ($\alpha + \beta = 0.62$):
-
-$$\frac{\beta}{\alpha + \beta} = \frac{0.28}{0.62} \approx 0.452, \qquad \frac{\alpha}{\alpha + \beta} = \frac{0.34}{0.62} \approx 0.548$$
-
-When balanced ($\alpha \approx \beta$), both $N^*$ and $D^*$ scale as $C^{0.5}$, yielding the famous **Chinchilla rule of thumb**:
-
-$$\frac{D^*}{N^*} \approx 20 \text{ tokens per parameter}$$
-
-Under Chinchilla scaling, our reference model `Qwen3-0.6B` ($N = 6 \times 10^8$) should be trained on only:
-
-$$D^* = 20 \times (6 \times 10^8) = 1.2 \times 10^{10} \text{ tokens } (12\text{B tokens})$$
-
-Yet the Qwen3 technical report states that `Qwen3-0.6B` was trained on **$36\text{ trillion}$ tokens** ($3.6 \times 10^{13}$) — exactly **$3{,}000\times$ the Chinchilla ratio** ($60{,}000$ tokens per parameter). Why?
+**Demo:** `book/code/scaling_laws.py`
+**Moves:** picks model size $N$, token budget $D$, batch size $B$, and context extension schedule before a cluster run starts
+**Prereq:** [30. The training ledger](30-training-arithmetic.md)
 
 ---
 
-### 2. Inference-Aware Scaling Laws: Why Modern Models Over-Train
+## The problem
 
-Chinchilla optimizes $L(N, D_{\text{train}})$ under a fixed *training* budget $C_{\text{train}} = 6 N D_{\text{train}}$. In production, you pay for both training and lifetime serving across $D_{\text{infer}}$ generated tokens:
+Lecture 30 showed that one training token through a dense model of $N$
+parameters costs $6N$ FLOPs, while one inference token costs $2N$ FLOPs. That
+$3:1$ ratio per token hides a much larger split over a model's life. You train a
+model once on $D_{\text{train}}$ tokens, and then you serve it to users across
+$D_{\text{infer}}$ tokens for months or years.
 
-$$C_{\text{total}}(N, D_{\text{train}}) = \underbrace{6 N D_{\text{train}}}_{\text{paid once}} + \underbrace{2 N D_{\text{infer}}}_{\text{paid across all users}}$$
-
-Suppose you want a model that achieves a target validation loss $L_{\text{target}}$ while minimizing **lifetime compute** $C_{\text{total}}$. Let us compare three ways to reach low loss when serving $D_{\text{infer}} = 100\text{T}$ ($10^{14}$) lifetime tokens:
-
-1. **Chinchilla $2.8\text{B}$ ($20\text{ tok/param}$):** $N = 2.8 \times 10^9$, $D_{\text{train}} = 5.6 \times 10^{10}$ ($56\text{B}$ tokens).
-   - Loss: $L = 1.69 + 406.4 (2.8 \times 10^9)^{-0.34} + 410.7 (5.6 \times 10^{10})^{-0.28} = 1.69 + 0.250 + 0.401 = 2.341$.
-   - Training FLOPs: $6 (2.8 \times 10^9)(5.6 \times 10^{10}) = 9.41 \times 10^{20} \approx 0.9\text{ ZFLOP}$.
-   - Inference FLOPs: $2 (2.8 \times 10^9)(10^{14}) = 5.60 \times 10^{23} = 560.0\text{ ZFLOP}$.
-   - Total lifetime compute: **$560.9\text{ ZFLOP}$**.
-2. **Over-trained $1.4\text{B}$ ($300\text{ tok/param}$):** $N = 1.4 \times 10^9$, $D_{\text{train}} = 4.2 \times 10^{11}$ ($420\text{B}$ tokens).
-   - Loss: $L = 1.69 + 406.4 (1.4 \times 10^9)^{-0.34} + 410.7 (4.2 \times 10^{11})^{-0.28} = 1.69 + 0.316 + 0.228 = 2.234$ (better than Chinchilla $2.8\text{B}$!).
-   - Training FLOPs: $6 (1.4 \times 10^9)(4.2 \times 10^{11}) = 3.53 \times 10^{21} \approx 3.5\text{ ZFLOP}$.
-   - Inference FLOPs: $2 (1.4 \times 10^9)(10^{14}) = 280.0\text{ ZFLOP}$.
-   - Total lifetime compute: **$283.5\text{ ZFLOP}$** ($1.98\times$ cheaper overall, plus half the HBM bandwidth per decode step).
-3. **`Qwen3-0.6B` scale ($60{,}000\text{ tok/param}$):** $N = 0.6 \times 10^9$, $D_{\text{train}} = 3.6 \times 10^{13}$ ($36\text{T}$ tokens).
-   - Loss: $L = 1.69 + 406.4 (0.6 \times 10^9)^{-0.34} + 410.7 (3.6 \times 10^{13})^{-0.28} = 1.69 + 0.421 + 0.066 = 2.177$.
-   - Training FLOPs: $6 (0.6 \times 10^9)(3.6 \times 10^{13}) = 129.6\text{ ZFLOP}$.
-   - Inference FLOPs: $2 (0.6 \times 10^9)(10^{14}) = 120.0\text{ ZFLOP}$.
-   - Total lifetime compute: **$249.6\text{ ZFLOP}$**, and the model fits in $1.2\text{ GB}$ of BF16 weights on an edge device.
-
-??? question "Why did Chinchilla say 20 tokens per parameter while Llama 3 and Qwen3 train on 1,000 to 60,000 tokens per parameter?"
-    Chinchilla answered a narrow question: *given a fixed pretraining budget $C_{\text{train}}$, what $(N, D)$ minimizes pretraining loss?* It assigned zero cost to inference. In practice, inference dominates lifetime fleet cost ($C_{\text{infer}} = 2 N D_{\text{infer}}$) and decode latency is bound by reading $2N$ bytes of weights from HBM at every token ([Lecture 02](02-arithmetic-intensity.md)). Spending $4\times$–$100\times$ more FLOPs once during pretraining to shrink $N$ by $2\times$–$4\times$ pays back permanently on every generated token. See [Q&A: Why did Chinchilla say 20 tokens per parameter while Llama 3 and Qwen3 train on 1,000+ tokens per parameter?](qa.md#why-did-chinchilla-say-20-tokens-per-parameter-while-llama-3-and-qwen3-train-on-1000-tokens-per-parameter).
+Before you launch a pretraining run, you have to answer four questions. How do
+you split a fixed compute budget between parameters $N$ and training tokens $D$?
+Why do modern small models train on thousands of times more tokens than classic
+scaling laws recommend? How big can you make the global batch size $B$ before
+extra GPUs stop helping? And how do you anneal the learning rate and stretch the
+context window from $4{,}096$ to $32{,}768$ tokens during **mid-training** (the
+bridge stage between raw web pretraining and post-training)?
 
 ---
 
-### 3. Critical Batch Size and Batch-Size Ramp
-
-Why can we not simply parallelize those $36\text{T}$ training tokens across a million GPUs by making the global batch size $B$ arbitrarily large?
-
-McCandlish et al. (2018) showed that stochastic gradients $g_i = \nabla_\theta \ell(x_i)$ have true mean $G = \mathbb{E}[g_i]$ and covariance $\Sigma = \text{Cov}(g_i)$. Averaging over a batch of $B$ independent samples produces a batch gradient $\bar{g}_B$ with expectation $G$ and covariance $\frac{1}{B}\Sigma$. To second order, the expected improvement in loss from a step along $\bar{g}_B$ saturates once the noise term $\frac{1}{B}\text{tr}(H\Sigma)$ falls below the signal $\|G\|_H^2$. The transition occurs at the **gradient noise scale** (or **critical batch size**):
-
-$$B_{\text{crit}} \approx B_{\text{noise}} = \frac{\text{tr}(\Sigma)}{\|G\|^2}$$
-
-Calling $S_{\min}$ the minimum number of serial optimizer steps needed at $B \to \infty$ and $E_{\min} = B_{\text{crit}} S_{\min}$ the minimum number of training tokens needed as $B \to 0$, the number of steps $S(B)$ and total tokens $E(B) = B \cdot S(B)$ required to reach a target loss obey the trade-off:
-
-$$\frac{S(B)}{S_{\min}} = 1 + \frac{B_{\text{crit}}}{B}, \qquad \frac{E(B)}{E_{\min}} = 1 + \frac{B}{B_{\text{crit}}}$$
-
-- **Small batch regime ($B \ll B_{\text{crit}}$):**Doubling $B$ halves the required steps $S(B)$ with almost zero extra token waste ($E(B) \approx E_{\min}$). Because gradient variance scales as $1/B$, the optimal learning rate scales as $\eta \propto B$ (or $\sqrt{B}$ for Adam).
-- **Large batch regime ($B \gg B_{\text{crit}}$):** The batch gradient is already noiseless ($\bar{g}_B \approx G$). Doubling $B$ yields zero reduction in steps ($S(B) \approx S_{\min}$) and **doubles the wasted tokens** ($E(B) \propto B$).
-- **Why $B_{\text{crit}}$ grows during training:** Early in training, the true gradient $\|G\|$ is large, so $B_{\text{crit}} = \text{tr}(\Sigma)/\|G\|^2$ is small. As the model approaches a minimum, $\|G\|$ shrinks while $\text{tr}(\Sigma)$ stays roughly constant, causing $B_{\text{crit}}$ to grow by $10\times$–$20\times$. This is why DeepSeek-V3 and Llama 3 **ramp the global batch size** from $4\text{M}$ tokens early in training to $16\text{M}$–$60\text{M}$ tokens later in training.
-
----
-
-### 4. Warmup-Stable-Decay (WSD) vs. Cosine Schedules & $\mu\text{P}$
-
-Classic pretraining uses a **Cosine Decay** learning-rate schedule after $T_w$ warmup steps over a predetermined horizon $T_{\max}$:
-
-$$\eta_{\text{cos}}(t) = \eta_{\min} + \frac{1}{2}(\eta_{\max} - \eta_{\min})\left(1 + \cos\left(\pi \frac{t - T_w}{T_{\max} - T_w}\right)\right)$$
-
-Cosine decay has a severe operational flaw: **you must commit to $T_{\max}$ before step 1**. You cannot stop early at $0.5\,T_{\max}$ (the learning rate is still high, so weights oscillate around the valley floor) and you cannot continue smoothly past $T_{\max}$.
-
-Modern frontier pretraining (MiniCPM, DeepSeek-V3, OLMo 2, Llama 3) replaces Cosine with **Warmup-Stable-Decay (WSD)**, also called ** trapezoidal scheduling**:
-
-$$\eta_{\text{WSD}}(t) = \begin{cases}
-\eta_{\max} \frac{t}{T_w} & 0 \le t \le T_w \quad \text{(Warmup, }\sim 2{,}000\text{ steps)} \\[4pt]
-\eta_{\max} & T_w < t \le T_s \quad \text{(Stable plateau, }80\%\text{–}90\%\text{ of tokens)} \\[4pt]
-\eta_{\max} \left(1 - \frac{t - T_s}{T_{\max} - T_s}\right) & T_s < t \le T_{\max} \quad \text{(Rapid Decay / Annealing, }10\%\text{–}20\%\text{ of tokens)}
-\end{cases}$$
-
-WSD separates exploration from convergence:
-
-1. The **Stable phase** holds $\eta = \eta_{\max}$ indefinitely without specifying $T_{\max}$ in advance.
-2. At any checkpoint ($1\text{T}$, $5\text{T}$, or $30\text{T}$ tokens), you can branch off a **Decay (Annealing) phase** over the final $10\%$ of tokens while swapping the data mixture from noisy web crawl to high-quality STEM, math, and code (**mid-training**).
-3. To set $\eta_{\max}$ without sweeping at $70\text{B}+$ scale, labs use **Maximal Update Parametrization ($\mu\text{P}$, Yang et al. 2022)**: if hidden weights initialize with variance $1/d_{\text{model}}$ and their Adam learning rate scales as $\eta_{\text{hidden}} = \eta_{\text{base}} \cdot (d_{\text{proxy}} / d_{\text{target}})$ while input embeddings keep $\eta_{\text{embed}} = \eta_{\text{base}}$, every layer's feature activation change $\|\Delta h_\ell\|_2 / \sqrt{d_{\text{model}}}$ stays $\Theta(1)$ across widths, allowing optimal hyperparameters tuned on a $40\text{M}$ proxy model to transfer zero-shot to $70\text{B}+$.
-
----
-
-### 5. Mid-Training Long-Context Extension: RoPE Scaling & YaRN
-
-Pretraining at $s = 32{,}768$ or $131{,}072$ for all $36\text{T}$ tokens would inflate quadratic attention FLOPs by $8\times$–$32\times$. Instead, models like `Qwen3` train Stage 1 and Stage 2 at $s_{\text{orig}} = 4{,}096$ for $30\text{T}+$ tokens, and extend context to $s_{\text{ext}} = 32{,}768$ or $131{,}072$ only during the final **mid-training** stage.
-
-Recall from [Lecture 01](01-the-two-phases.md) that Rotary Positional Embeddings (RoPE) rotate each 2D pair $j \in \{0, \dots, d_{\text{head}}/2 - 1\}$ at position $m$ by angle $m \theta_j$, where:
-
-$$\theta_j = \base^{-2j / d_{\text{head}}}, \qquad \text{with wavelength } \lambda_j = \frac{2\pi}{\theta_j} = 2\pi \cdot \base^{2j / d_{\text{head}}}$$
-
-When $m$ exceeds $s_{\text{orig}} = 4{,}096$, low-frequency dimensions ($j \to d_{\text{head}}/2$) encounter rotation angles $m \theta_j$ never seen during pretraining, destroying attention scores. Two mechanisms fix this during mid-training:
-
-1. **Adjusted Base Frequency (ABF) / NTK-Aware Scaling:** Increasing the RoPE base from $\base = 10{,}000$ to $\base' = 1{,}000{,}000$ (used in Llama 3 and Qwen3) stretches wavelengths $\lambda_j$, or equivalently scales the base by the NTK factor $\base' = \base \cdot s^{\frac{d_{\text{head}}}{d_{\text{head}}-2}}$ for extension ratio $s = s_{\text{ext}} / s_{\text{orig}}$.
-2. **YaRN (Yet another RoPE extensioN, Peng et al. 2023):** High-frequency dimensions ($\lambda_j \ll s_{\text{orig}}$) have already completed many full $2\pi$ periods during pretraining and only encode *relative* local distance; interpolating them blurs local token order. YaRN leaves high frequencies untouched ($\gamma_j = 1$), linearly interpolates low frequencies ($\gamma_j = 0 \implies \theta_j' = \theta_j / s$), and blends intermediate frequencies via a ramp $\gamma_j \in [0, 1]$:
-
-$$\theta_j^{\text{YaRN}} = (1 - \gamma_j) \frac{\theta_j}{s} + \gamma_j \theta_j$$
-
-Furthermore, as sequence length grows by factor $s$, the softmax partition function $\sum_{k=1}^m \exp(q_m^\top k_k / \sqrt{d_{\text{head}}})$ sums over $s\times$ more keys, flattening the attention distribution's entropy. YaRN counteracts this entropy growth by multiplying the pre-softmax logits (or scaling $Q$ and $K$) by an **attention temperature scale**:
-
-$$\sqrt{\frac{1}{t}} = 0.1 \ln(s) + 1$$
-
-For `Qwen3-0.6B` extending from $4{,}096 \to 32{,}768$ ($s = 8$):
-
-$$\sqrt{\frac{1}{t}} = 0.1 \ln(8) + 1 = 0.1(2.0794) + 1 = 1.2079 \implies t = \frac{1}{1.2079^2} = 0.6853$$
-
----
-
-### Running the Scaling & YaRN Calculator
-
-[`book/code/scaling_laws.py`](code/scaling_laws.py) computes the Chinchilla vs. over-trained lifetime FLOP ledger and YaRN temperature scaling factors:
+## See it
 
 ```bash
 uv run python book/code/scaling_laws.py
 ```
+
+Pure arithmetic, no GPU required:
 
 ```text
 Over-training vs. Chinchilla (100T lifetime served tokens)
@@ -180,14 +46,321 @@ YaRN attention temperature scale sqrt(1/t) = 0.1 * ln(s) + 1:
   s = 32x -> sqrt(1/t) = 1.3466, t = 0.5515
 ```
 
----
-
-### Key Takeaways
-
-- **Chinchilla ($D \approx 20N$)** minimizes pretraining FLOPs alone; **inference-aware scaling** minimizes $6ND_{\text{train}} + 2ND_{\text{infer}}$, justifying $1{,}000\times$–$3{,}000\times$ over-training (`Qwen3-0.6B` on $36\text{T}$ tokens).
-- **Critical batch size $B_{\text{crit}} = \text{tr}(\Sigma)/\|G\|^2$** bounds data-parallel scaling: increasing $B$ beyond $B_{\text{crit}}$ wastes tokens linearly without reducing serial steps.
-- **Warmup-Stable-Decay (WSD)** decouples training horizon selection from step 1 and reserves the final $10\%$–$20\%$ decay window for mid-training data annealing and YaRN long-context extension.
+Look at the lifetime column. Training a $1.4\text{B}$ model for $300$ tokens per
+parameter costs nearly $4\times$ as many training FLOPs as a Chinchilla-optimal
+$2.8\text{B}$ model, yet it reaches a *lower* validation loss ($2.234$ vs.
+$2.341$) and cuts total lifetime compute across $100\text{T}$ served tokens in
+half ($283.5$ vs. $560.9\text{ ZFLOP}$).
 
 ---
 
-*Next: [Lecture 31: Activation Memory & Selective Checkpointing](31-activation-memory.md)*
+## The idea
+
+### 1. Chinchilla compute-optimal scaling
+
+Suppose you have a fixed pretraining compute budget $C = 6ND$ FLOPs and you do
+not care what inference will cost later. Making the model larger ($N$) lets it
+represent richer patterns, but a fixed budget $C$ then forces you to train on
+fewer tokens ($D = C / 6N$). Training on more tokens ($D$) reduces sample noise,
+but forces a smaller model ($N$).
+
+Hoffmann et al. (2022) measured how validation cross-entropy loss $L(N, D)$
+falls as both $N$ and $D$ grow. They modeled the loss as the irreducible entropy
+$E$ of natural text plus two power-law error terms.
+
+$$L(N, D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta}$$
+
+Fitting this curve to hundreds of training runs gave $E = 1.69$, $A = 406.4$,
+$B = 410.7$, $\alpha = 0.34$, and $\beta = 0.28$. We want the pair $N^*, D^*$
+that minimizes $L(N, D)$ subject to the budget constraint $6ND = C$.
+
+First, solve the constraint $6ND = C$ for $D$. That gives $D = C / (6N)$. Now
+substitute $D = C / (6N)$ into $L(N, D)$ so the loss depends on $N$ alone.
+
+$$L(N) = E + A N^{-\alpha} + B \left(\frac{C}{6N}\right)^{-\beta} = E + A N^{-\alpha} + B \left(\frac{C}{6}\right)^{-\beta} N^{\beta}$$
+
+Next, differentiate $L(N)$ with respect to $N$. At the minimum, that derivative
+equals zero.
+
+$$\frac{dL}{dN} = -\alpha A N^{-\alpha - 1} + \beta B \left(\frac{C}{6}\right)^{-\beta} N^{\beta - 1} = 0$$
+
+Move the negative term to the right-hand side and multiply both sides by
+$N^{\alpha + 1}$. That collects both powers of $N$ on the left.
+
+$$\beta B \left(\frac{C}{6}\right)^{-\beta} N^{\alpha + \beta} = \alpha A$$
+
+Divide both sides by $\beta B (C/6)^{-\beta}$ to isolate $N^{\alpha + \beta}$.
+
+$$N^{\alpha + \beta} = \frac{\alpha A}{\beta B} \left(\frac{C}{6}\right)^{\beta}$$
+
+Finally, raise both sides to the power $\frac{1}{\alpha + \beta}$. That gives
+the compute-optimal parameter count $N^*(C)$.
+
+$$N^*(C) = \left(\frac{\alpha A}{\beta B}\right)^{\frac{1}{\alpha + \beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha + \beta}}$$
+
+By symmetry, plugging $N^*(C)$ back into $D^*(C) = \frac{C}{6 N^*(C)}$ gives the
+compute-optimal token count.
+
+$$D^*(C) = \left(\frac{\beta B}{\alpha A}\right)^{\frac{1}{\alpha + \beta}} \left(\frac{C}{6}\right)^{\frac{\alpha}{\alpha + \beta}}$$
+
+Plug in the fitted exponents $\alpha = 0.34$ and $\beta = 0.28$. Their sum is
+$\alpha + \beta = 0.62$.
+
+$$\frac{\beta}{\alpha + \beta} = \frac{0.28}{0.62} \approx 0.452, \qquad \frac{\alpha}{\alpha + \beta} = \frac{0.34}{0.62} \approx 0.548$$
+
+Because $\alpha$ and $\beta$ are nearly equal, $N^*$ and $D^*$ both grow roughly
+as $C^{0.5}$. Dividing $D^*$ by $N^*$ across typical budgets gives the
+**Chinchilla rule of thumb**: train for about **20 tokens per parameter**, or
+$D^* \approx 20 N^*$.
+
+For `Qwen3-0.6B` with $N = 6 \times 10^8$, Chinchilla recommends stopping at
+$D^* = 20 \times 6 \times 10^8 = 12\text{B}$ tokens. Instead, the Qwen3 team
+trained `Qwen3-0.6B` on **$36\text{ trillion}$ tokens**, which is $3{,}000\times$
+the Chinchilla ratio, or $60{,}000$ tokens per parameter.
+
+---
+
+### 2. Inference-aware scaling: why modern models over-train
+
+Chinchilla minimized $L(N, D_{\text{train}})$ under a fixed *training* budget
+$C_{\text{train}} = 6 N D_{\text{train}}$ and treated inference as free. In
+production, you pay the training bill once. Then you pay the serving bill on
+every generated token across $D_{\text{infer}}$ lifetime tokens.
+
+$$C_{\text{total}}(N, D_{\text{train}}) = \underbrace{6 N D_{\text{train}}}_{\text{paid once}} + \underbrace{2 N D_{\text{infer}}}_{\text{paid across all users}}$$
+
+Suppose your fleet will serve $D_{\text{infer}} = 100\text{T}$ lifetime tokens.
+Compare three ways to build the model.
+
+Start with a Chinchilla-scaled $2.8\text{B}$ model trained for $20$ tokens per
+parameter, so $N = 2.8 \times 10^9$ and $D_{\text{train}} = 5.6 \times 10^{10}$.
+Its loss reaches $L = 1.69 + 0.250 + 0.401 = 2.341$. The training run costs
+$0.94\text{ ZFLOP}$, while serving $100\text{T}$ tokens costs
+$560.0\text{ ZFLOP}$. Total lifetime compute comes to **$560.9\text{ ZFLOP}$**.
+
+Now cut the model in half to $1.4\text{B}$ parameters and over-train it for
+$300$ tokens per parameter, with $D_{\text{train}} = 4.2 \times 10^{11}$. Its
+loss drops to $L = 1.69 + 0.316 + 0.228 = 2.234$, which beats the $2.8\text{B}$
+Chinchilla model. Training costs more at $3.53\text{ ZFLOP}$, but serving
+$100\text{T}$ tokens now costs only $280.0\text{ ZFLOP}$. Total lifetime compute
+falls to **$283.5\text{ ZFLOP}$**, nearly $2\times$ cheaper overall, and every
+decode step moves half as many weight bytes from HBM.
+
+Push that trade-off to `Qwen3-0.6B` at $60{,}000$ tokens per parameter, where
+$N = 0.6 \times 10^9$ and $D_{\text{train}} = 3.6 \times 10^{13}$. The power-law
+curve gives $L = 1.69 + 0.421 + 0.066 = 2.177$. Training takes
+$129.6\text{ ZFLOP}$ and serving takes $120.0\text{ ZFLOP}$, for
+**$249.6\text{ ZFLOP}$** lifetime. Better still, the finished model fits in
+$1.2\text{ GB}$ of BF16 weights on a phone or laptop.
+
+??? question "Why did Chinchilla say 20 tokens per parameter while Llama 3 and Qwen3 train on 1,000 to 60,000 tokens per parameter?"
+    Chinchilla answered a narrow question: given a fixed pretraining budget
+    $C_{\text{train}}$, what $(N, D)$ gives the lowest loss at the end of
+    training? It priced inference at zero. In a real deployment, inference FLOPs
+    ($2 N D_{\text{infer}}$) and HBM weight traffic ($2N$ bytes per decoded
+    token, Lecture 02) dwarf the one-time training run. Spending $4\times$ to
+    $100\times$ more FLOPs once during pretraining to shrink $N$ by $2\times$ to
+    $4\times$ pays back on every token the model ever generates.
+    [Full answer](qa.md#why-did-chinchilla-say-20-tokens-per-parameter-while-llama-3-and-qwen3-train-on-1000-tokens-per-parameter)
+
+---
+
+### 3. Critical batch size and the batch-size ramp
+
+If `Qwen3-0.6B` needs $36\text{T}$ training tokens, why not finish the run in an
+afternoon by spreading one giant batch $B$ across a million GPUs?
+
+Each sample $x_i$ gives a noisy gradient $g_i = \nabla_\theta \ell(x_i)$ around
+the true population gradient $G = \mathbb{E}[g_i]$ with covariance
+$\Sigma = \text{Cov}(g_i)$. Averaging $B$ independent samples produces a batch
+gradient $\bar{g}_B$ with mean $G$ and covariance $\frac{1}{B}\Sigma$. When $B$
+is small, the noise term $\frac{1}{B}\text{tr}(H\Sigma)$ is large, so doubling
+$B$ cuts the noise in half and lets you take twice as large an effective step.
+Once $B$ is large enough that the noise $\frac{1}{B}\text{tr}(H\Sigma)$ is
+already smaller than the true signal $\|G\|_H^2$, averaging even more samples in
+the same step barely improves the update direction.
+
+McCandlish et al. (2018) showed that this saturation point sits at the
+**gradient noise scale**, also called the **critical batch size**.
+
+$$B_{\text{crit}} \approx B_{\text{noise}} = \frac{\text{tr}(\Sigma)}{\|G\|^2}$$
+
+Let $S_{\min}$ be the minimum number of serial optimizer steps needed at infinite
+batch size, and let $E_{\min} = B_{\text{crit}} S_{\min}$ be the minimum number
+of training tokens needed in the small-batch limit. At any batch size $B$, the
+required serial steps $S(B)$ and total data tokens $E(B) = B \cdot S(B)$ follow
+a simple trade-off.
+
+$$\frac{S(B)}{S_{\min}} = 1 + \frac{B_{\text{crit}}}{B}, \qquad \frac{E(B)}{E_{\min}} = 1 + \frac{B}{B_{\text{crit}}}$$
+
+At $B = B_{\text{crit}}$, you pay $2 S_{\min}$ serial steps and $2 E_{\min}$
+tokens. Below $B_{\text{crit}}$, doubling $B$ nearly halves wall-clock steps
+$S(B)$ with almost no extra token waste. In that regime, you scale the learning
+rate as $\eta \propto B$ for SGD or $\eta \propto \sqrt{B}$ for Adam. Above
+$B_{\text{crit}}$, the batch gradient is already clean, so doubling $B$ barely
+moves $S(B)$ while doubling the tokens burned per step.
+
+Notice how $B_{\text{crit}} = \text{tr}(\Sigma)/\|G\|^2$ changes during a run.
+In the first few billion tokens, the model is far from a minimum, so the true
+gradient norm $\|G\|$ is large and $B_{\text{crit}}$ is small. As loss drops,
+$\|G\|$ shrinks while the per-sample noise $\text{tr}(\Sigma)$ stays roughly
+flat, so $B_{\text{crit}}$ grows by $10\times$ to $20\times$. That is why
+DeepSeek-V3 and Llama 3 **ramp the global batch size** during pretraining,
+starting around $4\text{M}$ tokens per step and stepping up to $16\text{M}$ or
+$60\text{M}$ tokens once $B_{\text{crit}}$ has grown large enough to absorb the
+wider parallelism.
+
+---
+
+### 4. Warmup-Stable-Decay (WSD) schedules and $\mu\text{P}$
+
+Classic pretraining uses a **Cosine Decay** learning-rate schedule after $T_w$
+warmup steps over a fixed horizon $T_{\max}$.
+
+$$\eta_{\text{cos}}(t) = \eta_{\min} + \frac{1}{2}(\eta_{\max} - \eta_{\min})\left(1 + \cos\left(\pi \frac{t - T_w}{T_{\max} - T_w}\right)\right)$$
+
+Cosine decay forces a painful commitment: you have to pick the final step count
+$T_{\max}$ before step 1. You cannot stop early at $0.5\,T_{\max}$ because the
+learning rate is still high and the weights are bouncing around the walls of the
+loss valley. You also cannot keep training smoothly past $T_{\max}$ once the
+learning rate has hit $\eta_{\min}$.
+
+Modern pretraining runs such as MiniCPM, DeepSeek-V3, OLMo 2, and Llama 3
+replace Cosine with **Warmup-Stable-Decay**, or **WSD**, also called a
+trapezoidal schedule.
+
+$$\eta_{\text{WSD}}(t) = \begin{cases}
+\eta_{\max} \frac{t}{T_w} & 0 \le t \le T_w \\[4pt]
+\eta_{\max} & T_w < t \le T_s \\[4pt]
+\eta_{\max} \left(1 - \frac{t - T_s}{T_{\max} - T_s}\right) & T_s < t \le T_{\max}
+\end{cases}$$
+
+WSD separates bulk learning from final convergence. During the **Stable phase**
+from $T_w$ to $T_s$, the trainer holds $\eta = \eta_{\max}$ for $80\%$ to $90\%$
+of the run without needing a predetermined stopping step $T_{\max}$. Whenever
+you want a deployable model, whether at $1\text{T}$, $10\text{T}$, or
+$36\text{T}$ tokens, you branch off a checkpoint and run the rapid **Decay
+phase** over the last $10\%$ to $20\%$ of tokens while keeping the main stable
+trunk running. Better still, during that decay branch you swap the training mix
+from noisy web crawl to curated math, code, and reasoning data, a stage now
+called **mid-training** or **annealing**.
+
+How do you pick the peak learning rate $\eta_{\max}$ for a $70\text{B}$ model
+when a single trial run costs millions of dollars? Standard initialization breaks
+when you widen a network: as hidden width $d_{\text{model}}$ grows, activation
+updates $\Delta h_\ell$ blow up unless you re-tune $\eta_{\max}$ at every scale.
+**Maximal Update Parametrization**, or $\mu\text{P}$, from Yang et al. (2022)
+fixes the scaling law of the parameterization itself. Under $\mu\text{P}$,
+hidden weights initialize with variance $1 / d_{\text{model}}$ and scale their
+Adam learning rate inversely with width.
+
+$$\eta_{\text{hidden}} = \eta_{\text{base}} \cdot \frac{d_{\text{proxy}}}{d_{\text{target}}}$$
+
+Meanwhile, input embeddings keep $\eta_{\text{embed}} = \eta_{\text{base}}$ and
+the output readout scales by $d_{\text{proxy}} / d_{\text{target}}$. With those
+factors in place, every layer's normalized feature update
+$\|\Delta h_\ell\|_2 / \sqrt{d_{\text{model}}}$ stays $\Theta(1)$ at any width,
+so the optimal $\eta_{\text{base}}$ found on a cheap $40\text{M}$ proxy model
+transfers directly to a $70\text{B}$ run.
+
+---
+
+### 5. Mid-training long-context extension: RoPE scaling and YaRN
+
+Training at sequence length $s = 32{,}768$ or $131{,}072$ for all $36\text{T}$
+pretraining tokens would multiply quadratic attention FLOPs by $8\times$ to
+$32\times$. Instead, models like `Qwen3` run bulk pretraining at
+$s_{\text{orig}} = 4{,}096$ for over $30\text{T}$ tokens, and stretch the
+context window to $s_{\text{ext}} = 32{,}768$ or $131{,}072$ only during the
+short mid-training stage.
+
+Why does a model trained at $s_{\text{orig}} = 4{,}096$ fail if you feed it
+token $m = 10{,}000$ at test time? Recall from Lecture 01 that Rotary Positional
+Embeddings, or RoPE, group each head's $d_{\text{head}}$ channels into 2D pairs
+$j \in \{0, \dots, d_{\text{head}}/2 - 1\}$ and rotate pair $j$ at position $m$
+by angle $m \theta_j$.
+
+$$\theta_j = \text{base}^{-2j / d_{\text{head}}}, \qquad \lambda_j = \frac{2\pi}{\theta_j} = 2\pi \cdot \text{base}^{2j / d_{\text{head}}}$$
+
+When $m$ goes past $s_{\text{orig}} = 4{,}096$, the slow, long-wavelength pairs
+near $j \to d_{\text{head}}/2$ hit rotation angles $m \theta_j$ they never saw
+during pretraining. That scrambles the dot products $q_m^\top k_n$.
+
+Stretching every frequency equally by $\theta_j' = \theta_j / s$, where
+$s = s_{\text{ext}} / s_{\text{orig}}$, keeps angles in range. Yet it also
+squashes adjacent tokens $s\times$ closer together. That hurts the fast,
+short-wavelength pairs with $\lambda_j \ll s_{\text{orig}}$, which already
+completed many full $2\pi$ turns during pretraining and only track local word
+order.
+
+Mid-training therefore combines two targeted adjustments. First, **Adjusted Base
+Frequency** raises the RoPE base from $10{,}000$ to $1{,}000{,}000$, as in
+Llama 3 and Qwen3, or scales it by the NTK-aware factor
+$\text{base}' = \text{base} \cdot s^{d_{\text{head}} / (d_{\text{head}} - 2)}$.
+Second, **YaRN** from Peng et al. (2023) splits the frequency pairs by
+wavelength. It leaves high-frequency local pairs untouched with $\gamma_j = 1$,
+linearly interpolates slow global pairs with $\gamma_j = 0$, and blends the
+middle pairs with a smooth ramp $\gamma_j \in [0, 1]$.
+
+$$\theta_j^{\text{YaRN}} = (1 - \gamma_j) \frac{\theta_j}{s} + \gamma_j \theta_j$$
+
+Fixing the angles leaves one more problem. When a query attends over $s\times$
+more keys, the softmax denominator $\sum_{k=1}^m \exp(q_m^\top k_k / \sqrt{d_{\text{head}}})$
+sums $s\times$ as many positive terms, which flattens the attention weights into
+a blurry uniform distribution. YaRN sharpens the distribution back up by
+multiplying the pre-softmax logits by an **attention temperature factor**.
+
+$$\sqrt{\frac{1}{t}} = 0.1 \ln(s) + 1$$
+
+For `Qwen3-0.6B` extending $8\times$ from $4{,}096$ to $32{,}768$, the logit
+multiplier is $\sqrt{1/t} = 0.1 \ln(8) + 1 = 1.2079$, which corresponds to
+temperature $t = 1 / 1.2079^2 = 0.6853$.
+
+---
+
+## What you should see
+
+Running `book/code/scaling_laws.py` shows why Chinchilla's $D \approx 20N$ rule
+only applies when inference is free. Once you add lifetime serving FLOPs
+$2 N D_{\text{infer}}$, shrinking $N$ and over-training on $300\times$ to
+$60{,}000\times$ more tokens cuts total compute in half while making every
+decode step faster. During that long training run, $B_{\text{crit}}$ sets the
+ceiling on useful data parallelism, WSD saves the final $10\%$ to $20\%$ of
+tokens for high-quality annealing, and YaRN stretches the context window without
+paying quadratic attention FLOPs from step 1.
+
+---
+
+## Go deeper
+
+- [Training Compute-Optimal Large Language Models](https://arxiv.org/abs/2203.15556) (Hoffmann et al., 2022), the Chinchilla $L(N, D)$ fit and $20\text{ tokens/param}$ derivation.
+- [An Empirical Model of Large-Batch Training](https://arxiv.org/abs/1812.06162) (McCandlish et al., 2018), the gradient noise scale $B_{\text{crit}} = \text{tr}(\Sigma)/\|G\|^2$.
+- [Tensor Programs V: Tuning Large Neural Networks via Zero-Shot Hyperparameter Transfer](https://arxiv.org/abs/2203.03466) (Yang et al., 2022), the $\mu\text{P}$ width-transfer rules.
+- [YaRN: Efficient Context Window Extension of Large Language Models](https://arxiv.org/abs/2309.00071) (Peng et al., 2023), wavelength-band interpolation and attention temperature scaling.
+
+---
+
+## Check yourself
+
+1. Starting from $L(N, D) = E + A N^{-\alpha} + B D^{-\beta}$ and $6ND = C$,
+   show why $\alpha = \beta$ implies $N^* \propto C^{0.5}$ and $D^* \propto C^{0.5}$.
+2. Why does the critical batch size $B_{\text{crit}} = \text{tr}(\Sigma)/\|G\|^2$
+   increase as loss falls, and how do training pipelines exploit that shift?
+3. What goes wrong if you stop a Cosine Decay run halfway through, and how does
+   a WSD schedule avoid that problem?
+4. Why does YaRN leave high-frequency RoPE dimensions unscaled ($\gamma_j = 1$)
+   while scaling low-frequency dimensions by $1/s$?
+
+---
+
+## Next
+
+**[31. Activation memory and recomputation](31-activation-memory.md)**:
+Derive every byte saved per transformer layer for backward, why eager attention
+explodes as $O(s^2)$, why the final vocabulary logits can be the largest tensor
+in VRAM, and how selective checkpointing trades $33\%$ extra compute for an
+$18\times$ activation memory cut.
+
+```bash
+uv run python book/code/activation_budget.py
+```

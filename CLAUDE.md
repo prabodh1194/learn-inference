@@ -69,6 +69,21 @@ state. Show the traffic per operation, the term-by-term substitution, the
 factorisation, and the numbers plugged in. Condensed math is the fastest way to
 lose the reader the lecture was written for.
 
+## Book prose — plain words, causal chains, zero AI tells
+
+- **Walk the causal "why" step by step before introducing any mechanism or math**
+  (e.g., why duplicate pages bias training -> why measure text overlap -> why
+  Jaccard needs sets -> why exact Jaccard hits $O(N^2)$ -> why MinHash + LSH).
+- **Flowing paragraphs over `**Bold:**` bullet lists.** Do not format explanations
+  as vertical lists of bold labels with colons.
+- **Plain words and short sentences.** Chain sentences old-to-new (each sentence
+  starts from what the last one ended on), keep subject and verb close, and
+  avoid em-dashes (`—`), "not X, but Y" contrasts, rhetorical `? Because`
+  openers, dangling `, allowing` / `, leaving` participles, and AI-lexicon
+  filler (`crucial`, `essential`, `furthermore`, `pivotal`, `delve`).
+- **Gate prose edits** against `humanize/scripts/audit.py` (0 flags, CV > 0.40)
+  and `quiron/scripts/audit.py --brief` (0 FAIL, 0 TELL).
+
 ## Notes
 
 `notes/` is the deliverable, not an afterthought — prose and runnable code

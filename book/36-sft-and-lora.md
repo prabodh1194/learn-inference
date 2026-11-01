@@ -17,14 +17,14 @@ worksheets in Common Crawl look like lists of questions).
 training on `(prompt, response)` pairs formatted with chat templates
 (`<|im_start|>user\n...\n<|im_end|>\n<|im_start|>assistant\n...\n<|im_end|>`).
 
-Two questions immediately arise:
-1. **What changes in the loss function between pre-training and SFT?** Only one
-   thing — and getting it wrong wastes most of your gradient budget memorizing
-   user prompts.
-2. **Why pay Lecture 30's $16\Psi$ memory bill (8.88 GiB on 0.6B, 104 GiB on 7B)
-   to adjust a model that already knows English, code, and math?** **LoRA** and
-   **QLoRA** freeze the base weights and train a low-rank update — but with a
-   crucial activation-memory catch that catches almost everyone off guard.
+Two questions come up right away. First, we need to know what changes in the
+loss function between pre-training and SFT. Only one thing changes, and getting
+it wrong spends most of your gradient budget memorizing user prompts. Second, we
+want to avoid paying Lecture 30's $16\Psi$ memory bill, which is 8.88 GiB on
+0.6B and 104 GiB on 7B, just to adjust a model that already knows English, code,
+and math. **LoRA** and **QLoRA** freeze the base weights and train a low-rank
+update, though they come with an activation-memory catch that surprises almost
+everyone on their first run.
 
 ---
 
@@ -45,15 +45,15 @@ Qwen3-0.6B (596.0M total, LoRA r=16 on all 7 projections = 10.09M trainable, 1.6
   Notice: LoRA crushes grads+AdamW by 98%, so ACTIVATIONS become the dominant term!
 ```
 
-Read the three columns across the rows:
-- Full fine-tuning spends **7,958.1 MiB** ($14\Psi$: $2\Psi$ BF16 gradients +
-  $12\Psi$ FP32 AdamW state) on trainable state.
-- **LoRA ($r = 16$)** cuts that $7{,}958.1\text{ MiB}$ to **134.8 MiB** ($59\times$
-  smaller!), and **QLoRA** shrinks the frozen base weights from **1,136.9 MiB to
-  312.6 MiB**.
-- Yet the third column — **1,904.0 MiB of activations** — does **not move at all**!
+Read the three columns down the table. Full fine-tuning spends **7,958.1 MiB**
+($14\Psi$, made of $2\Psi$ BF16 gradients plus $12\Psi$ FP32 AdamW state) on
+trainable state. **LoRA ($r = 16$)** cuts that $7{,}958.1\text{ MiB}$ to
+**134.8 MiB** ($59\times$ smaller), and **QLoRA** shrinks the frozen base
+weights from **1,136.9 MiB to 312.6 MiB**. Yet the third column, **1,904.0 MiB
+of activations**, does **not move at all**.
 
-Let's derive every number in that table, and why the third column refuses to budge.
+Let's derive every number in that table, and see why the third column refuses
+to budge.
 
 ---
 
@@ -81,24 +81,22 @@ labels    : [   -100, -100, -100, -100, -100,  -100,  "4", <eos> ]
               └──────────── prompt (masked) ──────────┘ └─ scored ─┘
 ```
 
-What happens if you forget to mask the prompt (`labels = input_ids.clone()`)?
-Suppose a rag/coding prompt has $P = 2{,}000$ tokens of context and a $R = 20$
-token answer. Without prompt masking, $\frac{2000}{2020} = 99\%$ of the gradient
-updates the model to predict the user's messy prompt rather than the assistant's
-answer!
+See what happens if we forget to mask the prompt and set
+`labels = input_ids.clone()`. Suppose a coding prompt has $P = 2{,}000$ tokens
+of context and an $R = 20$ token answer. Without prompt masking,
+$\frac{2000}{2020} = 99\%$ of the gradient updates the model to predict the
+user's messy prompt instead of the assistant's answer.
 
-**Multi-turn masking & SFT hyperparameter regimes.** In a multi-turn conversation
-$(u_1, a_1, u_2, a_2, \dots, u_K, a_K)$, two conventions exist:
-- **Mask user/tool turns only:** Every assistant reply $a_1, \dots, a_K$ receives
-  supervision (`labels != -100`) in a single forward pass, while all `system`,
-  `user`, and `tool` observation tokens are set to `-100`.
-- **Final-turn only (unrolled):** Unroll a $K$-turn dialogue into $K$ examples
-  where example $k$ supervises only $a_k$ and masks $(u_1, a_1, \dots, u_k)$.
-- **Why SFT uses $10\times$–$30\times$ smaller learning rates and batches:** To
-  avoid overwriting pre-trained representations on a $1\text{M}$-prompt SFT mix,
-  models like `OLMo 2` drop the peak learning rate from $3 \times 10^{-4}$
-  (pre-training) to $1 \times 10^{-5}$–$5 \times 10^{-5}$ (SFT) and reduce global
-  batch size from $4\text{M}$ tokens to $256$ prompts ($1$–$2$ epochs total).
+In a multi-turn conversation $u_1, a_1, u_2, a_2, \dots, u_K, a_K$, most
+trainers mask only the `system`, `user`, and `tool` observation tokens with
+`-100` and score every assistant reply $a_1, \dots, a_K$ in one forward pass. An
+alternative unrolls a $K$-turn dialogue into $K$ separate examples where example
+$k$ scores only the final reply $a_k$ and masks all earlier turns. Because SFT
+runs on a smaller, curated mix of $100\text{K}$ to $1\text{M}$ prompts for $1$
+to $2$ epochs and we do not want to overwrite the base model's features, runs
+like `OLMo 2` drop the peak learning rate by $10\times$ to $30\times$, from
+$3 \times 10^{-4}$ in pre-training down to $2 \times 10^{-5}$ in SFT, and use
+smaller global batches of $128$ to $256$ sequences.
 
 ---
 
@@ -135,13 +133,13 @@ all 28 layers:  28 × 360,448                   = 10,092,544 params (10.09M = 1.
 ```
 
 Now plug $\Psi_{\text{LoRA}} = 10{,}092{,}544$ into Lecture 30's $14\Psi$
-gradient + AdamW state formula ($2\text{ B}$ BF16 grads + $12\text{ B}$ FP32
+gradient and AdamW state formula ($2\text{ B}$ BF16 grads + $12\text{ B}$ FP32
 master weights and moments):
 
 $$\text{Bytes}_{\text{LoRA grads+opt}} = 14 \times 10{,}092{,}544 = 141{,}295{,}616\text{ B} = 134.75\text{ MiB}$$
 
-against $14 \times 596{,}049{,}920 = 7{,}958.1\text{ MiB}$ for full fine-tuning —
-the exact **134.8 MiB vs 7,958.1 MiB** in the demo!
+Compare that against $14 \times 596{,}049{,}920 = 7{,}958.1\text{ MiB}$ for full
+fine-tuning, which gives the exact **134.8 MiB vs 7,958.1 MiB** in the demo.
 
 #### Why $B = 0$ and $A \sim \mathcal{N}(0, \sigma^2)$ at initialization
 
@@ -150,21 +148,25 @@ $Y = X W_0^\top + \frac{\alpha}{r} (X A^\top) B^\top$:
 
 $$\nabla_B = \frac{\alpha}{r} \nabla_Y^\top (X A^\top), \qquad \nabla_A = \frac{\alpha}{r} (B^\top \nabla_Y^\top)^\top X$$
 
-Check the three possible initialization choices at step $0$:
-1. **Both $A \neq 0$ and $B \neq 0$:** then $\Delta W = \frac{\alpha}{r} B A \neq 0$
-   at step 0, injecting random noise into every layer of your pre-trained model
-   before a single gradient step has been taken!
-2. **Both $A = 0$ and $B = 0$:** then $\Delta W = 0$ at step 0, **but look at
-   the gradients:**
-   $$\nabla_B = \frac{\alpha}{r} \nabla_Y^\top (X \cdot 0) = 0, \qquad \nabla_A = \frac{\alpha}{r} (0 \cdot \nabla_Y^\top)^\top X = 0$$
-   Both gradients are identically zero! It is a saddle point; neither $A$ nor $B$
-   can ever move!
-3. **$B = 0$ and $A \sim \mathcal{N}(0, \sigma^2)$ (the LoRA rule):**
-   - At step 0, $\Delta W = \frac{\alpha}{r} (0 \cdot A) = 0$, so the model starts
-     **bit-for-bit identical** to the pre-trained base model.
-   - At step 0, $\nabla_A = 0$, **but $\nabla_B = \frac{\alpha}{r} \nabla_Y^\top (X A^\top) \neq 0$**
-     because $A \neq 0$! So $B$ becomes non-zero on step 1, and from step 2
-     onward both $\nabla_A$ and $\nabla_B$ are non-zero!
+Check the three possible initialization choices at step 0. If we initialize
+**both $A \neq 0$ and $B \neq 0$**, then $\Delta W = \frac{\alpha}{r} B A \neq 0$
+at step 0, which injects random noise into every layer of the pre-trained model
+before a single gradient step has run.
+
+What if we initialize **both $A = 0$ and $B = 0$**? Then $\Delta W = 0$ at step
+0, but plug $A = 0$ and $B = 0$ into the two gradient formulas:
+
+$$\nabla_B = \frac{\alpha}{r} \nabla_Y^\top (X \cdot 0) = 0, \qquad \nabla_A = \frac{\alpha}{r} (0 \cdot \nabla_Y^\top)^\top X = 0$$
+
+Both gradients are identically zero. The parameters sit on a dead saddle point,
+and neither $A$ nor $B$ can ever move.
+
+Now check the **LoRA rule**, where $B = 0$ and $A \sim \mathcal{N}(0, \sigma^2)$.
+At step 0, $\Delta W = \frac{\alpha}{r} (0 \cdot A) = 0$, so the model starts
+**bit-for-bit identical** to the pre-trained base model. At step 0,
+$\nabla_A = 0$, **but $\nabla_B = \frac{\alpha}{r} \nabla_Y^\top (X A^\top) \neq 0$**
+because $A \neq 0$. That non-zero gradient updates $B$ on step 1, and from step
+2 onward both $\nabla_A$ and $\nabla_B$ are non-zero.
 
 ---
 
@@ -174,34 +176,34 @@ Look again at the backward equation for $\nabla_B$ and $\nabla_A$ in layer $\ell
 
 $$\nabla_{B_\ell} = \frac{\alpha}{r} \nabla_{Y_\ell}^\top (X_\ell A_\ell^\top)$$
 
-To compute $\nabla_{B_1}$ in **Layer 1**, you need two things:
-1. The forward input $X_1$ to Layer 1 (and $X_\ell$ at every adapted layer
-   $\ell = 1, \dots, 28$).
-2. The upstream activation gradient $\nabla_{Y_1}$, which only reaches Layer 1
-   by backpropagating $\nabla_X = \nabla_Y W_0^\top$ **all the way through the
-   frozen base weights $W_0$ of Layers 28 down to 2**!
+To compute $\nabla_{B_1}$ in **Layer 1**, we need two things. First, we need the
+forward input $X_1$ to Layer 1 (and $X_\ell$ at every adapted layer
+$\ell = 1, \dots, 28$). Second, we need the upstream activation gradient
+$\nabla_{Y_1}$, which only reaches Layer 1 by backpropagating
+$\nabla_X = \nabla_Y W_0^\top$ **all the way back through the frozen base
+weights $W_0$ of Layers 28 down to 2**.
 
-??? question "Wait — if the base weights $W_0$ are frozen (`requires_grad=False`), why does backpropagation still run through every layer and save activations?"
+??? question "Wait, if the base weights $W_0$ are frozen (`requires_grad=False`), why does backpropagation still run through every layer and save activations?"
     Freezing $W_0$ skips only the **weight-gradient** matmul $\nabla_{W_0} = X^\top \nabla_Y$
     for $W_0$ itself. Because LoRA adapters are attached to Layer 1 through Layer
-    28, the **input-gradient** $\nabla_X = \nabla_Y W_0^\top$ must still propagate
+    28, the **input-gradient** $\nabla_X = \nabla_Y W_0^\top$ must still travel
     from the loss all the way back to Layer 1, and every adapted layer (plus
     every non-linearity like SwiGLU, RMSNorm, and attention along that path)
-    must still save its forward activations! That is why LoRA + gradient
-    checkpointing is mandatory on long sequences.
+    must still save its forward tensors. That is why LoRA with gradient
+    checkpointing is needed on long sequences.
     [Full answer](qa.md#if-base-weights-are-frozen-in-lora-why-doesnt-activation-memory-drop)
 
-**QLoRA (Dettmers et al., 2023)** attacks the remaining **1,136.9 MiB** of
-frozen base weights $W_0$:
-- Store $W_0$ in **4-bit NormalFloat (NF4)** ($0.5\text{ bytes/param}$), a
-  quantile-spaced 16-bin lookup table optimized for normally distributed weights.
-- **Double quantization:** quantize the FP32 block-scale factors (one per 64
-  weights) down to FP8 in groups of 256, cutting scale overhead from
-  $32 / 64 = 0.5\text{ bits/param}$ to $8 / 64 + 32 / (64 \times 256) \approx 0.127\text{ bits/param}$
-  (total $\approx 0.55\text{ bytes/param} \implies 312.6\text{ MiB}$ on Qwen3-0.6B).
-- During forward and backward ($\nabla_X = \nabla_Y W_0^\top$), dequantize $W_0$
-  on the fly to BF16 tile-by-tile, while keeping the small LoRA adapters $A, B$
-  in BF16/FP32.
+**QLoRA (Dettmers et al., 2023)** shrinks the remaining **1,136.9 MiB** of
+frozen base weights $W_0$. It stores $W_0$ in **4-bit NormalFloat (NF4)**
+($0.5\text{ bytes/param}$), a quantile-spaced 16-bin lookup table tuned for
+normally distributed weights. It then applies **double quantization**, which
+quantizes the FP32 block-scale factors (one per 64 weights) down to FP8 in
+groups of 256. That cuts scale overhead from $32 / 64 = 0.5\text{ bits/param}$
+to $8 / 64 + 32 / (64 \times 256) \approx 0.127\text{ bits/param}$, bringing
+total storage to $\approx 0.55\text{ bytes/param}$ ($312.6\text{ MiB}$ on
+Qwen3-0.6B). During forward and backward ($\nabla_X = \nabla_Y W_0^\top$),
+QLoRA dequantizes $W_0$ on the fly to BF16 tile by tile, while keeping the small
+LoRA adapters $A$ and $B$ in BF16 and FP32.
 
 ---
 
@@ -253,20 +255,20 @@ uv run pytest tests/test_36_sft_lora.py -v
 
 ## What you should see
 
-- **LoRA reduces gradient + optimizer state by $98.3\%$** on Qwen3-0.6B at $r=16$.
-- **Zero-initializing $B$ preserves exact base-model outputs at step 0** while
-  giving $B$ a non-zero gradient on step 1.
-- **Merging adapters at inference time** ($W_{\text{merged}} = W_0 + \frac{\alpha}{r} B A$)
-  gives **zero serving latency overhead** for a single adapter, or multi-LoRA
-  batching (Lecture 12b) when serving many adapters simultaneously.
+LoRA cuts gradient and optimizer state by **98.3%** on Qwen3-0.6B at $r=16$.
+Setting $B = 0$ at initialization keeps the base model's exact outputs at step 0
+while giving $B$ a non-zero gradient on step 1. Once training finishes, merging
+the adapter into the base weights ($W_{\text{merged}} = W_0 + \frac{\alpha}{r} B A$)
+adds **zero serving latency** for a single adapter, or pairs with multi-LoRA
+batching (Lecture 12b) when serving many adapters at once.
 
 ---
 
 ## Go deeper
 
-- **[LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)** (Hu et al., 2021).
-- **[QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)** (Dettmers et al., 2023) — NF4, double quantization, and paged optimizers.
-- **[LoRA Without Regrets](https://thinkingmachines.ai/blog/lora/)** (Schulman et al., Thinking Machines Lab, 2025) — why applying LoRA to **all 7 linear layers** (especially MLP gate/up/down, not just Q and V) matches full fine-tuning in post-training.
+- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) (Hu et al., 2021).
+- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314) (Dettmers et al., 2023), NF4, double quantization, and paged optimizers.
+- [LoRA Without Regrets](https://thinkingmachines.ai/blog/lora/) (Schulman et al., Thinking Machines Lab, 2025), why applying LoRA to **all 7 linear layers** (especially MLP gate/up/down, not only Q and V) matches full fine-tuning in post-training.
 
 ---
 

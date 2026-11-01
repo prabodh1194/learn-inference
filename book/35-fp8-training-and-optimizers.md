@@ -12,26 +12,26 @@ In Lecture 19b, we used 8-bit floating point (**FP8 E4M3**, range $\pm 448$) for
 **inference**, where weights are frozen and there is only one matrix multiply
 per linear layer ($Y = XW$).
 
-Training in FP8 is much harder for three reasons:
+Training in FP8 is much harder for three reasons. First, **outliers in
+activations and gradients erase normal values**. E4M3 has only 4 exponent bits
+and 3 mantissa bits, with minimum positive subnormal $2^{-9} \approx 0.001953$.
+Under per-tensor scaling, a single outlier of $500{,}000$ in a tensor forces the
+shared scale factor so high that every ordinary value around $1.0$ divides down
+to $0.000896 < 2^{-9}$ and **flushes straight to zero**, wiping out gradients.
 
-1. **Outliers in activations and gradients erase normal values.** E4M3 has only
-   4 exponent bits and 3 mantissa bits (minimum positive subnormal
-   $2^{-9} \approx 0.001953$). Under per-tensor scaling, a single outlier of
-   $500{,}000$ in a tensor forces the shared scale factor so high that every
-   ordinary value around $1.0$ divides down to $0.000896 < 2^{-9}$ and **flushes
-   straight to zero**, destroying gradients.
-2. **Each linear layer has three GEMMs contracting along two different axes.**
-   Forward ($Y = XW$) and input-backward ($\nabla_X = \nabla_Y W^\top$) contract
-   along the hidden dimensions ($d_{\text{in}}$ and $d_{\text{out}}$), while
-   weight-backward ($\nabla_W = X^\top \nabla_Y$) contracts along the **token
-   dimension $D = B \cdot S$**.
-3. **MoE load-balancing losses fight the language-modeling loss.** Standard MoE
-   training adds an auxiliary penalty $\mathcal{L}_{\text{aux}}$ to prevent
-   routing collapse (Lecture 23), trading token quality against load balance.
+Second, **each linear layer has three GEMMs contracting along two different
+axes**. Forward ($Y = XW$) and input-backward ($\nabla_X = \nabla_Y W^\top$)
+contract along the hidden dimensions $d_{\text{in}}$ and $d_{\text{out}}$, while
+weight-backward ($\nabla_W = X^\top \nabla_Y$) contracts along the **token
+dimension $D = B \cdot S$**.
 
-DeepSeek-V3 solved all three on a 671B-parameter model across 14.8 trillion
-tokens in **2.788M H800 GPU hours ($5.58M)** with zero irrecoverable loss spikes.
-Let's derive the exact mechanisms.
+Third, **MoE load-balancing losses fight the language-modeling loss**. Standard
+MoE training adds an auxiliary penalty $\mathcal{L}_{\text{aux}}$ to prevent
+routing collapse (Lecture 23), trading token quality against load balance.
+
+DeepSeek-V3 solved all three on a 671B-parameter model over 14.8 trillion tokens
+in **2.788M H800 GPU hours ($5.58M)** with zero irrecoverable loss spikes. Let's
+derive the mechanisms behind that run.
 
 ---
 
@@ -69,28 +69,31 @@ Look at both blocks:
 
 ### 1. Fine-grained FP8 scaling ($1 \times 128$ tiles and $128 \times 128$ blocks) + FP32 tensor-core promotion
 
-Recall E4M3's representable range from Lecture 19b:
-- Maximum finite value: $V_{\max} = 448.0$
-- Minimum positive normal: $2^{-6} = 0.015625$
-- Minimum positive subnormal: $2^{-9} = \frac{1}{512} \approx 0.001953125$
-- Anything below $\frac{1}{2} \times 2^{-9} = 2^{-10} \approx 0.0009766$ rounds to **exact zero**.
+Recall E4M3's representable range from Lecture 19b. Its maximum finite value is
+$V_{\max} = 448.0$, its minimum positive normal is $2^{-6} = 0.015625$, and its
+minimum positive subnormal is $2^{-9} = \frac{1}{512} \approx 0.001953125$. Any
+magnitude below $\frac{1}{2} \times 2^{-9} = 2^{-10} \approx 0.0009766$ rounds
+to **exact zero**.
 
 Now trace what happens in the demo when 255 elements equal $1.0$ and element 255
-is an activation outlier of $500{,}000.0$:
+is an activation outlier of $500{,}000.0$. Under **per-tensor scaling**, we
+compute one scale for all 256 numbers.
 
-1. **Per-tensor scaling** computes one scale for all 256 numbers:
-   $$s_{\text{tensor}} = \frac{\max_i |x_i|}{448.0} = \frac{500{,}000.0}{448.0} \approx 1{,}116.07$$
-   Divide the ordinary values $x = 1.0$ by $s_{\text{tensor}}$:
-   $$\tilde{x} = \frac{1.0}{1{,}116.07} \approx 0.000896 < 2^{-10} \implies \text{round}_{\text{E4M3}}(\tilde{x}) = 0.0$$
-   Every single ordinary activation is flushed to zero.
+$$s_{\text{tensor}} = \frac{\max_i |x_i|}{448.0} = \frac{500{,}000.0}{448.0} \approx 1{,}116.07$$
 
-2. **Tile-wise scaling ($1 \times 128$ for activations/gradients, $128 \times 128$ for weights)**
-   gives each 128-element strip its own FP32 scale factor:
-   - Tile 0 (indices `0..127`, all `1.0`):
-     $$s_0 = \frac{1.0}{448.0} \implies \tilde{x} = 448.0 \implies \text{dequantized} = 448.0 \times \frac{1.0}{448.0} = 1.0000$$
-   - Tile 1 (indices `128..255`, containing the outlier): only the 127 neighbors
-     inside that single tile share the large scale; every other tile in the tensor
-     is untouched!
+Divide the ordinary values $x = 1.0$ by $s_{\text{tensor}}$.
+
+$$\tilde{x} = \frac{1.0}{1{,}116.07} \approx 0.000896 < 2^{-10} \implies \text{round}_{\text{E4M3}}(\tilde{x}) = 0.0$$
+
+Every single ordinary activation flushes to zero.
+
+Under **tile-wise scaling** ($1 \times 128$ tiles for activations and gradients,
+$128 \times 128$ blocks for weights), each 128-element strip gets its own FP32
+scale factor. In Tile 0 (indices `0..127`, all equal to `1.0`), the scale is
+$s_0 = 1.0 / 448.0$, so every `1.0` quantizes to `448.0` and dequantizes back to
+exact `1.0000`. In Tile 1 (indices `128..255`, holding the outlier), only the
+127 neighbors inside that single tile share the large scale; every other tile in
+the tensor stays clean.
 
 And inside the Hopper (H100/H800) tensor core, a second problem appears: the
 hardware FP8 `mma` (`wgmma.mma_async`) accumulates partial dot products in a
@@ -171,15 +174,17 @@ matrix orthogonalization** of the momentum matrix $M_t$:
 $$O_t = \text{NewtonSchulz}_5(M_t) \approx U V^\top \quad \text{where } M_t = U \Sigma V^\top$$
 
 Specifically, after normalizing $X_0 = M_t / \|M_t\|_F$ so all singular values
-lie in $(0, 1]$, Muon runs $5$ iterations of the odd quintic matrix polynomial:
+lie in $(0, 1]$, Muon runs $5$ iterations of the odd quintic matrix polynomial.
 
 $$X_{k+1} = a X_k + b X_k (X_k^\top X_k) + c X_k (X_k^\top X_k)^2, \qquad (a, b, c) = (3.4445, -4.7750, 2.0315)$$
 
-Why does this work without calling `torch.linalg.svd`? Because if $X_k = U \Sigma_k V^\top$,
-then $X_k (X_k^\top X_k) = U \Sigma_k^3 V^\top$ and $X_k (X_k^\top X_k)^2 = U \Sigma_k^5 V^\top$,
-so the matrix iteration applies the scalar polynomial $\phi(\sigma) = a\sigma + b\sigma^3 + c\sigma^5$
-independently to every singular value $\sigma_i \in (0, 1]$, pushing all
-$\sigma_i \to 1$ in 5 pure BF16 matrix multiplications!
+This iteration works without calling `torch.linalg.svd` because when
+$X_k = U \Sigma_k V^\top$, the products $X_k (X_k^\top X_k) = U \Sigma_k^3 V^\top$
+and $X_k (X_k^\top X_k)^2 = U \Sigma_k^5 V^\top$ share the same singular vectors
+$U$ and $V^\top$. Each matrix step therefore applies the scalar polynomial
+$\phi(\sigma) = a\sigma + b\sigma^3 + c\sigma^5$ to every singular value
+$\sigma_i \in (0, 1]$, pushing all $\sigma_i \to 1$ in 5 fast BF16 matrix
+multiplications.
 
 Setting all singular values of the update to $1$ forces every orthogonal
 direction of the weight matrix to advance at the same rate, while needing only
@@ -249,18 +254,18 @@ uv run pytest tests/test_35_fp8_train.py -v
 
 ## What you should see
 
-- **Tile quantization isolates outlier quantization noise to the 128-element tile
-  containing the outlier**, leaving every other tile's signal-to-noise ratio intact.
-- **The bias thermostat converges toward uniform expert load** over repeated steps
-  without altering the raw gating scores $s_{i,t}$.
+Tile quantization keeps outlier quantization noise inside the single 128-element
+tile that holds the outlier, so every other tile keeps its full precision. In
+the MoE router, the bias thermostat converges toward even expert load over
+repeated steps without changing the raw gating weights $s_{i,t}$.
 
 ---
 
 ## Go deeper
 
-- **[DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437)** — Section 2.1.2 (Auxiliary-loss-free load balancing), Section 2.2 (Multi-Token Prediction), and Section 3.3 (FP8 mixed-precision training framework).
-- **[Auxiliary-Loss-Free Load Balancing Strategy for Mixture-of-Experts](https://arxiv.org/abs/2408.15664)** (Wang et al., 2024).
-- **[Muon: An optimizer for hidden layers in neural networks](https://kellerjordan.github.io/posts/muon/)** (Keller Jordan, 2024).
+- [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437), Section 2.1.2 (Auxiliary-loss-free load balancing), Section 2.2 (Multi-Token Prediction), and Section 3.3 (FP8 mixed-precision training framework).
+- [Auxiliary-Loss-Free Load Balancing Strategy for Mixture-of-Experts](https://arxiv.org/abs/2408.15664) (Wang et al., 2024).
+- [Muon: An optimizer for hidden layers in neural networks](https://kellerjordan.github.io/posts/muon/) (Keller Jordan, 2024).
 
 ---
 
@@ -282,7 +287,7 @@ pre-training run from first principles.
 
 **[36. Supervised fine-tuning (SFT), LoRA, and QLoRA](36-sft-and-lora.md)**:
 Part VII begins. A pre-trained base model only completes documents; now turn it
-into an assistant — and see why LoRA eliminates optimizer memory while leaving
+into an assistant and see why LoRA cuts optimizer memory while leaving
 activation memory untouched.
 
 ```bash

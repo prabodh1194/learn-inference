@@ -1,34 +1,33 @@
 # 41. RL infrastructure: where the inference engine meets the trainer
 
 **Demo:** `book/code/rl_loop_profile.py` · **Build:** `train/rl_loop.py` · **Test:** `tests/test_41_rl_systems.py`
-**Moves:** unifies Parts I–V and Parts VI–VII — explains why 75%–85% of RL training time is inference decode
+**Moves:** unifies Parts I to V and Parts VI to VII, showing why 75% to 85% of RL training time is inference decode
 **Prereq:** [01. The two phases](01-the-two-phases.md), [08. Continuous batching](08-continuous-batching.md), [10. Prefix caching](10-prefix-caching.md), [33. ZeRO and FSDP](33-zeRO-and-fsdp.md), [39. GRPO](39-grpo-and-reinforcement-learning.md)
 
 ---
 
 ## The problem
 
-Look back at the two halves of this book:
-- **Parts I–V (Inference):** memory-bandwidth-bound decode ($0.79\text{ ops:byte}$),
-  KV caching ($112\text{ KiB/token}$), continuous batching, paged attention,
-  prefix caching, speculative decoding, vLLM, and SGLang.
-- **Parts VI–VII (Training & Post-Training):** compute-bound forward + backward
-  passes ($6ND\text{–}8ND$ FLOPs), $16\Psi$ AdamW state, activation checkpointing,
-  ZeRO/FSDP, and GRPO.
+Look back at the two halves of this book. Parts I to V covered inference:
+memory-bandwidth-bound decode ($0.79\text{ ops:byte}$), KV caching
+($112\text{ KiB/token}$), continuous batching, paged attention, prefix caching,
+speculative decoding, vLLM, and SGLang. Parts VI to VII covered training and
+post-training: compute-bound forward and backward passes ($6ND$ to $8ND$ FLOPs),
+$16\Psi$ AdamW state, activation checkpointing, ZeRO, FSDP, and GRPO.
 
-In an online RL loop (GRPO / PPO, Lectures 37 and 39), **every single training
+In an online RL loop (GRPO or PPO, Lectures 37 and 39), **every single training
 step executes both halves back to back**:
 
 ```
    ┌──────────────────────────────────────────────────────────────┐
-   │  PHASE 1: ROLLOUT (Inference Engine — vLLM / SGLang)         │
+   │  PHASE 1: ROLLOUT (Inference Engine: vLLM / SGLang)          │
    │  For each prompt q, decode G = 8..64 completions token-by-   │
    │  token using current weights pi_theta_old (MEMORY-BOUND)     │
    └──────────────────────────────┬───────────────────────────────┘
                                   │  generated token ids + rewards
                                   ▼
    ┌──────────────────────────────────────────────────────────────┐
-   │  PHASE 2: LEARNER UPDATE (Trainer — FSDP / Megatron)         │
+   │  PHASE 2: LEARNER UPDATE (Trainer: FSDP / Megatron)          │
    │  Run 1 forward + backward pass over all generated tokens in  │
    │  parallel and call optimizer.step() (COMPUTE-BOUND)          │
    └──────────────────────────────┬───────────────────────────────┘
@@ -59,16 +58,15 @@ One GRPO step on RTX 3090 (Qwen3-0.6B, 4 prompts x G=8 = 32 sequences)
   Rollout is Parts I-V (decode + KV cache). Learner is Part VI (6ND-8ND compute).
 ```
 
-Read the `rollout share` column from top to bottom:
-- At $512$-token responses, rollout is **38.2%** of the step.
-- By $4{,}096$-token reasoning traces, rollout is **74.7%** of the step.
-- By $8{,}192$-token reasoning traces (still only a quarter of DeepSeek-R1's
-  $32\text{k}$–$65\text{k}$ rollout cap!), **84.6% of your RL training time is
-  spent inside the inference engine generating tokens**, and only **15.4%** is
-  spent computing gradients!
+Read the `rollout share` column from top to bottom. At $512$-token responses,
+rollout takes **38.2%** of the step. By $4{,}096$-token reasoning traces,
+rollout takes **74.7%** of the step. By $8{,}192$-token reasoning traces (still
+only a quarter of DeepSeek-R1's $32\text{k}$ to $65\text{k}$ rollout cap),
+**84.6% of your RL training time is spent inside the inference engine generating
+tokens**, and only **15.4%** is spent computing gradients.
 
 > **Modern RL post-training is 80% an inference problem.** Every optimization you
-> built in Parts I–V sits directly on the critical path of training a reasoning
+> built in Parts I to V sits directly on the critical path of training a reasoning
 > model.
 
 ---
@@ -85,15 +83,18 @@ active params $N = 440.4\text{M}$).
 
 #### Phase 1: Rollout (autoregressive decode, $T_{\text{gen}} = 4096$ sequential steps)
 
-Each of the $4{,}096$ decode steps must read from HBM:
-1. **The model weights once per step** (shared across the $B = 32$ sequences,
-   Lecture 07):
-   $$2 N = 2 \times 440{,}401{,}920\text{ B} = 880.8\text{ MB}$$
-2. **The KV cache of all $B = 32$ sequences at the current context length**
-   (growing from $P = 256$ to $P + T_{\text{gen}} = 4352$, average context
-   $\bar{C} = 256 + \frac{4096}{2} = 2{,}304$ tokens, at $114{,}688\text{ B/token}$
-   from Lecture 05):
-   $$\text{KV}_{\text{step}} = B \times \bar{C} \times 114{,}688\text{ B} = 32 \times 2{,}304 \times 114{,}688\text{ B} = 8{,}455.7\text{ MB}$$
+Each of the $4{,}096$ decode steps must read two things from HBM. First, it
+reads **the model weights once per step**, shared over the $B = 32$ sequences
+(Lecture 07).
+
+$$2 N = 2 \times 440{,}401{,}920\text{ B} = 880.8\text{ MB}$$
+
+Second, it reads **the KV cache of all $B = 32$ sequences at the current context
+length**, which grows from $P = 256$ to $P + T_{\text{gen}} = 4352$ (an average
+context of $\bar{C} = 256 + \frac{4096}{2} = 2{,}304$ tokens at
+$114{,}688\text{ B/token}$ from Lecture 05).
+
+$$\text{KV}_{\text{step}} = B \times \bar{C} \times 114{,}688\text{ B} = 32 \times 2{,}304 \times 114{,}688\text{ B} = 8{,}455.7\text{ MB}$$
 
 Sum the two HBM reads per decode step and multiply by $T_{\text{gen}} = 4{,}096$
 steps:
@@ -107,8 +108,8 @@ rollout time @ 936.2 GB/s:  38.24 × 10^12 B / (936.2 × 10^9 B/s)      =  40.85
 #### Phase 2: Learner update (one parallel pass over all $D$ tokens)
 
 Once all $T_{\text{gen}} = 4{,}096$ tokens exist, the Learner processes all
-$B = 32$ sequences of length $P + T_{\text{gen}} = 4{,}352$ **in parallel** (just
-like prefill in Lecture 01!):
+$B = 32$ sequences of length $P + T_{\text{gen}} = 4{,}352$ **in parallel**,
+just like prefill in Lecture 01.
 
 $$D = B \times (P + T_{\text{gen}}) = 32 \times 4{,}352 = 139{,}264 \text{ tokens}$$
 
@@ -128,108 +129,110 @@ $$\text{Rollout share} = \frac{40.85\text{ s}}{40.85\text{ s} + 13.82\text{ s}} 
 
 ### 2. Every Part II optimization is an RL training optimization
 
-Look at what happens inside that 40.85-second rollout phase:
+Look at what happens inside that 40.85-second rollout phase. First, **prefix
+caching (Lecture 10) gives a $G\times$ win on every prompt**. In GRPO, $G = 8$
+to $64$ completions are sampled for the **exact same prompt $q$**. With prefix
+caching turned on in vLLM or SGLang, $q$ is prefilled **once** and its physical
+KV blocks are shared by all $G$ branches (`ref_count = G`).
 
-1. **Prefix caching (Lecture 10) is a $G\times$ win on every prompt.**
-   In GRPO, $G = 8$ to $64$ completions are sampled for the **exact same prompt
-   $q$**. With prefix caching enabled in vLLM / SGLang, $q$ is prefilled **once**
-   and its physical KV blocks are shared across all $G$ branches (`ref_count = G`)!
-2. **Continuous batching (Lecture 08) and the long-tail straggler problem.**
-   In a group of $32 \times 16 = 512$ reasoning traces, 500 traces may finish in
-   $2{,}000$ tokens while 12 stragglers keep thinking to $32{,}768$ tokens. By
-    step $10{,}000$, your GPU is running at batch size $12$ instead of $512$!
-   Production RL systems mitigate this with **continuous prompt-pool refilling**
-   (or partial rollout continuation across steps).
-3. **PagedAttention (Lecture 09) and KV quantization (Lecture 19).**
-   At average context $2{,}304$ tokens across $32$ sequences, the KV cache
-   ($8.46\text{ GB}$) is already **$9.6\times$ larger than the weights
-   ($880.8\text{ MB}$)**! Without PagedAttention, the rollout phase OOMs at a
-   fraction of the batch size.
-4. **Speculative decoding / MTP (Lectures 12 & 35).**
-   Because the Learner cannot start until the longest rollout finishes,
-   repurposing DeepSeek-V3's MTP head for speculative decoding cuts the tail
-   rollout latency nearly in half.
+Second, **continuous batching (Lecture 08) faces a long-tail straggler problem**.
+In a group of $32 \times 16 = 512$ reasoning traces, 500 traces may finish in
+$2{,}000$ tokens while 12 stragglers keep thinking to $32{,}768$ tokens. By step
+$10{,}000$, your GPU is running at batch size $12$ instead of $512$. Production
+RL systems fix this with **continuous prompt-pool refilling** or partial rollout
+continuation across steps.
+
+Third, **PagedAttention (Lecture 09) and KV quantization (Lecture 19)** prevent
+KV memory blowups. At an average context of $2{,}304$ tokens over $32$ sequences,
+the KV cache ($8.46\text{ GB}$) is already **$9.6\times$ larger than the weights
+($880.8\text{ MB}$)**. Without PagedAttention, the rollout phase runs out of
+memory at a fraction of the batch size.
+
+Fourth, **speculative decoding and MTP (Lectures 12 and 35)** cut the straggler
+tail. Because the Learner cannot start until the longest rollout finishes,
+repurposing DeepSeek-V3's MTP head for speculative decoding cuts the tail
+rollout latency nearly in half.
 
 ---
 
 ### 3. The RL systems dilemma: Co-located (HybridEngine) vs Disaggregated
 
-How should you arrange the **Rollout Engine (vLLM/SGLang)** and the **Learner
-(FSDP/Megatron)** across your GPUs?
-
-They want **opposite parallelism layouts** and compete for the **same HBM**:
+How should we arrange the **Rollout Engine (vLLM/SGLang)** and the **Learner
+(FSDP/Megatron)** on our GPUs? They want **opposite parallelism layouts** and
+compete for the **same HBM**:
 
 | Requirement | Rollout Engine (vLLM / SGLang) | Learner (FSDP / Megatron) |
 |---|---|---|
-| **Weights** | Unsharded BF16/FP8 per replica (or small TP) | Sharded across DP ranks ($16\Psi / D$, L33) |
-| **Rest of VRAM** | **Paged KV cache pool** (as large as possible!) | **Optimizer states ($12\Psi$), grads ($2\Psi$), activations** |
+| **Weights** | Unsharded BF16/FP8 per replica (or small TP) | Sharded over DP ranks ($16\Psi / D$, L33) |
+| **Rest of VRAM** | **Paged KV cache pool** (as large as possible) | **Optimizer states ($12\Psi$), grads ($2\Psi$), activations** |
 | **Bottleneck** | Memory bandwidth | Tensor-core FLOPS |
 
-Two architectures dominate open-source RL frameworks (**veRL**, **OpenRLHF**, **SkyRL**):
+Two architectures dominate open-source RL frameworks (**veRL**, **OpenRLHF**, **SkyRL**).
 
-1. **Co-located (veRL `3D-HybridEngine`):** Both vLLM and FSDP live on the
-   **same GPUs**, taking turns in time:
-   - Before Rollout: FSDP runs an `all-gather` to reshard weights from the
-     training mesh into vLLM's inference TP layout, then **offloads/sleeps**
-     FSDP's gradients and optimizer states (or wakes vLLM's CUDA memory pool via
-     `sleep_level=1`) so vLLM can claim $80\%$ of VRAM for its Paged KV cache.
-   - Before Learner update: vLLM **sleeps its KV cache pool** (freeing the
-     physical blocks without destroying the process or CUDA graphs), and FSDP
-     wakes up to run the backward pass and `optimizer.step()`.
-2. **Disaggregated Rollout / Learner (Ray actors on separate GPU pools):**
-   One pool of GPUs runs vLLM continuously; another pool runs FSDP; updated
-   weights are broadcast from rank 0 of FSDP to the vLLM workers over a
-   dedicated NCCL process group (`init_process_group` between trainer and vLLM
-   workers — see [Troubleshooting Incident I9](troubleshooting.md#i9-an-rl-trainers-vllm-integration-segfaults)
-   for what happens when their PyTorch/vLLM versions drift!).
+In a **co-located architecture (veRL `3D-HybridEngine`)**, both vLLM and FSDP
+live on the **same GPUs** and take turns in time. Before Rollout, FSDP runs an
+`all-gather` to reshard weights from the training mesh into vLLM's inference TP
+layout, then **offloads or sleeps** FSDP's gradients and optimizer states (or
+wakes vLLM's CUDA memory pool via `sleep_level=1`) so vLLM can claim $80\%$ of
+VRAM for its Paged KV cache. Before the Learner update, vLLM **sleeps its KV
+cache pool**, freeing physical blocks without destroying the process or CUDA
+graphs, and FSDP wakes up to run the backward pass and `optimizer.step()`.
+
+In a **disaggregated Rollout / Learner architecture**, Ray actors run on
+separate GPU pools. One pool of GPUs runs vLLM continuously while another pool
+runs FSDP, and updated weights are broadcast from rank 0 of FSDP to the vLLM
+workers over a dedicated NCCL process group (`init_process_group` between
+trainer and vLLM workers; see [Troubleshooting Incident I9](troubleshooting.md#i9-an-rl-trainers-vllm-integration-segfaults)
+for what happens when their PyTorch and vLLM versions drift).
 
 ??? question "Why can't you just keep vLLM's KV cache pool allocated while FSDP runs the backward pass on the same GPU?"
-    Because vLLM pre-allocates `gpu_memory_utilization` (default $90\%$) of VRAM
-    for its Paged KV cache pool at startup (Lecture 09), while FSDP needs VRAM
-    for the $16\Psi / D$ model states plus activation buffers and temporary
-    `all-gather` buckets (Lectures 31 and 33). If both hold their pools at once,
-    they exceed $100\%$ of VRAM and crash immediately. That is why modern RL
-    engines use CUDA virtual memory management (`cuMemCreate` / vLLM sleep mode)
-    to unmap vLLM's KV pages during the Learner step and unmap optimizer states
-    during the Rollout step!
+    vLLM pre-allocates `gpu_memory_utilization` (default $90\%$) of VRAM for its
+    Paged KV cache pool at startup (Lecture 09), while FSDP needs VRAM for the
+    $16\Psi / D$ model states plus activation buffers and temporary `all-gather`
+    buckets (Lectures 31 and 33). If both hold their pools at once, they exceed
+    $100\%$ of VRAM and crash right away. That is why modern RL engines use CUDA
+    virtual memory management (`cuMemCreate` and vLLM sleep mode) to unmap
+    vLLM's KV pages during the Learner step and unmap optimizer states during
+    the Rollout step.
     [Full answer](qa.md#why-must-co-located-rl-trainers-sleep-vllms-kv-cache-during-the-backward-pass)
 
 ---
 
-### 4. Learner–Sampler Numerical Mismatch, Truncated Importance Sampling (TIS) & Asynchronous RL (`AReaL`)
+### 4. Learner-sampler numerical mismatch, Truncated IS (TIS), and async RL (`AReaL`)
 
 Even when the vLLM Sampler and the FSDP Learner hold the **exact same weight
 tensor $\theta_{\text{old}}$**, their token log-probabilities do not match:
 
 $$\pi_{\theta_{\text{old}}}^{\text{sampler}}(a_t \mid s_t) \neq \pi_{\theta_{\text{old}}}^{\text{learner}}(a_t \mid s_t)$$
 
-Why? Because vLLM uses PagedAttention, FP8/BF16 decode kernels, and inference TP
-reduction order, whereas FSDP uses packed varlen FlashAttention and training
-TP/SP reduction order — and floating-point addition is non-associative
-([Lecture 02](02-arithmetic-intensity.md)). Over an $8{,}192$-token rollout, small per-token
-log-prob drifts compound into large sequence probability discrepancies (*"Your
+That mismatch happens because vLLM uses PagedAttention, FP8/BF16 decode kernels,
+and inference TP reduction order, whereas FSDP uses packed varlen FlashAttention
+and training TP/SP reduction order, and floating-point addition is
+non-associative (Lecture 02). Over an $8{,}192$-token rollout, small per-token
+log-prob differences build up into large sequence probability gaps (*"Your
 framework secretly brings you off-policy RL"*, Yao et al. 2025).
 
 **Truncated Importance Sampling (TIS, Ionides 2008; adopted in veRL, OpenRLHF, Open-Instruct)**
-fixes this by recomputing $\pi_{\theta_{\text{old}}}^{\text{learner}}$ on the
-learner so the PPO ratio $\rho_t^{\text{policy}} = \pi_\theta^{\text{learner}} / \pi_{\theta_{\text{old}}}^{\text{learner}}$
+fixes this drift by recomputing $\pi_{\theta_{\text{old}}}^{\text{learner}}$ on
+the learner so the PPO ratio
+$\rho_t^{\text{policy}} = \pi_\theta^{\text{learner}} / \pi_{\theta_{\text{old}}}^{\text{learner}}$
 starts at $1.0000$ at gradient step 0, and multiplying the loss by a detached,
-one-sided capped sampler-to-learner importance weight ($C = 2.0$):
+one-sided capped sampler-to-learner importance weight ($C = 2.0$).
 
 $$\tilde{\rho}_t^{\text{learner}} = \min\!\left(\frac{\pi_{\theta_{\text{old}}}^{\text{learner}}(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}^{\text{sampler}}(a_t \mid s_t)},\; C\right)$$
 
-**Fully Asynchronous RL (`AReaL`, Fu et al. 2025).** In a synchronous RL step,
-every GPU waits for the single longest $32\text{k}$-token rollout in the batch to
-finish before starting the learner pass. **AReaL** decouples streaming rollout
-workers from learner workers completely: rollout workers generate continuously
+In a synchronous RL step, every GPU also waits for the single longest
+$32\text{k}$-token rollout in the batch to finish before starting the learner
+pass. **Fully Asynchronous RL (`AReaL`, Fu et al. 2025)** decouples streaming
+rollout workers from learner workers: rollout workers generate continuously
 without barriers (using **interruptible rollouts** when new weights arrive,
 resuming from the cached KV prefix), while learner workers update whenever a
-batch buffer fills and apply a staleness-bounded PPO objective to achieve a
-**$2.57\times$–$2.77\times$ throughput speedup** on 512 GPUs.
+batch buffer fills and apply a staleness-bounded PPO objective for a
+**$2.57\times$ to $2.77\times$ throughput speedup** on 512 GPUs.
 
 ---
 
-### 5. Multi-Turn Tool-Use and Agentic RL
+### 5. Multi-turn tool-use and agentic RL
 
 Modern reasoning agents (`OpenAI o3`, `Qwen3`, `Kimi K2`) interleave `<think>`
 tokens with external tool calls (`<code>...</code>` or JSON MCP `<tool_call>`)
@@ -240,16 +243,18 @@ and environment observations (`<tool_output>...</tool_output>`):
    mask=0                     mask=1                                  mask=0                            mask=1
 ```
 
-Two systems rules govern multi-turn tool-use RL:
-1. **Mask environment/tool output tokens (`completion_mask = 0`):** The tokens
-   inside `<output>...</output>` were produced by the Python interpreter or search
-   API, **not** sampled from $\pi_\theta$. Leaving `completion_mask = 1` on tool
-   outputs corrupts the policy gradient by training the model to hallucinate
-   interpreter stdout and breaks importance sampling ratios $\rho_t$.
-2. **Preserve KV cache across tool turns:** When the rollout worker pauses at
-   `</code>`, executes the sandbox, and appends `<output>...</output>`, prefix
-   caching (or paused request slots in SGLang/vLLM) reuses the KV blocks of all
-   prior turns so a 10-turn SWE-bench trajectory does not re-prefill $O(K^2)$ tokens.
+Two systems rules govern multi-turn tool-use RL. First, we must **mask
+environment and tool output tokens (`completion_mask = 0`)**. The tokens inside
+`<output>...</output>` were produced by the Python interpreter or search API,
+**not** sampled from $\pi_\theta$. Leaving `completion_mask = 1` on tool outputs
+corrupts the policy gradient by training the model to hallucinate interpreter
+stdout and breaks importance sampling ratios $\rho_t$.
+
+Second, we must **preserve the KV cache across tool turns**. When the rollout
+worker pauses at `</code>`, runs the sandbox, and appends `<output>...</output>`,
+prefix caching (or paused request slots in SGLang and vLLM) reuses the KV blocks
+of all earlier turns so a 10-turn SWE-bench trajectory does not re-prefill
+$O(K^2)$ tokens.
 
 ---
 
@@ -296,17 +301,18 @@ uv run pytest tests/test_41_rl_systems.py -v
 
 ## What you should see
 
-- **Rollout time grows with generated trace length** (and quadratically once KV
-  cache traffic exceeds weight traffic past the ~8k crossover from Lecture 01!).
-- **Every inference win in Parts I–V directly accelerates RL training in Part VII.**
+Rollout time grows with generated trace length, and grows quadratically once KV
+cache traffic exceeds weight traffic past the ~8k crossover from Lecture 01. As
+a result, **every inference win in Parts I to V directly speeds up RL training
+in Part VII**.
 
 ---
 
 ## Go deeper
 
-- **[HybridFlow: A Flexible and Efficient RLHF Framework (veRL)](https://arxiv.org/abs/2409.19256)** (Sheng et al., EuroSys 2025) — the `3D-HybridEngine` weight resharding and memory-pool sleep/wake design.
-- **[OpenRLHF: An Easy-to-Scale RLHF Framework](https://arxiv.org/abs/2405.11143)** (Hu et al., 2024) — Ray + vLLM + DeepSpeed ZeRO-3 architecture.
-- **[DeepSeek-R1 Technical Report](https://arxiv.org/abs/2501.12948)** — how rollout length scaling drove reasoning emergence.
+- [HybridFlow: A Flexible and Efficient RLHF Framework (veRL)](https://arxiv.org/abs/2409.19256) (Sheng et al., EuroSys 2025), the `3D-HybridEngine` weight resharding and memory-pool sleep/wake design.
+- [OpenRLHF: An Easy-to-Scale RLHF Framework](https://arxiv.org/abs/2405.11143) (Hu et al., 2024), Ray + vLLM + DeepSpeed ZeRO-3 architecture.
+- [DeepSeek-R1 Technical Report](https://arxiv.org/abs/2501.12948), how rollout length scaling drove reasoning emergence.
 
 ---
 

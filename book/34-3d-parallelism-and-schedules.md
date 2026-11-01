@@ -12,18 +12,16 @@ In Lecture 22 (Tensor parallelism), we split each layer's weight matrices across
 $t$ GPUs using Column-Parallel followed by Row-Parallel linear layers, linked by
 one `all-reduce` per sub-block. For inference, that was the whole story.
 
-In training, two new problems appear:
-
-1. **Plain Tensor Parallelism leaves $10 s b h$ of activations per layer
-   completely unsharded.** Norms, residuals, and the inputs to the column-parallel
-   projections sits *outside* the tensor-parallel regions, so every TP rank
-   holds an identical copy of them. At $t = 8$, those replicated buffers swallow
-   **77% of your remaining activation memory**.
-2. **Pipeline Parallelism (PP) introduces idle "bubbles" and an in-flight
-   activation explosion.** In inference, forward-only micro-batches stream
-   through pipeline stages without stopping. In training, all $m$ micro-batches
-   must complete both forward and backward before `optimizer.step()`, leaving
-   GPUs idle during pipeline fill and drain.
+In training, two new problems appear. First, **plain Tensor Parallelism leaves
+$10 s b h$ of activations per layer completely unsharded**. Norms, residuals, and
+the inputs to the column-parallel projections sit *outside* the tensor-parallel
+regions, so every TP rank holds an identical copy of them. At $t = 8$, those
+replicated buffers take **77% of your remaining activation memory**. Second,
+**Pipeline Parallelism (PP) introduces idle bubbles and an in-flight activation
+explosion**. In inference, forward-only micro-batches stream through pipeline
+stages without stopping. In training, all $m$ micro-batches must finish both
+forward and backward before `optimizer.step()`, so GPUs sit idle while the
+pipeline fills and drains.
 
 ---
 
@@ -68,15 +66,14 @@ Look at the two tables:
 
 Recall from Korthikanti et al. (2022) that a standard transformer layer's
 non-score activation memory ($34 s b h$ bytes in their GPT formulation, or
-$38 s b h$ for Qwen3's GQA+SwiGLU in Lecture 31) splits into two regions:
-
-- **Inside the TP regions ($24 s b h$):** the $Q, K, V$ outputs, attention output
-  projection input, and MLP intermediate activations are split along the head
-  or hidden axis across the $t$ TP ranks $\to \frac{24}{t} s b h$ bytes per rank.
-- **Outside the TP regions ($10 s b h$):** the two LayerNorm/RMSNorm inputs
-  ($4 s b h$), the inputs to the QKV and MLP blocks ($4 s b h$), and residual/dropout
-  buffers ($2 s b h$) are consumed after the TP `all-reduce`, so they are
-  **replicated identically on all $t$ GPUs**:
+$38 s b h$ for Qwen3's GQA+SwiGLU in Lecture 31) splits into two regions. Inside
+the TP regions ($24 s b h$), the $Q, K, V$ outputs, attention output projection
+input, and MLP intermediate tensors are split along the head or hidden axis over
+the $t$ TP ranks, taking $\frac{24}{t} s b h$ bytes per rank. Outside the TP
+regions ($10 s b h$), the two LayerNorm/RMSNorm inputs ($4 s b h$), the inputs
+to the QKV and MLP blocks ($4 s b h$), and residual/dropout buffers ($2 s b h$)
+are consumed after the TP `all-reduce`, so they stay **replicated on all $t$
+GPUs**:
 
 $$\text{Act}_{\text{TP only}} = s b h \left(10 + \frac{24}{t}\right)$$
 
@@ -105,33 +102,35 @@ TP + SEQUENCE PARALLELISM (shards sequence s/t outside TP, 1 RS + 1 AG = same by
   (saved: 2sbh/t)             (saved: 2sbh/t — re-gather X in bwd!)
 ```
 
-Count the bytes saved and the bytes communicated:
-- Every norm and residual buffer outside the TP block now has shape
-  $(s/t, b, h)$ instead of $(s, b, h)$, so the $10 s b h$ term divides by $t$:
-  $$\text{Act}_{\text{TP+SP}} = s b h \left(\frac{10}{t} + \frac{24}{t}\right) = \frac{34}{t} s b h$$
-- In forward, each sub-block runs one `all-gather` ($g$) before Column-Parallel
-  and one `reduce-scatter` ($\bar{g}$) after Row-Parallel. Together, one
-  `all-gather` + one `reduce-scatter` move the **exact same number of bytes as
-  the single `all-reduce` that plain TP was already doing**!
+Count the bytes saved and the bytes communicated. Every norm and residual buffer
+outside the TP block now has shape $(s/t, b, h)$ instead of $(s, b, h)$, so the
+$10 s b h$ term divides by $t$:
 
-??? question "Wait — if the `all-gather` reconstructs the full `[s, b, h]` tensor before the Column-Parallel matmul, doesn't $\nabla_W = X^\top \nabla_Y$ still require saving that full `[s, b, h]` tensor?"
-    Only if you keep the gathered copy! Megatron-LM's trick is to **discard**
-    the gathered `[s, b, h]` buffer immediately after the forward matmul finishes
-    and keep only the local `[s/t, b, h]` slice in VRAM. During the backward
-    pass, an asynchronous `all-gather` reconstructs `[s, b, h]` in a temporary
-    buffer right before $\nabla_W = X^\top \nabla_Y$ runs, overlapped underneath
-    the $\nabla_X$ computation.
+$$\text{Act}_{\text{TP+SP}} = s b h \left(\frac{10}{t} + \frac{24}{t}\right) = \frac{34}{t} s b h$$
+
+In forward, each sub-block runs one `all-gather` ($g$) before Column-Parallel
+and one `reduce-scatter` ($\bar{g}$) after Row-Parallel. Together, one
+`all-gather` plus one `reduce-scatter` move the **exact same number of bytes as
+the single `all-reduce` that plain TP was already doing**.
+
+??? question "Wait, if the `all-gather` rebuilds the full `[s, b, h]` tensor before the Column-Parallel matmul, doesn't $\nabla_W = X^\top \nabla_Y$ still require saving that full `[s, b, h]` tensor?"
+    Only if you keep the gathered copy. Megatron-LM's trick is to **discard**
+    the gathered `[s, b, h]` buffer right after the forward matmul finishes and
+    keep only the local `[s/t, b, h]` slice in VRAM. During the backward pass,
+    an asynchronous `all-gather` rebuilds `[s, b, h]` in a temporary buffer
+    right before $\nabla_W = X^\top \nabla_Y$ runs, overlapped underneath the
+    $\nabla_X$ computation.
     [Full answer](qa.md#how-does-sequence-parallelism-avoid-saving-the-all-gathered-input-for-backward)
 
 ---
 
 ### 2. Pipeline Parallelism schedules: GPipe, 1F1B, and Zero-Bubble / DualPipe
 
-Across nodes connected by slower scale-out links (InfiniBand or RoCE), Tensor
+Between nodes connected by slower scale-out links (InfiniBand or RoCE), Tensor
 Parallelism's per-layer collectives become too chatty (Lecture 22). Instead,
 **Pipeline Parallelism (PP)** places whole layers on different stages
-$0, 1, \dots, p-1$ and sends only the layer-boundary activation $(s, b, h)$ point-to-point
-between adjacent stages.
+$0, 1, \dots, p-1$ and sends only the layer-boundary activation $(s, b, h)$
+point-to-point between adjacent stages.
 
 Split the batch into $m$ micro-batches. Let one micro-batch take time $T_F$ for
 forward on one stage and $T_B$ for backward on one stage.
@@ -146,26 +145,32 @@ stage 0:  [F0][F1][F2][F3]                          [B3][B2][B1][B0]
           |<-- fill -->|                            |<-- drain -->|
 ```
 
-Count the useful time vs the idle bubble time on any stage:
-- **Useful work per stage:** $m$ forwards and $m$ backwards:
-  $$T_{\text{useful}} = m (T_F + T_B)$$
-- **Idle bubble time per stage:** a stage waits $(p - 1)$ micro-steps for the
-  pipeline to fill and $(p - 1)$ micro-steps for the pipeline to drain:
-  $$T_{\text{bubble}} = (p - 1)(T_F + T_B)$$
-- **Bubble fraction** (dividing numerator and denominator by $T_F + T_B$):
-  $$\text{Bubble fraction} = \frac{T_{\text{bubble}}}{T_{\text{useful}} + T_{\text{bubble}}} = \frac{(p - 1)(T_F + T_B)}{m(T_F + T_B) + (p - 1)(T_F + T_B)} = \frac{p - 1}{m + p - 1}$$
+Count the useful time versus the idle bubble time on any stage. Each stage does
+$m$ forwards and $m$ backwards of useful work:
 
-To make $\frac{p-1}{m+p-1}$ small, you must make $m \gg p$ (e.g., $m = 64$ at
-$p = 4$ gives $\frac{3}{67} = 4.5\%$). **Here is GPipe's fatal flaw:** Stage 0
-runs all $m = 64$ forward passes before `B0` arrives back from Stage 1, so
+$$T_{\text{useful}} = m (T_F + T_B)$$
+
+Meanwhile, a stage waits $(p - 1)$ micro-steps for the pipeline to fill and
+$(p - 1)$ micro-steps for the pipeline to drain:
+
+$$T_{\text{bubble}} = (p - 1)(T_F + T_B)$$
+
+Divide the bubble time by the total step time, and cancel $T_F + T_B$ from
+numerator and denominator:
+
+$$\text{Bubble fraction} = \frac{T_{\text{bubble}}}{T_{\text{useful}} + T_{\text{bubble}}} = \frac{(p - 1)(T_F + T_B)}{m(T_F + T_B) + (p - 1)(T_F + T_B)} = \frac{p - 1}{m + p - 1}$$
+
+To make $\frac{p-1}{m+p-1}$ small, you must make $m \gg p$ (for instance,
+$m = 64$ at $p = 4$ gives $\frac{3}{67} = 4.5\%$). Here is GPipe's catch: Stage
+0 runs all $m = 64$ forward passes before `B0` arrives back from Stage 1, so
 Stage 0 must hold **all $m = 64$ micro-batches of forward activations in VRAM at
-the same time**!
+the same time**.
 
 #### Schedule 2: 1F1B (One-Forward-One-Backward, PipeDream-Flush)
 
 Why run `F4` on Stage 0 when `B0` is already ready to run? Once the pipeline
-fills ($p$ warmup forwards on Stage 0), alternate **one backward immediately
-after each forward**:
+fills ($p$ warmup forwards on Stage 0), alternate **one backward right after
+each forward**:
 
 ```
 stage 3:              [F0][B0][F1][B1][F2][B2][F3][B3]
@@ -176,29 +181,30 @@ stage 0:  [F0][F1][F2][F3][B0]    [B1]    [B2]    [B3]
 ```
 
 Look at what happens on Stage 0 as soon as `B0` finishes: **micro-batch 0's
-activations are freed before `F4` runs!**
-- **Bubble fraction:** still $\frac{p - 1}{m + p - 1}$ (same total work, same
-  warmup/cooldown).
-- **Peak in-flight micro-batches on Stage 0:** capped at **$\min(p, m)$**
-  instead of $m$! At $p = 4, m = 64$, 1F1B holds **$4$ micro-batches of
-  activations instead of $64$** — a **$16\times$ reduction in activation memory**
-  at the exact same throughput!
+activations are freed before `F4` runs**. Because the total work and the warmup
+and drain periods are unchanged, the bubble fraction stays at
+$\frac{p - 1}{m + p - 1}$. However, peak in-flight micro-batches on Stage 0 are
+now capped at **$\min(p, m)$** instead of $m$. At $p = 4, m = 64$, 1F1B holds
+**$4$ micro-batches of activations instead of $64$**, a **$16\times$ reduction
+in activation memory** at the exact same throughput.
 
 #### Schedule 3: Zero-Bubble PP and DeepSeek-V3's DualPipe
 
-Recall Lecture 30's backward split:
-- $B_x$ ($\nabla_X = \nabla_Y W^\top$, $2ND$ FLOPs) must be sent to stage $\ell - 1$ immediately.
-- $B_w$ ($\nabla_W = X^\top \nabla_Y$, $2ND$ FLOPs) is **not needed by any other stage** — it only updates local weights at the end of the step!
+Recall Lecture 30's backward split. The input gradient $B_x$
+($\nabla_X = \nabla_Y W^\top$, $2ND$ FLOPs) must go to stage $\ell - 1$ right
+away so the upstream stage can keep working. By contrast, the weight gradient
+$B_w$ ($\nabla_W = X^\top \nabla_Y$, $2ND$ FLOPs) is **not needed by any other
+stage**; it only updates local weights at the end of the step.
 
-**Zero-Bubble PP** (Qi et al., 2024) runs $B_x$ immediately so the upstream
-stage never stalls, and holds $B_w$ in reserve to **plug the idle bubble slots**
-during warmup and drain!
+**Zero-Bubble PP** (Qi et al., 2024) runs $B_x$ right away so the upstream stage
+never stalls, and holds $B_w$ in reserve to **plug the idle bubble slots**
+during warmup and drain.
 
-**DeepSeek-V3's DualPipe** goes one step further for cross-node MoE training: it
-feeds two streams of micro-batches from **both ends of the pipeline simultaneously**
+**DeepSeek-V3's DualPipe** goes one step further for cross-node MoE training. It
+feeds two streams of micro-batches from **both ends of the pipeline at once**
 (Stage $0 \to p-1$ and Stage $p-1 \to 0$) and overlaps the cross-node MoE
-`all-to-all` dispatch/combine of micro-batch $A$ underneath the attention/$B_w$
-compute of micro-batch $B$, hiding the $1:1$ network communication behind math.
+`all-to-all` dispatch and combine of micro-batch $A$ underneath the attention and
+$B_w$ compute of micro-batch $B$, hiding the network traffic behind math.
 
 ---
 
@@ -260,18 +266,19 @@ uv run pytest tests/test_34_pipeline.py -v
 
 ## What you should see
 
-- **TP + SP divides the entire layer's activation footprint by $t$** ($34/t$ instead
-  of $10 + 24/t$) with zero additional network bytes.
-- **1F1B decouples bubble reduction (large $m$) from activation memory (bounded by $p$).**
+Adding Sequence Parallelism to Tensor Parallelism **divides the entire layer's
+activation footprint by $t$** ($34/t$ instead of $10 + 24/t$) with zero
+additional network bytes. When you also pipeline layers across nodes, **1F1B
+decouples bubble reduction (large $m$) from activation memory (bounded by $p$)**.
 
 ---
 
 ## Go deeper
 
-- **[Reducing Activation Recomputation in Large Transformer Models](https://arxiv.org/abs/2205.05198)** (Korthikanti et al., 2022) — Section 4.2.2 derives Sequence Parallelism's $g$ and $\bar{g}$ conjugate operators.
-- **[Zero Bubble Pipeline Parallelism](https://arxiv.org/abs/2401.10241)** (Qi et al., 2024) — splitting $B_x$ and $B_w$ to fill pipeline bubbles.
-- **[DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437)** — Section 3.2.1 introduces DualPipe.
-- **[The Ultra-Scale Playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook)** (HuggingFace Nanotron, 2025) — visual walkthrough of 5D parallelism.
+- [Reducing Activation Recomputation in Large Transformer Models](https://arxiv.org/abs/2205.05198) (Korthikanti et al., 2022), Section 4.2.2 derives Sequence Parallelism's $g$ and $\bar{g}$ conjugate operators.
+- [Zero Bubble Pipeline Parallelism](https://arxiv.org/abs/2401.10241) (Qi et al., 2024), splitting $B_x$ and $B_w$ to fill pipeline bubbles.
+- [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437), Section 3.2.1 introduces DualPipe.
+- [The Ultra-Scale Playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook) (HuggingFace Nanotron, 2025), visual walkthrough of 5D parallelism.
 
 ---
 

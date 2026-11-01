@@ -11,25 +11,25 @@
 You rent an $8 \times \text{RTX 3090}$ node ($8 \times 24\text{ GiB} = 192\text{ GiB}$
 of aggregate VRAM) to train a **7B dense model** ($\Psi = 7 \times 10^9$).
 
-From Lecture 30's ledger, mixed-precision AdamW state for a 7B model is:
+From Lecture 30's ledger, mixed-precision AdamW state for a 7B model totals
+104.31 GiB.
 
 $$16 \Psi = 16 \times 7 \times 10^9\text{ B} = 112\text{ GB} = 104.31\text{ GiB}$$
 
-Look at the two numbers:
-- Your 8 GPUs have **192 GiB** of VRAM combined — almost twice what the 7B
-  model's state needs ($104.31\text{ GiB}$).
-- Yet standard **Distributed Data Parallel (DDP)** crashes immediately on all 8
-  GPUs, because DDP puts a **complete 104.31 GiB copy** of the weights,
-  gradients, and optimizer state on **every single GPU**.
+Look at the two numbers. Your 8 GPUs have **192 GiB** of VRAM combined, nearly
+twice what the 7B model's state needs ($104.31\text{ GiB}$). Yet standard
+**Distributed Data Parallel (DDP)** crashes right away on all 8 GPUs, because
+DDP puts a **complete 104.31 GiB copy** of the weights, gradients, and optimizer
+state on **every single GPU**.
 
-Across 8 GPUs, DDP spends $8 \times 104.31 = 834.5\text{ GiB}$ to store
-$104.31\text{ GiB}$ of information. Seven-eighths of your cluster's memory is
-holding duplicate copies of the exact same numbers.
+Over 8 GPUs, DDP spends $8 \times 104.31 = 834.5\text{ GiB}$ to store
+$104.31\text{ GiB}$ of information. Seven-eighths of your cluster's memory holds
+duplicate copies of the exact same numbers.
 
 **ZeRO (Zero Redundancy Optimizer, Rajbhandari et al., 2019)** and PyTorch's
-**FSDP (Fully Sharded Data Parallel)** ask one question: *why replicate state
-across $D$ data-parallel GPUs when each GPU can hold $1/D$ of it and reconstruct
-the rest on the fly?*
+**FSDP (Fully Sharded Data Parallel)** stop replicating state on all $D$
+data-parallel GPUs. Instead, each GPU holds $1/D$ of the state and rebuilds the
+rest on the fly.
 
 ---
 
@@ -57,13 +57,13 @@ Qwen3-0.6B (0.60B params) across 8 GPUs
   ZeRO-3 / FSDP      13.04 GiB       8.00x           34.23 GiB
 ```
 
-Look at the two columns side by side:
-1. **ZeRO-1 and ZeRO-2 cut model-state memory by $2.91\times$ and $4.27\times$
-   while moving the EXACT same network bytes ($1.94\text{ GiB}$ for Qwen3-0.6B,
-   $22.82\text{ GiB}$ for 7B) as plain DDP!**
-2. **ZeRO-3 / FSDP cuts model-state memory by the full $8.00\times$** ($104.31 \to 13.04\text{ GiB}$,
-   fitting the 7B model comfortably on 24 GiB 3090s!) at a cost of **exactly
-   $1.5\times$ the network traffic** ($22.82 \to 34.23\text{ GiB}$).
+Look at the two columns side by side. First, **ZeRO-1 and ZeRO-2 cut model-state
+memory by $2.91\times$ and $4.27\times$ while moving the exact same network
+bytes ($1.94\text{ GiB}$ for Qwen3-0.6B, $22.82\text{ GiB}$ for 7B) as plain
+DDP**. Second, **ZeRO-3 / FSDP cuts model-state memory by the full $8.00\times$**
+($104.31 \to 13.04\text{ GiB}$, fitting the 7B model comfortably on 24 GiB
+3090s) at a cost of **exactly $1.5\times$ the network traffic**
+($22.82 \to 34.23\text{ GiB}$).
 
 Both facts come out of one collective identity. Let's derive them.
 
@@ -77,8 +77,8 @@ In Lecture 22 (Tensor parallelism), we used `all-reduce` as a black box: $D$
 GPUs each hold a vector of size $M$ bytes ($M = 2\Psi$ for BF16 gradients), and
 at the end every GPU holds the elementwise sum.
 
-How does a ring or tree `all-reduce` actually move those $M$ bytes across $D$
-GPUs? In **two halves**:
+A ring or tree `all-reduce` moves those $M$ bytes among $D$ GPUs in **two
+halves**:
 
 ```
 1. REDUCE-SCATTER (costs ((D-1)/D) * M bytes per GPU)
@@ -92,34 +92,40 @@ GPUs? In **two halves**:
    (Every GPU now has the full updated tensor again!)
 ```
 
-Count the bytes sent per GPU in each half:
-- In `reduce-scatter`, the vector is split into $D$ chunks of size $M / D$, and
-  each GPU sends $D - 1$ chunks around the ring:
-  $$\text{Bytes}_{\text{RS}} = \frac{D - 1}{D} M$$
-- In `all-gather`, each GPU broadcasts its $M / D$ chunk to the other $D - 1$
-  steps around the ring:
-  $$\text{Bytes}_{\text{AG}} = \frac{D - 1}{D} M$$
-- Sum of the two halves:
-  $$\text{Bytes}_{\text{AllReduce}} = \text{Bytes}_{\text{RS}} + \text{Bytes}_{\text{AG}} = 2 \frac{D - 1}{D} M$$
+Count the bytes sent per GPU in each half. In `reduce-scatter`, the vector is
+split into $D$ chunks of size $M / D$, and each GPU sends $D - 1$ chunks around
+the ring.
 
-With $M = 2\Psi$ bytes (BF16 gradients), in the large-$D$ limit
-($\frac{D-1}{D} \approx 1$), an `all-reduce` moves:
+$$\text{Bytes}_{\text{RS}} = \frac{D - 1}{D} M$$
+
+In `all-gather`, each GPU broadcasts its $M / D$ chunk to the other $D - 1$
+steps around the ring.
+
+$$\text{Bytes}_{\text{AG}} = \frac{D - 1}{D} M$$
+
+Add the two halves together.
+
+$$\text{Bytes}_{\text{AllReduce}} = \text{Bytes}_{\text{RS}} + \text{Bytes}_{\text{AG}} = 2 \frac{D - 1}{D} M$$
+
+With $M = 2\Psi$ bytes of BF16 gradients, in the large-$D$ limit where
+$\frac{D-1}{D} \approx 1$, an `all-reduce` moves $4\Psi$ bytes per GPU per step.
 
 $$\text{Bytes}_{\text{DDP}} = 2 \frac{D - 1}{D} (2\Psi) \approx 4\Psi \text{ bytes per GPU per step}$$
 
-At $D = 8$ GPUs:
-- For Qwen3-0.6B ($\Psi = 596.05\text{M}$): $4 \times \frac{7}{8} \times 596{,}049{,}920 = 2{,}086{,}174{,}720\text{ B} = 1.94\text{ GiB}$.
-- For 7B ($\Psi = 7\text{B}$): $4 \times \frac{7}{8} \times 7 \times 10^9 = 24.5\text{ GB} = 22.82\text{ GiB}$.
+At $D = 8$ GPUs, Qwen3-0.6B ($\Psi = 596.05\text{M}$) sends
+$4 \times \frac{7}{8} \times 596{,}049{,}920 = 2{,}086{,}174{,}720\text{ B} = 1.94\text{ GiB}$
+per GPU, while a 7B model ($\Psi = 7\text{B}$) sends
+$4 \times \frac{7}{8} \times 7 \times 10^9 = 24.5\text{ GB} = 22.82\text{ GiB}$.
 
 ---
 
 ### 2. Deriving ZeRO-1, ZeRO-2, and ZeRO-3 / FSDP term by term
 
-Recall Lecture 30's $16\Psi$ breakdown per GPU:
+Recall Lecture 30's $16\Psi$ breakdown per GPU.
 
 $$\text{State}_{\text{DDP}} = \underbrace{2\Psi}_{\text{BF16 weights}} + \underbrace{2\Psi}_{\text{BF16 grads}} + \underbrace{12\Psi}_{\text{FP32 master } w + m + v} = 16\Psi$$
 
-Now watch what happens as we shard those three pieces across $D$ data-parallel
+Now watch what happens as we shard those three pieces over $D$ data-parallel
 GPUs:
 
 ```
@@ -135,76 +141,91 @@ GPUs:
 
 #### Stage 1: ZeRO-1 (shard optimizer states only, $12\Psi / D$)
 
-- **Memory per GPU:**
-  $$\text{Bytes}_{\text{ZeRO-1}} = 2\Psi + 2\Psi + \frac{12\Psi}{D}$$
-  At $D = 8$: $4\Psi + 1.5\Psi = 5.5\Psi$, a **$16 / 5.5 = 2.91\times$ reduction**
-  ($8.88 \to 3.05\text{ GiB}$ on Qwen3-0.6B; $104.31 \to 35.86\text{ GiB}$ on 7B).
-- **How the step works:**
-  1. Forward and backward run exactly like DDP (every GPU already has full $2\Psi$ weights).
-  2. Instead of a full `all-reduce` on gradients, run **only the first half**:
-     `reduce-scatter` on the $2\Psi$ gradients ($\approx 2\Psi$ bytes moved). Now
-     GPU $r$ holds the summed gradient for parameter shard $r$.
-  3. GPU $r$ runs `optimizer.step()` on **only its $1/D$ shard** of FP32 master
-     weights, $m$, and $v$, producing updated BF16 weights for shard $r$.
-  4. Run **the second half**: `all-gather` the updated BF16 weight shards across
-     all GPUs ($\approx 2\Psi$ bytes moved).
-- **Total communication:**
-  $$\underbrace{2\Psi}_{\text{grad reduce-scatter}} + \underbrace{2\Psi}_{\text{weight all-gather}} = 4\Psi \quad (\text{identical to DDP!})$$
+ZeRO-1 leaves the BF16 weights ($2\Psi$) and BF16 gradients ($2\Psi$) replicated,
+and shards only the FP32 optimizer states ($12\Psi$) over the $D$ ranks.
 
-??? question "Wait — how can ZeRO-1 save 65% of model-state memory with ZERO extra network traffic?"
-    Because DDP was doing redundant work! In DDP, `all-reduce` is a
+$$\text{Bytes}_{\text{ZeRO-1}} = 2\Psi + 2\Psi + \frac{12\Psi}{D}$$
+
+At $D = 8$, each GPU holds $4\Psi + 1.5\Psi = 5.5\Psi$ bytes, which is a
+**$16 / 5.5 = 2.91\times$ reduction** ($8.88 \to 3.05\text{ GiB}$ on Qwen3-0.6B;
+$104.31 \to 35.86\text{ GiB}$ on 7B).
+
+Because every GPU still holds the full $2\Psi$ weights, the forward and backward
+passes run just like DDP. Once backward finishes, instead of running a full
+`all-reduce` on the gradients, we run **only the first half**: a `reduce-scatter`
+on the $2\Psi$ gradients, moving $2\Psi$ bytes. Now GPU $r$ holds the fully
+summed gradient for parameter shard $r$. GPU $r$ then runs `optimizer.step()` on
+**only its $1/D$ shard** of the FP32 master weights, $m$, and $v$, producing
+updated BF16 weights for shard $r$. Finally, we run **the second half**: an
+`all-gather` of the updated BF16 weight shards so every GPU has the full updated
+weights again, moving another $2\Psi$ bytes.
+
+Add the two network steps together.
+
+$$\underbrace{2\Psi}_{\text{grad reduce-scatter}} + \underbrace{2\Psi}_{\text{weight all-gather}} = 4\Psi \quad (\text{identical to DDP!})$$
+
+??? question "Wait, how can ZeRO-1 save 65% of model-state memory with ZERO extra network traffic?"
+    DDP does redundant work at the end of every step. In DDP, `all-reduce` is a
     `reduce-scatter` followed by an `all-gather` of gradients, and then all $D$
     GPUs execute the **exact same AdamW update** on all $\Psi$ parameters in
-    lockstep. ZeRO-1 simply moves the `optimizer.step()` **between** the
+    lockstep. ZeRO-1 simply moves `optimizer.step()` **between** the
     `reduce-scatter` and the `all-gather`: you `reduce-scatter` gradients, each
     GPU updates its own $1/D$ slice of AdamW state, and then you `all-gather`
     the updated BF16 weights. Same two collective halves, same $4\Psi$ bytes on
-    the wire, $D\times$ less optimizer memory and $D\times$ less optimizer compute!
+    the wire, $D\times$ less optimizer memory and $D\times$ less optimizer compute.
     [Full answer](qa.md#how-can-zero-1-save-memory-with-zero-extra-network-traffic)
 
 #### Stage 2: ZeRO-2 (shard optimizer states + gradients, $(2\Psi + 12\Psi)/D$)
 
-Why keep the full $2\Psi$ gradient tensor on every GPU after layer $\ell$'s
-`reduce-scatter` has already finished?
-- As soon as layer $\ell$ computes $\nabla_{W_\ell}$ during backward, immediately
-  `reduce-scatter` it so GPU $r$ keeps only its $1/D$ slice of $\nabla_{W_\ell}$
-  and **frees the other $(D-1)/D$ slices** before layer $\ell-1$'s backward pass!
-- **Memory per GPU:**
-  $$\text{Bytes}_{\text{ZeRO-2}} = 2\Psi + \frac{2\Psi + 12\Psi}{D}$$
-  At $D = 8$: $2\Psi + 1.75\Psi = 3.75\Psi$, a **$16 / 3.75 = 4.27\times$ reduction**
-  ($8.88 \to 2.08\text{ GiB}$ on Qwen3-0.6B; $104.31 \to 24.45\text{ GiB}$ on 7B).
-- **Total communication:** still **one `reduce-scatter` + one `all-gather` = $4\Psi$ bytes**!
+There is no reason to keep the full $2\Psi$ gradient tensor on every GPU after
+layer $\ell$'s `reduce-scatter` has already finished. As soon as layer $\ell$
+computes $\nabla_{W_\ell}$ during backward, ZeRO-2 immediately runs
+`reduce-scatter` on it so GPU $r$ keeps only its $1/D$ slice of
+$\nabla_{W_\ell}$ and **frees the other $(D-1)/D$ slices** before layer
+$\ell-1$'s backward pass begins.
+
+$$\text{Bytes}_{\text{ZeRO-2}} = 2\Psi + \frac{2\Psi + 12\Psi}{D}$$
+
+At $D = 8$, memory per GPU drops to $2\Psi + 1.75\Psi = 3.75\Psi$, a
+**$16 / 3.75 = 4.27\times$ reduction** ($8.88 \to 2.08\text{ GiB}$ on Qwen3-0.6B;
+$104.31 \to 24.45\text{ GiB}$ on 7B). Total communication stays at **one
+`reduce-scatter` plus one `all-gather` = $4\Psi$ bytes**.
 
 #### Stage 3: ZeRO-3 / PyTorch FSDP (shard everything, $16\Psi / D$)
 
 Now shard the $2\Psi$ BF16 weights too. Each GPU holds only $1/D$ of every
-layer's weights at rest:
-- **Memory per GPU:**
-  $$\text{Bytes}_{\text{ZeRO-3}} = \frac{2\Psi + 2\Psi + 12\Psi}{D} = \frac{16\Psi}{D} \quad (+\text{ one live layer buffer})$$
-  At $D = 8$: $16\Psi / 8 = 2\Psi$, an **$8.00\times$ reduction**
-  ($104.31 \to 13.04\text{ GiB}$ on 7B).
-- **How the step works (and where the extra $2\Psi$ traffic comes from):**
-  1. **Forward pass, layer $\ell$:** `all-gather` layer $\ell$'s BF16 weights
-     from all $D$ GPUs, run forward $Y_\ell = X_\ell W_\ell$, then **immediately
-     free** the gathered weights you don't own! Across all layers: $+2\Psi$ bytes.
-  2. **Backward pass, layer $\ell$:** you threw away the non-local weights after
-     forward, so you must **`all-gather` layer $\ell$'s BF16 weights a second
-     time** ($+2\Psi$ bytes), compute $\nabla_X$ and $\nabla_W$, free the
-     non-local weights, and **`reduce-scatter` the gradients $\nabla_W$**
-     ($+2\Psi$ bytes).
-  3. **Optimizer step:** each GPU updates its $1/D$ shard in place (no weight
-     `all-gather` needed at the end because step 1 of the next iteration will
-     gather them per layer!).
-- **Total communication:**
-  $$\underbrace{2\Psi}_{\text{fwd weight AG}} + \underbrace{2\Psi}_{\text{bwd weight AG}} + \underbrace{2\Psi}_{\text{bwd grad RS}} = 6\Psi \text{ bytes} \quad (1.5\times \text{ DDP})$$
+layer's weights at rest, plus a temporary buffer for whichever single layer is
+currently running.
+
+$$\text{Bytes}_{\text{ZeRO-3}} = \frac{2\Psi + 2\Psi + 12\Psi}{D} = \frac{16\Psi}{D} \quad (+\text{ one live layer buffer})$$
+
+At $D = 8$, state memory per GPU falls to $16\Psi / 8 = 2\Psi$, an
+**$8.00\times$ reduction** ($104.31 \to 13.04\text{ GiB}$ on 7B).
+
+We can trace where the extra $2\Psi$ of network traffic in ZeRO-3 comes from by
+walking one step layer by layer. During the forward pass at layer $\ell$, all
+$D$ GPUs run `all-gather` on layer $\ell$'s BF16 weights, compute
+$Y_\ell = X_\ell W_\ell$, and **immediately free** the gathered weight shards
+they do not own. Summed over all layers, that forward pass sends $2\Psi$ bytes.
+When the backward pass returns to layer $\ell$, those non-local weights are
+already gone, so the GPUs must **`all-gather` layer $\ell$'s BF16 weights a
+second time** ($+2\Psi$ bytes), compute $\nabla_X$ and $\nabla_W$, free the
+non-local weights, and **`reduce-scatter` the gradients $\nabla_W$** ($+2\Psi$
+bytes). Finally, each GPU runs `optimizer.step()` on its own $1/D$ shard in
+place; no end-of-step weight `all-gather` is needed because the next step's
+forward pass will gather each layer on demand.
+
+Add the three collectives together.
+
+$$\underbrace{2\Psi}_{\text{fwd weight AG}} + \underbrace{2\Psi}_{\text{bwd weight AG}} + \underbrace{2\Psi}_{\text{bwd grad RS}} = 6\Psi \text{ bytes} \quad (1.5\times \text{ DDP})$$
 
 ??? question "Why does DeepSeek-V3 use ZeRO-1 instead of ZeRO-3 / FSDP at 2,048 GPUs?"
-    Because ZeRO-3's two weight `all-gather`s sit directly on the forward and
-    backward path of **every micro-batch**, whereas ZeRO-1 communicates only
-    **once per optimizer step** (after accumulating across all $K$ micro-batches!).
-    With $K$ gradient-accumulation micro-batches, ZeRO-1's communication per step
-    is $4\Psi$, while ZeRO-3's is $(4K + 2)\Psi$ — at $K = 8$, ZeRO-3 moves
-    $34\Psi / 4\Psi = 8.5\times$ more bytes across the network! When pipeline and
+    ZeRO-3's two weight `all-gather`s sit directly on the forward and backward
+    path of **every micro-batch**, whereas ZeRO-1 communicates only **once per
+    optimizer step** after accumulating over all $K$ micro-batches. With $K$
+    gradient-accumulation micro-batches, ZeRO-1's communication per step is
+    $4\Psi$, while ZeRO-3's is $(4K + 2)\Psi$. At $K = 8$, ZeRO-3 moves
+    $34\Psi / 4\Psi = 8.5\times$ more bytes over the network. When pipeline and
     expert parallelism already fit the weights in VRAM, ZeRO-1 gives the $75\%$
     optimizer-memory savings without paying per-microbatch weight gathers.
     [Full answer](qa.md#why-does-deepseek-v3-use-zero-1-instead-of-zero-3-at-scale)
@@ -251,19 +272,18 @@ uv run pytest tests/test_33_zero.py -v
 
 ## What you should see
 
-- **ZeRO-1 and ZeRO-2 are strictly free in network volume** compared to DDP at
-  $K=1$ ($4\Psi$ bytes), while cutting state memory by $2.91\times$ and
-  $4.27\times$ at $D=8$.
-- **ZeRO-3 / FSDP scales state memory linearly as $16\Psi / D$**, trading $1.5\times$
-  communication (or $(2K+1)/2\times$ under gradient accumulation) for the ability
-  to fit models larger than a single GPU.
+ZeRO-1 and ZeRO-2 cost **zero extra network volume** compared to DDP at $K=1$
+($4\Psi$ bytes), while cutting per-GPU state memory by $2.91\times$ and
+$4.27\times$ at $D=8$. ZeRO-3 and FSDP scale state memory all the way down as
+$16\Psi / D$, trading $1.5\times$ communication (or $(2K+1)/2\times$ under
+gradient accumulation) for the ability to fit models larger than a single GPU.
 
 ---
 
 ## Go deeper
 
-- **[ZeRO: Memory Optimizations Toward Training Trillion Parameter Models](https://arxiv.org/abs/1910.02054)** (Rajbhandari et al., 2019) — Sections 3 and 5 derive the exact memory and communication bounds above.
-- **[PyTorch FSDP2 (`fully_shard`)](https://pytorch.org/docs/stable/distributed.fsdp.fully_shard.html)** — DTensor-based per-parameter sharding with overlapped prefetching.
+- [ZeRO: Memory Optimizations Toward Training Trillion Parameter Models](https://arxiv.org/abs/1910.02054) (Rajbhandari et al., 2019), Sections 3 and 5 derive the memory and communication bounds above.
+- [PyTorch FSDP2 (`fully_shard`)](https://pytorch.org/docs/stable/distributed.fsdp.fully_shard.html), DTensor-based per-parameter sharding with overlapped prefetching.
 
 ---
 
