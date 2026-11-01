@@ -288,10 +288,9 @@ uv run pytest tests/test_34_pipeline.py -v
 
 ## Next
 
-**[35. Low-precision training (FP8) and modern optimizers (AdamW, Muon, loss-free MoE)](35-fp8-training-and-optimizers.md)**:
-how DeepSeek-V3 trained a 671B model in 8-bit floating point for $5.58M with
-zero loss spikes.
+**[34b. Context parallelism, expert parallelism, and the 5D playbook](34b-context-and-expert-parallelism.md)**:
+how Zig-Zag Ring Attention balances causal long-context FLOPs across GPUs and how Expert Parallelism shards MoEs across nodes.
 
 ```bash
-uv run python book/code/fp8_trainingsim.py
+uv run python book/code/context_parallel_balance.py
 ```

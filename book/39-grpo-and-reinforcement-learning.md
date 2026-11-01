@@ -189,22 +189,52 @@ four refinements became standard:
      saving $14.34\text{ GiB}$; on `Qwen3-0.6B`: $10.00\text{ GiB} \to 8.88\text{ GiB}$).
    - **Step compute drops by $2ND_{\text{rollout}}$ FLOPs** by eliminating the
      reference forward pass across all $B \times G$ trajectories.
-2. **Removing the $1/|o_i|$ length bias (Dr. GRPO / DAPO token-level loss):**
+2. **Removing the $1/|o_i|$ length bias & local $\sigma_r$ bias (Dr. GRPO / RLOO / REINFORCE++):**
    In vanilla GRPO's $\frac{1}{G}\sum_{i=1}^G \frac{1}{|o_i|}\sum_{t=1}^{|o_i|}$,
    dividing each trajectory by its own length $|o_i|$ gives a **larger** per-token
    gradient to **shorter** correct answers ($\hat{A}_i > 0$) and a **smaller**
    per-token penalty to **longer** wrong answers ($\hat{A}_i < 0$) — silently
-   rewarding the model for rambling when wrong. **Dr. GRPO** replaces $|o_i|$
-   with a constant $L_{\max}$ (and drops $\sigma_r$ normalization); **DAPO**
-   normalizes by the total tokens in the group $\sum_{i=1}^G |o_i|$.
-3. **Clip-Higher ($\varepsilon_{\text{low}} = 0.2,\; \varepsilon_{\text{high}} = 0.28$ in DAPO):**
+   rewarding the model for rambling when wrong. Compare the three loss-aggregation
+   rules on a 2-completion batch where every token has unit loss $\ell_{i,t} = 2.0$,
+   completion 1 has $|o_1| = 4$ tokens, and completion 2 has $|o_2| = 7$ tokens
+   ($L_{\max} = 7$):
+   - **Strategy 1 — Per-sequence mean (Vanilla GRPO):**
+     $$\mathcal{L}_{\text{seq}} = \frac{1}{2}\left(\frac{1}{4}\sum_{t=1}^4 \ell_{1,t} + \frac{1}{7}\sum_{t=1}^7 \ell_{2,t}\right) \implies \frac{\partial \mathcal{L}_{\text{seq}}}{\partial \ell_{1,t}} = \frac{1}{8} = 0.1250,\quad \frac{\partial \mathcal{L}_{\text{seq}}}{\partial \ell_{2,t}} = \frac{1}{14} \approx 0.0714$$
+     Every token in the 4-token completion receives **$1.75\times$ larger gradient**
+     than a token in the 7-token completion!
+   - **Strategy 2 — Per-token mean (DAPO):**
+     $$\mathcal{L}_{\text{tok}} = \frac{\sum_{i=1}^2 \sum_{t=1}^{|o_i|} \ell_{i,t}}{4 + 7} \implies \frac{\partial \mathcal{L}_{\text{tok}}}{\partial \ell_{i,t}} = \frac{1}{11} \approx 0.0909 \quad (\text{equal for all tokens})$$
+   - **Strategy 3 — Fixed-length $L_{\max}$ normalization (Dr. GRPO):**
+     $$\mathcal{L}_{\text{fix}} = \frac{1}{2 \cdot 7}\sum_{i=1}^2 \sum_{t=1}^{|o_i|} \ell_{i,t} \implies \frac{\partial \mathcal{L}_{\text{fix}}}{\partial \ell_{i,t}} = \frac{1}{14} \approx 0.0714 \quad (\text{equal across sequences and steps})$$
+
+   Second, dividing by the *local* group standard deviation $\sigma_{\text{group}}$
+   in $\hat{A}_i = (r_i - \mu_{\text{group}})/\sigma_{\text{group}}$ introduces
+   statistical bias because $\sigma_{\text{group}}$ is correlated with $(r_i - \mu_{\text{group}})$
+   for small $G \in \{4, 8\}$. Two clean fixes eliminate this bias:
+   - **Dr. GRPO & RLOO (REINFORCE Leave-One-Out):** **RLOO** (Kool et al., 2019;
+     Ahmadian et al., 2024) defines each sample's baseline using only the *other*
+     $G - 1$ completions in the group, keeping the baseline statistically
+     independent of $o_i$:
+     $$A_i^{\text{RLOO}} = r_i - \frac{1}{G - 1}\sum_{j \neq i} r_j$$
+     **Dr. GRPO** drops $\sigma_{\text{group}}$ and uses $\tilde{A}_i = r_i - \frac{1}{G}\sum_{j=1}^G r_j$.
+     Notice that $\tilde{A}_i$ and $A_i^{\text{RLOO}}$ are **algebraically identical
+     up to the constant factor $\frac{G}{G-1}$**:
+     $$\frac{G}{G-1}\tilde{A}_i = \frac{G}{G-1}\left(r_i - \frac{1}{G}r_i - \frac{1}{G}\sum_{j\neq i} r_j\right) = \frac{G}{G-1}\left(\frac{G-1}{G}r_i - \frac{1}{G}\sum_{j\neq i} r_j\right) = r_i - \frac{1}{G-1}\sum_{j\neq i} r_j = A_i^{\text{RLOO}}$$
+   - **REINFORCE++ (Hu et al., 2025):** Subtracts the local group mean
+     $A'_{q,o_t} = R_{q,o_t} - \mu_{\text{group}}$, then normalizes by the **global
+     batch standard deviation** $\sigma_{\text{batch}}$ across all $B \times G$
+     samples in the step (where $B \times G \ge 1024$ makes $\sigma_{\text{batch}}$
+     a low-variance constant).
+3. **Clip-Higher ($\varepsilon_{\text{low}} = 0.2,\; \varepsilon_{\text{high}} = 0.28$ in DAPO) & Overlong Reward Shaping:**
    Symmetric clipping at $1 + 0.2 = 1.2$ caps a low-probability reasoning token
    ($\pi_{\theta_{\text{old}}} = 0.01$) at $0.012$, starving exploration and
    causing entropy collapse. Raising only the upper clip bound to
    $\varepsilon_{\text{high}} = 0.28$ lets rare reasoning tokens grow while
    keeping the $1 - \varepsilon_{\text{low}} = 0.8$ floor against catastrophic
-   probability drops.
-4. **Sequence-level importance ratios (GSPO — Qwen3):**
+   probability drops. Combined with **Dynamic Sampling** (discarding groups where
+   all $G$ answers are right or all $G$ are wrong, so $0 < \sum_i r_i < G$) and
+   **Overlong Filtering**, DAPO jumps from $30\%$ to $50\%$ on AIME 2024.
+4. **Sequence-level importance ratios (GSPO — Qwen3) & Clipped IS Weights (CISPO — MiniMax-M1):**
    Token-level ratios $\rho_{i,t}$ accumulate high variance over thousands of
    tokens and destabilize MoE training when expert routing changes between
    $\pi_{\theta_{\text{old}}}$ and $\pi_\theta$. **Group Sequence Policy
@@ -212,6 +242,9 @@ four refinements became standard:
    sequence geometric-mean ratio:
    $$s_i(\theta) = \left(\frac{\pi_\theta(o_i \mid q)}{\pi_{\theta_{\text{old}}}(o_i \mid q)}\right)^{\frac{1}{|o_i|}} = \exp\left(\frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \log \frac{\pi_\theta(o_{i,t} \mid q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,<t})}\right)$$
    matching sequence-level clipping directly to the sequence-level reward $r_i$.
+   Alternatively, **CISPO** clips the importance weight itself with a stop-gradient
+   $\text{sg}\bigl(\text{clip}(\rho_{i,t}, 1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}})\bigr) \hat{A}_{i,t} \log \pi_\theta(o_{i,t} \mid q, o_{i,<t})$
+   so clipped tokens still receive a bounded gradient instead of zero gradient.
 
 ??? question "Why do modern GRPO reasoning runs drop the reference model ($\beta = 0$, 'no-ref GRPO')?"
     In PPO RLHF with a neural reward model $r_\phi$, the reference KL penalty

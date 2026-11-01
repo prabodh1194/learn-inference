@@ -98,6 +98,24 @@ Notice an algebraic invariance here that Lecture 38 (DPO) will exploit: adding
 any prompt-dependent constant $c(x)$ to $r_\phi(x, y)$ leaves the difference
 $(r_\phi(x, y_w) + c(x)) - (r_\phi(x, y_l) + c(x))$ **completely unchanged**!
 
+**Outcome Reward Models (ORMs) vs. Process Reward Models (PRMs).** A Bradley-Terry
+preference RM emits a single score at `<eos>`. For multi-step math and coding
+reasoning, two finer-grained reward architectures exist (Cobbe et al., 2021;
+Lightman et al., 2023 *Let's Verify Step by Step*):
+- **Outcome Reward Model (ORM):** Given a completion $s = (s_1, \dots, s_T)$ with
+  final correctness label $r \in \{0, 1\}$, an ORM trains a per-token scalar head
+  $p_\phi(s_t) = \sigma(w_\phi(s_t))$ against the sequence outcome at every token:
+  $$\mathcal{L}_{\text{ORM}}(\phi) = -\mathbb{E}_{(s, r)}\left[\frac{1}{T}\sum_{t=1}^T \Bigl(r \log p_\phi(s_t) + (1 - r)\log\bigl(1 - p_\phi(s_t)\bigr)\Bigr)\right]$$
+- **Process Reward Model (PRM):** Splits a chain-of-thought into $K$ explicit
+  reasoning steps $(s_1, \dots, s_K)$ delimited by `\n\n` or `<step>` tokens and
+  trains a binary classifier $r_\phi(s_i \mid x, s_{<i})$ on each step's validity
+  $y_{s_i} \in \{0, 1\}$:
+  $$\mathcal{L}_{\text{PRM}}(\phi) = -\mathbb{E}_{(x, s)}\left[\sum_{i=1}^K \Bigl(y_{s_i} \log r_\phi(s_i \mid x, s_{<i}) + (1 - y_{s_i})\log\bigl(1 - r_\phi(s_i \mid x, s_{<i})\bigr)\Bigr)\right]$$
+  To avoid expensive human step-annotations, **Math-Shepherd** (Wang et al., 2024)
+  labels step $s_i$ automatically via Monte Carlo rollouts: sample $M = 8$
+  continuations from prefix $(x, s_{\le i})$ and set $y_{s_i}$ to the fraction
+  (or existence) of continuations that reach the verified final answer $a^*$.
+
 ---
 
 ### 2. Stage 2: The KL-constrained RL objective
@@ -137,9 +155,26 @@ To optimize that objective with **PPO** (Schulman et al., 2017):
    Why can't every token $t$ just use the raw return $\sum_{k=t}^T R_k$? Because
    the variance across prompts and token positions is enormous. So PPO trains a
    **second full transformer**, the **Critic $V_\psi$**, to predict the expected
-   future return from every partial prefix $(x, y_{<t})$ via Generalized
-   Advantage Estimation (GAE):
-   $$\delta_t = R_t + \gamma V_\psi(s_{t+1}) - V_\psi(s_t), \qquad \hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l}$$
+   future return from every partial prefix $(x, y_{<t})$ via **Generalized
+   Advantage Estimation (GAE, Schulman et al. 2015)**.
+
+   Define the 1-step temporal-difference (TD) residual $\delta_t = R_t + \gamma V_\psi(s_{t+1}) - V_\psi(s_t)$
+   and the $n$-step advantage estimator $\hat{A}_t^{(n)}$:
+   $$\begin{aligned}
+   \hat{A}_t^{(1)} &= R_t + \gamma V_\psi(s_{t+1}) - V_\psi(s_t) = \delta_t \\
+   \hat{A}_t^{(2)} &= R_t + \gamma R_{t+1} + \gamma^2 V_\psi(s_{t+2}) - V_\psi(s_t) = \delta_t + \gamma \delta_{t+1} \\
+   \hat{A}_t^{(n)} &= \sum_{l=0}^{n-1} \gamma^l \delta_{t+l}
+   \end{aligned}$$
+   GAE takes the exponentially weighted average of all $\hat{A}_t^{(n)}$ with decay
+   $(1 - \lambda)\lambda^{n-1}$ and collapses the double sum via the geometric series
+   $\sum_{k=l}^\infty \lambda^k = \frac{\lambda^l}{1 - \lambda}$:
+   $$\begin{aligned}
+   \hat{A}_t^{\text{GAE}(\gamma, \lambda)}
+   &= (1 - \lambda)\Bigl(\hat{A}_t^{(1)} + \lambda \hat{A}_t^{(2)} + \lambda^2 \hat{A}_t^{(3)} + \cdots\Bigr) \\
+   &= (1 - \lambda)\Bigl(\delta_t(1 + \lambda + \lambda^2 + \cdots) + \gamma\delta_{t+1}(\lambda + \lambda^2 + \cdots) + \cdots\Bigr) \\
+   &= (1 - \lambda)\left(\delta_t \frac{1}{1-\lambda} + \gamma\delta_{t+1} \frac{\lambda}{1-\lambda} + \gamma^2\delta_{t+2} \frac{\lambda^2}{1-\lambda} + \cdots\right) \\
+   &= \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l}
+   \end{aligned}$$
 4. **Update the Actor $\pi_\theta$ via the clipped surrogate objective:**
    Define the per-token importance ratio between the updated policy $\pi_\theta$
    and the rollout policy $\pi_{\theta_{\text{old}}}$:

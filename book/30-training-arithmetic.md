@@ -357,10 +357,9 @@ uv run pytest tests/test_30_training_ledger.py -v
 
 ## Next
 
-**[31. Activations, checkpointing, and gradient accumulation](31-activation-memory.md)**:
-8.88 GiB was only the static state. Now add the forward activations that
-$\nabla_W = X^\top \nabla_Y$ forces you to keep alive.
+**[30b. Scaling laws, learning rate schedules, and mid-training](30b-scaling-laws-and-schedules.md)**:
+Derive Chinchilla vs. inference-aware over-training, critical batch size, WSD schedules, and YaRN long-context extension.
 
 ```bash
-uv run python book/code/activation_budget.py
+uv run python book/code/scaling_laws.py
 ```

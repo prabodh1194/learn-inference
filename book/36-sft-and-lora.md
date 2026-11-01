@@ -87,6 +87,19 @@ token answer. Without prompt masking, $\frac{2000}{2020} = 99\%$ of the gradient
 updates the model to predict the user's messy prompt rather than the assistant's
 answer!
 
+**Multi-turn masking & SFT hyperparameter regimes.** In a multi-turn conversation
+$(u_1, a_1, u_2, a_2, \dots, u_K, a_K)$, two conventions exist:
+- **Mask user/tool turns only:** Every assistant reply $a_1, \dots, a_K$ receives
+  supervision (`labels != -100`) in a single forward pass, while all `system`,
+  `user`, and `tool` observation tokens are set to `-100`.
+- **Final-turn only (unrolled):** Unroll a $K$-turn dialogue into $K$ examples
+  where example $k$ supervises only $a_k$ and masks $(u_1, a_1, \dots, u_k)$.
+- **Why SFT uses $10\times$–$30\times$ smaller learning rates and batches:** To
+  avoid overwriting pre-trained representations on a $1\text{M}$-prompt SFT mix,
+  models like `OLMo 2` drop the peak learning rate from $3 \times 10^{-4}$
+  (pre-training) to $1 \times 10^{-5}$–$5 \times 10^{-5}$ (SFT) and reduce global
+  batch size from $4\text{M}$ tokens to $256$ prompts ($1$–$2$ epochs total).
+
 ---
 
 ### 2. LoRA math: parameter count, initialization, and $\alpha / r$ scaling
@@ -271,10 +284,9 @@ uv run pytest tests/test_36_sft_lora.py -v
 
 ## Next
 
-**[37. Reward modeling and RLHF with PPO (the 4-model problem)](37-reward-models-and-ppo.md)**:
-SFT can only imitate demonstrations. To steer a model by preferences, the
-field built RLHF with PPO — and accidentally multiplied the VRAM bill by four.
+**[36b. Rejection sampling, Best-of-N, and synthetic data engines](36b-rejection-sampling-and-synthetic-data.md)**:
+derive the exact $\ln N - \frac{N-1}{N}$ KL cost of Best-of-$N$, compare per-prompt vs. global rejection sampling, and build synthetic data pipelines.
 
 ```bash
-uv run python book/code/rlhf_memory.py
+uv run python book/code/rejection_sampling.py
 ```

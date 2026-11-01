@@ -185,9 +185,24 @@ token-level loss normalization, and dropping $\pi_{\text{ref}}$ ($\beta = 0$).
 Replaces token-level importance ratios with sequence-level geometric-mean ratios
 to stabilize RL training on Mixture-of-Experts models.
 
+**[Tülu 3: Pushing Frontiers in Open Language Model Post-Training](https://arxiv.org/abs/2411.15124)** · Lambert et al. (AI2), 2024 · **L36, L36b, L39, L42**
+Open SFT + on-policy DPO + RLVR recipe, persona-driven synthetic data, and 8-gram decontamination.
+
+**[Qwen3 Technical Report](https://arxiv.org/abs/2505.09388)** · Qwen Team, 2025 · **L30b, L40**
+36T-token 3-stage pretraining, 4-stage post-training with Thinking Mode Fusion (`/think` and `/no_think`), thinking budgets, and on-policy strong-to-weak distillation.
+
+**[REINFORCE++: Stabilizing Critic-Free Policy Optimization with Global Advantage Normalization](https://arxiv.org/abs/2501.03262)** · Hu et al., 2025 · **L39**
+Proves local group standard deviation is biased for small $G$ and replaces it with global batch normalization.
+
+**[AReaL: A Large-Scale Asynchronous Reinforcement Learning System for Language Reasoning](https://arxiv.org/abs/2505.24298)** · Fu et al., 2025 · **L41**
+Decouples streaming interruptible rollout workers from learner workers with staleness-bounded PPO ($2.57\times$ speedup).
+
 **[HybridFlow: A Flexible and Efficient RLHF Framework (veRL)](https://arxiv.org/abs/2409.19256)** · Sheng et al., EuroSys 2025 · **L41**
 Co-locating vLLM rollout engines and FSDP trainers via 3D-HybridEngine weight
 resharding and KV pool sleep/wake.
+
+**[Reinforcement Learning from Human Feedback (RLHF Book)](https://arxiv.org/abs/2504.12501)** · Nathan Lambert, Manning 2026 · **L36–L42**
+Comprehensive textbook on instruction tuning, reward models, policy gradients, RLVR, direct alignment, on-policy distillation, tool use, and over-optimization.
 
 ---
 

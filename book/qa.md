@@ -2262,3 +2262,46 @@ Unless vLLM explicitly unmaps the physical pages of its KV cache pool (vLLM's
 phase starts — and FSDP offloads or unmaps its optimizer states before vLLM
 wakes back up — the two engines collide and OOM immediately.
 
+---
+
+## Why did Chinchilla say 20 tokens per parameter while Llama 3 and Qwen3 train on 1,000+ tokens per parameter?
+
+**Lecture:** [30b. Scaling Laws, Learning Rate Schedules & Mid-Training](30b-scaling-laws-and-schedules.md)
+
+**Wrong intuition:** "Chinchilla proved that training past $20$ tokens per parameter is compute-suboptimal and wastes FLOPs."
+
+Chinchilla minimized pretraining loss $L(N, D)$ subject to a fixed **training-only** budget $C_{\text{train}} = 6 N D_{\text{train}}$, implicitly assuming inference is free ($D_{\text{infer}} = 0$). In production, lifetime compute is $C_{\text{total}} = 6 N D_{\text{train}} + 2 N D_{\text{infer}}$, and decode latency is bottlenecked by reading $2N$ bytes of weights from HBM at every step (Lecture 04). Over-training a $0.6\text{B}$ model on $36\text{T}$ tokens (`Qwen3-0.6B`, $60{,}000$ tokens/param) costs more FLOPs once during pretraining, but cuts lifetime serving FLOPs and HBM bandwidth by $2\times$–$5\times$ on every generated token forever.
+
+---
+
+## When should you use Ring Attention versus DeepSpeed Ulysses for Context Parallelism?
+
+**Lecture:** [34b. Context Parallelism, Expert Parallelism & the 5D Playbook](34b-context-and-expert-parallelism.md)
+
+**Wrong intuition:** "Ring Attention and DeepSpeed Ulysses both split the sequence across $C$ GPUs, so they have the same scaling limits and communication cost."
+
+Both keep MLP and LayerNorm sequence-sharded ($s/C$ tokens per GPU), but they transpose different axes inside Attention:
+- **DeepSpeed Ulysses** uses `All-to-All` on $(Q, K, V)$ to switch from sequence-sharded $(s/C, h)$ to head-sharded $(s, h/C)$. Because each GPU must receive at least one KV head, Ulysses cannot scale past the number of KV heads ($C \le h_{kv} = 8$ on `Qwen3-0.6B`), though its per-GPU communication volume shrinks as $O(1/C)$.
+- **Zig-Zag Ring Attention** keeps all heads on each GPU and circulates KV chunks around a P2P ring while overlapping FlashAttention compute. Its degree $C$ is not bounded by $h_{kv}$, making hybrid **USP** (Ulysses intra-node on NVLink + Zig-Zag Ring inter-node on InfiniBand) the standard at $s \ge 128\text{K}$.
+
+---
+
+## Why does global top-K rejection sampling hurt reasoning compared to per-prompt selection?
+
+**Lecture:** [36b. Rejection Sampling, Best-of-N & Synthetic Data Engines](36b-rejection-sampling-and-synthetic-data.md)
+
+**Wrong intuition:** "Selecting the highest-scoring $K$ prompt-completion pairs across the entire dataset maximizes average reward in the SFT training set, so it should produce the strongest model."
+
+In a global top-$K$ sort over the $M \times N$ reward matrix, easy prompts where the base model already scores $0.9+$ contribute multiple completions to the surviving set, while hard reasoning prompts where only one rollout scored $0.6$ get dropped entirely. Per-prompt `argmax` selection guarantees uniform prompt coverage across easy and hard problems alike.
+
+---
+
+## Why is pass@k the wrong metric for production tool-use agents (and why pass^k is used instead)?
+
+**Lecture:** [42. Over-Optimization, Model Merging & Post-Training Evaluation](42-overoptimization-merging-and-eval.md)
+
+**Wrong intuition:** "If a coding or tool-use model achieves $99\%$ `pass@5`, it is ready for autonomous production deployment."
+
+`pass@k` $= 1 - \binom{n-c}{k}/\binom{n}{k}$ measures the probability that **at least one** of $k$ attempts succeeds — which only matters when an oracle verifier (like a unit test suite) exists at inference time to discard the $k-1$ failures. A production agent booking flights or modifying files has no oracle undo button: a customer running the agent $k = 5$ times needs **every** run to succeed, which occurs with probability $\text{pass}^k = (c/n)^k$. At $80\%$ single-trial accuracy, `pass@5` is $100\%$ while $\text{pass}^5 = 0.80^5 = 32.8\%$.
+
+

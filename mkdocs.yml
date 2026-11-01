@@ -146,18 +146,22 @@ nav:
       - 29 Contributing: 29-contributing.md
   - Part VI — Training systems:
       - 30 The training ledger (6ND & 16Ψ): 30-training-arithmetic.md
+      - 30b Scaling laws, schedules, and mid-training: 30b-scaling-laws-and-schedules.md
       - 31 Activations and checkpointing: 31-activation-memory.md
-      - 32 Data pipelines and packing: 32-data-and-packing.md
+      - 32 Data curation, MinHash, and packing: 32-data-and-packing.md
       - 33 Data parallelism, ZeRO, and FSDP: 33-zeRO-and-fsdp.md
       - 34 TP + SP, Pipeline schedules, and 3D: 34-3d-parallelism-and-schedules.md
+      - 34b Context parallelism, EP, and 5D design: 34b-context-and-expert-parallelism.md
       - 35 FP8 training and modern optimizers: 35-fp8-training-and-optimizers.md
   - Part VII — Post-training & alignment:
-      - 36 SFT, LoRA, and QLoRA: 36-sft-and-lora.md
-      - 37 Reward modeling and PPO (4 models): 37-reward-models-and-ppo.md
-      - 38 Direct Preference Optimization (DPO): 38-dpo-and-offline-preference.md
-      - 39 GRPO and verifiable rewards (RLVR): 39-grpo-and-reinforcement-learning.md
-      - 40 Reasoning pipelines and distillation: 40-reasoning-pipelines-and-distillation.md
-      - 41 RL systems — inference meets training: 41-rl-systems-inference-meets-training.md
+      - 36 SFT, chat templates, and LoRA/QLoRA: 36-sft-and-lora.md
+      - 36b Rejection sampling, Best-of-N, and synthetic data: 36b-rejection-sampling-and-synthetic-data.md
+      - 37 Reward modeling (BT, ORM, PRM) and PPO: 37-reward-models-and-ppo.md
+      - 38 Direct alignment (DPO, IPO, SimPO, ORPO): 38-dpo-and-offline-preference.md
+      - 39 Critic-free RL (RLOO, GRPO, DAPO, GSPO): 39-grpo-and-reinforcement-learning.md
+      - 40 Reasoning pipelines, thinking fusion, and OPD: 40-reasoning-pipelines-and-distillation.md
+      - 41 RL systems, TIS, AReaL, and tool-use RL: 41-rl-systems-inference-meets-training.md
+      - 42 Over-optimization, model merging, and eval: 42-overoptimization-merging-and-eval.md
   - Reference:
       - Q&A — worked answers: qa.md
       - Field notes: field-notes.md

@@ -202,6 +202,67 @@ whichever micro-batch happened to have more padding or longer masked prompts!
 
 ---
 
+### 3. Pretraining data curation & MinHash LSH deduplication
+
+Before a single token reaches the sequence packer, a pretraining pipeline
+(FineWeb-Edu, DCLM, Stanford CS336 Assignment 4, Qwen3's $36\text{T}$-token
+corpus) transforms petabytes of raw Common Crawl HTML into clean documents
+through four stages:
+
+1. **Text extraction & heuristic filtering:** Strip HTML boilerplates (`trafilatura`
+   / `resiliparse`), detect language (`fastText`), and discard documents with
+   abnormal symbol-to-word ratios or repeated lines.
+2. **Fuzzy deduplication via MinHash LSH:** Web crawls contain up to $30\%$–$50\%$
+   near-duplicate boilerplate. Comparing all $\binom{N}{2}$ document pairs for
+   $N = 10^9$ documents would require $5 \times 10^{17}$ comparisons.
+   **MinHash Locality-Sensitive Hashing (LSH)** reduces this to $O(N)$ by hashing
+   each document's set of $n$-grams into $K = b \cdot r$ MinHash signatures split
+   into $b$ **bands** of $r$ **rows** each.
+
+#### Full Derivation of the MinHash LSH S-Curve
+
+Let two documents $A$ and $B$ have $n$-gram Jaccard similarity:
+
+$$s = J(A, B) = \frac{|A \cap B|}{|A \cup B|}$$
+
+By a fundamental property of random permutations, a single MinHash function $h_i$
+produces the same minimum hash for $A$ and $B$ with probability exactly equal to
+their Jaccard similarity:
+
+$$\Pr[h_i(A) = h_i(B)] = s$$
+
+Now partition $K = b \cdot r$ independent MinHash values into $b$ bands of $r$
+rows each. Two documents are flagged as a candidate duplicate pair if and only if
+they match on **all $r$ rows in at least one of the $b$ bands**:
+
+1. **Probability that all $r$ rows match in one specific band:** Because the $r$
+   hash functions are independent,
+   $$\Pr[\text{band } j \text{ matches}] = \underbrace{s \cdot s \cdots s}_{r \text{ times}} = s^r$$
+2. **Probability that band $j$ does *not* match:**
+   $$\Pr[\text{band } j \text{ differs}] = 1 - s^r$$
+3. **Probability that *none* of the $b$ independent bands match:**
+   $$\Pr[\text{no band matches}] = (1 - s^r)^b$$
+4. **Probability that *at least one* band matches (candidate collision):**
+   $$P_{\text{collision}}(s) = 1 - (1 - s^r)^b$$
+
+Plug in standard FineWeb parameters ($K = 100$ hashes split into $b = 20$ bands
+of $r = 5$ rows, threshold $t \approx (1/b)^{1/r} = (1/20)^{1/5} \approx 0.549$):
+
+- **Near-duplicates ($s = 0.80$):**
+  $$s^5 = 0.80^5 = 0.32768 \implies P_{\text{collision}}(0.80) = 1 - (1 - 0.32768)^{20} = 1 - 0.67232^{20} = 1 - 0.00035 = 99.96\%$$
+- **Unrelated documents ($s = 0.30$):**
+  $$s^5 = 0.30^5 = 0.00243 \implies P_{\text{collision}}(0.30) = 1 - (1 - 0.00243)^{20} = 1 - 0.99757^{20} = 4.75\%$$
+
+3. **Model-based quality filtering & synthetic data:** Modern corpora (FineWeb-Edu,
+   DCLM, Qwen3) score every deduplicated document with a lightweight classifier
+   distilled from LLM educational-value annotations, then augment natural web
+   text with trillions of synthetic math, code, and textbook tokens.
+4. **Domain & instance-level mixing:** Rather than sampling domains in proportion
+   to raw web volume, small proxy models optimize domain weights (DoReMi, RegMix,
+   or Qwen3's instance-level mixture optimization) to up-weight STEM and code.
+
+---
+
 ## The code
 
 ```python

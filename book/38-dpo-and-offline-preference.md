@@ -168,7 +168,19 @@ Three real failure modes show up when you run DPO in production:
    huge values regardless of $\beta$. **IPO** replaces the logistic loss with a
    squared loss $\bigl((\hat{r}_w - \hat{r}_l) - \frac{1}{2\beta}\bigr)^2$ that
    stops pushing once the margin hits $\frac{1}{2\beta}$.
-3. **Offline distribution shift.** DPO trains on a **fixed offline dataset**
+3. **Preference displacement (likelihood squeezing) and DPO+NLL (Pang et al., 2024).**
+   Because $\mathcal{L}_{\text{DPO}}$ only depends on the *difference*
+   $\log \pi_\theta(y_w \mid x) - \log \pi_\theta(y_l \mid x)$, the optimizer can
+   widen the margin by **reducing the log-probability of both $y_w$ and $y_l$**
+   as long as $\log \pi_\theta(y_l \mid x)$ falls faster! Where does the leaked
+   probability mass go? Into out-of-distribution tokens never seen in $(y_w, y_l)$,
+   which degrades reasoning and causes gibberish on long generations. Adding a
+   length-normalized NLL anchor on the chosen response (**DPO+NLL** / **RPO**):
+   $$\mathcal{L}_{\text{DPO+NLL}}(\theta) = \mathcal{L}_{\text{DPO}}(\theta) - \alpha \frac{\log \pi_\theta(y_w \mid x)}{|y_w|}$$
+   or using **ORPO** (which penalizes the log odds-ratio $\text{odds}_\theta(y) = \frac{\pi_\theta(y\mid x)}{1 - \pi_\theta(y\mid x)}$
+   directly alongside SFT loss without $\pi_{\text{ref}}$) prevents chosen likelihoods
+   from collapsing.
+4. **Offline distribution shift.** DPO trains on a **fixed offline dataset**
    $\mathcal{D}$. As $\pi_\theta$ moves away from the model that generated
    $\mathcal{D}$, it never sees its *own* fresh mistakes. **Online / Iterative
    DPO** fixes this by periodically sampling fresh pairs from $\pi_\theta$,

@@ -109,6 +109,23 @@ Walk through the engineering logic of each transition:
    neural preference reward models only in the final 400 steps so the reward
    model cannot get hacked!).
 
+**Qwen3's Thinking Mode Fusion (`/think` and `/no_think`) and Thinking Budgets.**
+Having separate chat (`GPT-4o`) and reasoning (`o1`) models doubles serving
+deployment complexity. **Qwen3** fuses both modes into a single checkpoint using
+a 4-stage post-training pipeline (Long-CoT Cold Start $\to$ Reasoning RL $\to$
+Thinking Mode Fusion SFT $\to$ General RL):
+- During Stage 3 (**Thinking Mode Fusion**), the Stage 2 reasoning model is
+  fine-tuned on a mix of rejection-sampled thinking traces (tagged `/think`) and
+  general chat traces (tagged `/no_think`).
+- Crucially, `/no_think` responses still emit an **empty thinking block**
+  `<think>\n\n</think>` before the final answer so the internal output format
+  remains identical across modes.
+- Because the model learns both full `<think>` blocks and empty `<think>` blocks,
+  it naturally supports a **user-controlled thinking budget**: if a `<think>`
+  trace reaches $B_{\text{think}}$ tokens (e.g. $2{,}048$), the serving engine
+  appends `\nConsidering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>\n\n`
+  and the model smoothly summarizes its partial reasoning into a final answer!
+
 ---
 
 ### 2. Why distillation beats direct RL on small models: exploration vs imitation
@@ -196,6 +213,51 @@ raising $T$ from $1$ to $10$ shrinks the distillation gradient by $100\times$!
     can **lock onto one high-quality mode** of the teacher without smearing
     (**mode-seeking**).
     [Full answer](qa.md#what-is-the-difference-between-forward-kl-and-reverse-kl-in-distillation)
+
+---
+
+### 4. Why SFT Memorizes while RL Generalizes — and On-Policy Distillation (OPD / MOPD)
+
+Controlled studies (Chu et al., 2025; Chen et al., 2025) show that sequential SFT
+causes much worse catastrophic forgetting of prior skills than RL. Both facts
+follow from the exact KL divergence each objective optimizes:
+
+1. **SFT minimizes Forward KL $\mathbb{D}_{\text{KL}}(\pi_\star \,\|\, \pi_\theta)$:**
+   $$\mathbb{D}_{\text{KL}}(\pi_\star \,\|\, \pi_\theta) = \mathbb{E}_{(x, y) \sim \pi_\star}\bigl[\log \pi_\star(y \mid x) - \log \pi_\theta(y \mid x)\bigr] = \underbrace{-H(\pi_\star)}_{\text{const in }\theta} + \mathcal{L}_{\text{SFT}}(\theta)$$
+   Because samples $(x, y)$ are drawn from a **fixed offline dataset $\pi_\star$**,
+   mode-covering pressure forces $\pi_\theta$ to stretch probability mass toward
+   the dataset's surface tokens, pulling mass away from the model's existing modes.
+2. **KL-regularized RL minimizes Reverse KL $\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_\star)$:**
+   Let $\pi_\star(y \mid x) = \frac{1}{Z(x)}\pi_{\text{ref}}(y \mid x)\exp\bigl(\frac{1}{\beta}r(x, y)\bigr)$
+   be the Gibbs optimal policy from Lecture 38. Expand the Reverse KL under
+   **on-policy samples $y \sim \pi_\theta(\cdot \mid x)$**:
+   $$\begin{aligned}
+   \mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_\star)
+   &= \mathbb{E}_{y \sim \pi_\theta}\left[\log \pi_\theta(y \mid x) - \log \pi_{\text{ref}}(y \mid x) + \log Z(x) - \frac{1}{\beta}r(x, y)\right] \\
+   &= -\frac{1}{\beta}\Bigl(\mathbb{E}_{y \sim \pi_\theta}[r(x, y)] - \beta\,\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})\Bigr) + \log Z(x) = -\frac{1}{\beta}\mathcal{J}_{\text{RL}}(\theta) + \text{const}
+   \end{aligned}$$
+   Because RL samples from the student's **own** policy $\pi_\theta$, updates
+   stay local to modes $\pi_\theta$ actually visits.
+
+**On-Policy Distillation (OPD) & Multi-Teacher OPD (MOPD).** Offline distillation
+trains the student on teacher prefixes $u_{<t} \sim \pi_T$, creating **exposure
+bias**: at test time, a per-step imitation error $\epsilon$ compounds quadratically
+as $O(\epsilon L^2)$ over a length-$L$ rollout once the student drifts into states
+the teacher never visited (Ross et al., 2011 DAgger). **On-Policy Distillation**
+(used in `Qwen3` lightweight models, `MiMo-V2-Flash`, and `DeepSeek-V4`) fixes
+this by sampling trajectories **on-policy from the student** $a \sim \pi_\theta(\cdot \mid s)$
+and grading every visited token $s_t = (s, a_{<t})$ with the teacher's dense
+log-probability gap as a token-level RL advantage:
+
+$$A_t^{\text{OPD}} = \log \pi_T(a_t \mid s_t) - \log \pi_\theta(a_t \mid s_t)$$
+
+reducing trajectory error compounding from $O(\epsilon L^2)$ to $O(\epsilon L)$
+and requiring only **$1/10$ of the GPU-hours** of a full 4-stage RL pipeline
+(Qwen3 §4.5). When $K$ domain-specialist teachers $\pi_{T_1}, \dots, \pi_{T_K}$
+(math, coding, tool-use, chat) are combined into one student via prompt-routed
+weights $w_k(s)$, this becomes **Multi-Teacher On-Policy Distillation (MOPD)**:
+
+$$\mathcal{L}_{\text{MOPD}}(\theta) = \mathbb{E}_{s,\, a \sim \pi_\theta(\cdot \mid s)} \sum_{t=1}^{|a|} \sum_{k=1}^K w_k(s)\,\mathbb{D}_{\text{KL}}\bigl(\pi_\theta(\cdot \mid s_t) \,\big\|\, \pi_{T_k}(\cdot \mid s_t)\bigr)$$
 
 ---
 

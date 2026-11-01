@@ -170,10 +170,35 @@ matrix orthogonalization** of the momentum matrix $M_t$:
 
 $$O_t = \text{NewtonSchulz}_5(M_t) \approx U V^\top \quad \text{where } M_t = U \Sigma V^\top$$
 
+Specifically, after normalizing $X_0 = M_t / \|M_t\|_F$ so all singular values
+lie in $(0, 1]$, Muon runs $5$ iterations of the odd quintic matrix polynomial:
+
+$$X_{k+1} = a X_k + b X_k (X_k^\top X_k) + c X_k (X_k^\top X_k)^2, \qquad (a, b, c) = (3.4445, -4.7750, 2.0315)$$
+
+Why does this work without calling `torch.linalg.svd`? Because if $X_k = U \Sigma_k V^\top$,
+then $X_k (X_k^\top X_k) = U \Sigma_k^3 V^\top$ and $X_k (X_k^\top X_k)^2 = U \Sigma_k^5 V^\top$,
+so the matrix iteration applies the scalar polynomial $\phi(\sigma) = a\sigma + b\sigma^3 + c\sigma^5$
+independently to every singular value $\sigma_i \in (0, 1]$, pushing all
+$\sigma_i \to 1$ in 5 pure BF16 matrix multiplications!
+
 Setting all singular values of the update to $1$ forces every orthogonal
-direction of the weight matrix to advance at the same rate, while needs only
+direction of the weight matrix to advance at the same rate, while needing only
 **one** momentum buffer ($4\Psi$ bytes) instead of AdamW's two ($m_t$ and $v_t$,
 $8\Psi$ bytes)! (1-D norms, embeddings, and the LM head remain on AdamW.)
+
+**MuonClip (QK-Clip) for Trillion-Parameter MoE Stability (Kimi K2).** Because
+Muon amplifies small singular directions in $W_q$ and $W_k$, attention pre-softmax
+logits $S^h = \frac{1}{\sqrt{d_h}} Q^h (K^h)^\top$ can grow past $100$ at $1\text{T}$
+scale, causing softmax overflow and loss spikes. **Kimi K2** (`1T` total, `32B`
+active, trained on $15.5\text{T}$ tokens with zero loss spikes) introduces
+**MuonClip**: after each Muon step, if head $h$'s maximum attention logit
+$S_{\max}^h = \max_{i,j} S_{i,j}^h$ exceeds threshold $\tau = 100$, rescale that
+head's query and key projection weights directly:
+
+$$\gamma_h = \min\left(1, \frac{\tau}{S_{\max}^h}\right), \qquad W_q^h \leftarrow \gamma_h^{0.5} W_q^h, \qquad W_k^h \leftarrow \gamma_h^{0.5} W_k^h$$
+
+Because $( \gamma_h^{0.5} Q^h ) ( \gamma_h^{0.5} K^h )^\top = \gamma_h Q^h (K^h)^\top$,
+this caps the next step's logit at $\tau$ without distorting the attention pattern!
 
 ---
 

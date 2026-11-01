@@ -196,6 +196,63 @@ Two architectures dominate open-source RL frameworks (**veRL**, **OpenRLHF**, **
 
 ---
 
+### 4. Learner–Sampler Numerical Mismatch, Truncated Importance Sampling (TIS) & Asynchronous RL (`AReaL`)
+
+Even when the vLLM Sampler and the FSDP Learner hold the **exact same weight
+tensor $\theta_{\text{old}}$**, their token log-probabilities do not match:
+
+$$\pi_{\theta_{\text{old}}}^{\text{sampler}}(a_t \mid s_t) \neq \pi_{\theta_{\text{old}}}^{\text{learner}}(a_t \mid s_t)$$
+
+Why? Because vLLM uses PagedAttention, FP8/BF16 decode kernels, and inference TP
+reduction order, whereas FSDP uses packed varlen FlashAttention and training
+TP/SP reduction order — and floating-point addition is non-associative
+([Lecture 02](02-arithmetic-intensity.md)). Over an $8{,}192$-token rollout, small per-token
+log-prob drifts compound into large sequence probability discrepancies (*"Your
+framework secretly brings you off-policy RL"*, Yao et al. 2025).
+
+**Truncated Importance Sampling (TIS, Ionides 2008; adopted in veRL, OpenRLHF, Open-Instruct)**
+fixes this by recomputing $\pi_{\theta_{\text{old}}}^{\text{learner}}$ on the
+learner so the PPO ratio $\rho_t^{\text{policy}} = \pi_\theta^{\text{learner}} / \pi_{\theta_{\text{old}}}^{\text{learner}}$
+starts at $1.0000$ at gradient step 0, and multiplying the loss by a detached,
+one-sided capped sampler-to-learner importance weight ($C = 2.0$):
+
+$$\tilde{\rho}_t^{\text{learner}} = \min\!\left(\frac{\pi_{\theta_{\text{old}}}^{\text{learner}}(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}^{\text{sampler}}(a_t \mid s_t)},\; C\right)$$
+
+**Fully Asynchronous RL (`AReaL`, Fu et al. 2025).** In a synchronous RL step,
+every GPU waits for the single longest $32\text{k}$-token rollout in the batch to
+finish before starting the learner pass. **AReaL** decouples streaming rollout
+workers from learner workers completely: rollout workers generate continuously
+without barriers (using **interruptible rollouts** when new weights arrive,
+resuming from the cached KV prefix), while learner workers update whenever a
+batch buffer fills and apply a staleness-bounded PPO objective to achieve a
+**$2.57\times$–$2.77\times$ throughput speedup** on 512 GPUs.
+
+---
+
+### 5. Multi-Turn Tool-Use and Agentic RL
+
+Modern reasoning agents (`OpenAI o3`, `Qwen3`, `Kimi K2`) interleave `<think>`
+tokens with external tool calls (`<code>...</code>` or JSON MCP `<tool_call>`)
+and environment observations (`<tool_output>...</tool_output>`):
+
+```
+[Prompt x] -> [Asst: <think>...<code>fib(50)</code>] -> [Env: <output>12586269025</output>] -> [Asst: </think><answer>...]
+   mask=0                     mask=1                                  mask=0                            mask=1
+```
+
+Two systems rules govern multi-turn tool-use RL:
+1. **Mask environment/tool output tokens (`completion_mask = 0`):** The tokens
+   inside `<output>...</output>` were produced by the Python interpreter or search
+   API, **not** sampled from $\pi_\theta$. Leaving `completion_mask = 1` on tool
+   outputs corrupts the policy gradient by training the model to hallucinate
+   interpreter stdout and breaks importance sampling ratios $\rho_t$.
+2. **Preserve KV cache across tool turns:** When the rollout worker pauses at
+   `</code>`, executes the sandbox, and appends `<output>...</output>`, prefix
+   caching (or paused request slots in SGLang/vLLM) reuses the KV blocks of all
+   prior turns so a 10-turn SWE-bench trajectory does not re-prefill $O(K^2)$ tokens.
+
+---
+
 ## The code
 
 ```python
@@ -264,9 +321,11 @@ uv run pytest tests/test_41_rl_systems.py -v
 
 ---
 
-**Part VII — and the full course — complete.**
+## Next
 
-You now hold both halves of the modern LLM stack in one mental model: how tokens
-are trained into weights (Parts VI–VII), how weights are served back into tokens
-(Parts I–V), and why modern RL post-training is the place where both halves fuse
-into a single loop.
+**[42. Over-optimization, model merging, and post-training evaluation](42-overoptimization-merging-and-eval.md)**:
+derive Goodhart's KL over-optimization peak, Assistant Axis activation capping, TIES/DARE model merging, and unbiased `pass@k` vs. `pass^k` evaluation.
+
+```bash
+uv run python book/code/merging_and_eval.py
+```
