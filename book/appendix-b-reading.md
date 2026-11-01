@@ -173,6 +173,18 @@ unified gradient paradigm across SFT, RFT, DPO, PPO, and GRPO.
 R1-Zero emergent reasoning via verifiable rewards, the 4-stage R1 pipeline, and
 why distilling R1 into a 32B model beats direct RL on the 32B model by 25.6 AIME points.
 
+**[Understanding R1-Zero-Like Training: A Critical Perspective (Dr. GRPO)](https://arxiv.org/abs/2503.20783)** · Liu et al., 2025 · **L39**
+Proves vanilla GRPO's $1/|o_i|$ normalization biases toward shorter correct answers
+and longer wrong answers, and shows $\beta = 0$ (no reference model) works on RLVR.
+
+**[DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)** · Yu et al., 2025 · **L39**
+Clip-Higher ($\varepsilon_{\text{high}}$), dynamic sampling of non-homogeneous groups,
+token-level loss normalization, and dropping $\pi_{\text{ref}}$ ($\beta = 0$).
+
+**[Group Sequence Policy Optimization (GSPO)](https://arxiv.org/abs/2507.18071)** · Zheng et al. (Qwen3), 2025 · **L39**
+Replaces token-level importance ratios with sequence-level geometric-mean ratios
+to stabilize RL training on Mixture-of-Experts models.
+
 **[HybridFlow: A Flexible and Efficient RLHF Framework (veRL)](https://arxiv.org/abs/2409.19256)** · Sheng et al., EuroSys 2025 · **L41**
 Co-locating vLLM rollout engines and FSDP trainers via 3D-HybridEngine weight
 resharding and KV pool sleep/wake.

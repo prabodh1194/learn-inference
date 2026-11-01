@@ -2191,6 +2191,35 @@ trainers (like DAPO) filter or resample homogeneous groups.
 
 ---
 
+## Why do modern GRPO reasoning runs drop the reference model (beta = 0)?
+
+**Lecture:** [39. Group Relative Policy Optimization (GRPO)](39-grpo-and-reinforcement-learning.md)
+
+**Wrong intuition:** "Every RL post-training loop needs a frozen reference model
+$\pi_{\text{ref}}$ and a KL penalty $\beta\,\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})$,
+otherwise the policy will collapse immediately."
+
+In classic RLHF with a learned neural Reward Model $r_\phi$ (Lecture 37), the
+reference KL penalty is mandatory because $r_\phi$ is an imperfect proxy that
+the policy will rapidly reward-hack if allowed to drift far from $\pi_{\text{ref}}$.
+In **RL with Verifiable Rewards (RLVR)** on math and code (DAPO, Dr. GRPO,
+Open-R1), two things change:
+1. **Verifiers cannot be hacked:** an exact math or unit-test checker only pays
+   when the solution is genuinely valid, and PPO's clipped importance ratio
+   $\text{clip}(\rho_{i,t}, 1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}})$
+   already prevents destructive single-step jumps away from $\pi_{\theta_{\text{old}}}$.
+2. **The reference model fights long chain-of-thought emergence:** the initial
+   base or SFT model $\pi_{\text{ref}}$ assigns very low probability to 8,000-token
+   self-correction and backtracking trajectories, so penalizing
+   $\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})$ actively taxes the
+   exact reasoning behavior RL is trying to discover.
+
+Setting $\beta = 0$ ("no-ref GRPO") deletes $\pi_{\text{ref}}$ from the cluster,
+cutting model-state memory from $18\Psi \to 16\Psi$ (saving $14.34\text{ GiB}$ on
+a 7B model) and eliminating one full forward pass over every group of $G$ rollouts.
+
+---
+
 ## What is the difference between Forward KL and Reverse KL in distillation?
 
 **Lecture:** [40. Reasoning pipelines and knowledge distillation](40-reasoning-pipelines-and-distillation.md)

@@ -10,7 +10,9 @@ the curve go flat.
 
 ## → [**START-HERE.md**](START-HERE.md)
 
-A numbered path, 1 through 41, from `uv sync` to landing a PR on vLLM. Start
+A numbered path, 1 through 53, from `uv sync` through building an inference
+engine, landing a PR on vLLM, and crossing the aisle into training & post-training
+(ZeRO/FSDP, 3D parallelism, FP8, LoRA, PPO, DPO, GRPO, and R1 distillation). Start
 there.
 
 Three commands to check everything works:
@@ -178,3 +180,4 @@ Read and write code locally, batch the GPU work, **always stop the pod**.
 - **[Inside vLLM](https://www.aleksagordic.com/blog/vllm)** (Gordić) — the Phase 1 capstone, read *after* building.
 - **[nano-vllm](https://github.com/GeeeekExplorer/nano-vllm)** — ~1,200 readable lines; the nanoGPT of inference.
 - **[vLLM](https://github.com/vllm-project/vllm)** / **[SGLang](https://github.com/sgl-project/sglang)** — the real thing.
+- **[DeepSeekMath](https://arxiv.org/abs/2402.03300)** & **[DeepSeek-R1](https://arxiv.org/abs/2501.12948)** — GRPO, verifiable rewards (RLVR), and reasoning distillation (Part VII, L39–L40).

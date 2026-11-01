@@ -192,7 +192,10 @@ years of production edge cases. Expect to lose to it decisively in Lecture 26,
 and to be able to explain exactly where and why.
 
 Parts III–V go down (Triton and CUDA kernels), sideways (JAX, tensor parallelism),
-and out (serving, load testing, cost).
+and out (serving, load testing, cost). Parts VI–VII then cross the aisle into
+training systems (the $6ND$ compute and $16\Psi$ memory ledgers, ZeRO/FSDP, 3D
+parallelism, FP8) and post-training alignment (SFT, LoRA, PPO, DPO, GRPO, R1
+distillation, and co-located RL engines).
 
 ---
 

@@ -251,6 +251,12 @@ undercuts a big model answering short on the `params × tokens` axis.
 
 ## Go deeper
 
+- **[39. GRPO and verifiable rewards](39-grpo-and-reinforcement-learning.md)** and
+  **[40. Reasoning pipelines (R1-Zero to R1) and distillation](40-reasoning-pipelines-and-distillation.md)**:
+  Part VII derives the training side of everything priced in this lecture — how
+  GRPO trains reasoning models without a Critic, why R1-Zero grows longer traces
+  automatically, and how KL distillation transfers 671B reasoning into a 32B dense
+  student.
 - **DeepSeek-R1** ([arXiv:2501.12948](https://arxiv.org/abs/2501.12948)): the
   source of the 77.9 → 86.7 majority-voting and the length-rises-with-accuracy
   curves.

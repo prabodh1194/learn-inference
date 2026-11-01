@@ -49,7 +49,7 @@ what makes the fix feel inevitable rather than arbitrary.
 
     ---
 
-    Numbered steps 1–41, setup through landing a PR.
+    Numbered steps 1–53, setup through vLLM, training systems, and GRPO/R1.
 
     [START-HERE](https://github.com/prabodh1194/learn-inference/blob/main/START-HERE.md)
 
@@ -103,8 +103,21 @@ post-training alignment with SFT, LoRA, PPO, DPO, GRPO, and R1 distillation
 (Parts VI–VII).
 
 The **code** is a different matter, and deliberately so: `engine/`, `kernels/`,
-`jaxlm/`, and `serve/` are stubs for *you* to fill in. The demos in `book/code/`
-run today; the tests in `tests/` fail until you build each lecture. That failure
-list is the course.
+`jaxlm/`, `serve/`, and `train/` are stubs for *you* to fill in. The demos in
+`book/code/` run today; the tests in `tests/` fail until you build each lecture.
+That failure list is the course.
 
 Run `uv run python scripts/progress.py` to see where you are.
+
+---
+
+## Table of contents
+
+- **Part I — Foundations:** [00 Intro](00-intro.md) · [01 The two phases](01-the-two-phases.md) · [02 Arithmetic intensity](02-arithmetic-intensity.md) · [03 Naive generation](03-naive-generation.md) · [04 Measuring](04-measuring.md)
+- **Part II — The Engine (PyTorch):** [05 KV cache](05-kv-cache.md) · [06 Sampling](06-sampling.md) · [06b Search-based decoding](06b-search-based-decoding.md) · [07 Static batching](07-static-batching.md) · [08 Continuous batching](08-continuous-batching.md) · [09 Paged attention](09-paged-attention.md) · [10 Prefix caching](10-prefix-caching.md) · [11 Chunked prefill](11-chunked-prefill.md) · [12 Speculative decoding](12-speculative-decoding.md) · [12b Structured output](12b-structured-output.md) · [13 CUDA graphs](13-cuda-graphs.md) · [14 Reading vLLM](14-reading-vllm.md)
+- **Part IIb — h3.c (Metal):** [14b Reading h3.c](14b-reading-h3.md) · [14c Weight residency](14c-weight-residency.md) · [14d Fusion](14d-fusion.md) · [14e Activation lifetimes](14e-activation-lifetimes.md) · [14f CPU/GPU overlap](14f-cpu-gpu-overlap.md) · [14g Quantization with receipts](14g-quantization.md) · [14h When optimization changes outputs](14h-aggressive-optimization.md)
+- **Part III — Kernels (Triton & CUDA):** [15 Profiling](15-profiling.md) · [16 Triton basics](16-triton-basics.md) · [17 FlashAttention](17-flash-attention.md) · [18 Paged attention kernel](18-paged-attention-kernel.md) · [19 Quantization](19-quantization.md) · [19b FP8](19b-fp8.md) · [19c GGUF](19c-gguf.md) · [20 Raw CUDA C](20-raw-cuda.md)
+- **Part IV — Parallelism (JAX & NCCL):** [21 JAX & XLA](21-jax-and-xla.md) · [21b Model compilation](21b-model-compilation.md) · [22 Tensor parallelism](22-tensor-parallelism.md) · [23 MoE & expert parallelism](23-moe-and-expert-parallelism.md)
+- **Part V — Production:** [24 Serving](24-serving.md) · [24b Serving agents](24b-serving-agents.md) · [25 Load testing](25-load-testing.md) · [25b Deployment environments](25b-deployment-environments.md) · [26 Versus vLLM](26-versus-vllm.md) · [26b SGLang internals](26b-sglang-internals.md) · [27 Routing & disaggregation](27-routing-and-disaggregation.md) · [28 Autoscaling & cost](28-autoscaling-and-cost.md) · [28b Reasoning & test-time compute](28b-reasoning-and-test-time-compute.md) · [29 Contributing](29-contributing.md)
+- **Part VI — Training Systems:** [30 The training ledger ($6ND$ & $16\Psi$)](30-training-arithmetic.md) · [31 Activations & checkpointing](31-activation-memory.md) · [32 Data pipelines & packing](32-data-and-packing.md) · [33 Data parallelism, ZeRO & FSDP](33-zeRO-and-fsdp.md) · [34 TP + SP, Pipeline schedules & 3D](34-3d-parallelism-and-schedules.md) · [35 FP8 training & modern optimizers](35-fp8-training-and-optimizers.md)
+- **Part VII — Post-Training & Alignment:** [36 SFT, LoRA & QLoRA](36-sft-and-lora.md) · [37 Reward modeling & PPO](37-reward-models-and-ppo.md) · [38 DPO & offline preference](38-dpo-and-offline-preference.md) · [39 GRPO & verifiable rewards (RLVR)](39-grpo-and-reinforcement-learning.md) · [40 Reasoning pipelines (R1-Zero $\to$ R1) & distillation](40-reasoning-pipelines-and-distillation.md) · [41 RL infrastructure: inference meets training](41-rl-systems-inference-meets-training.md)

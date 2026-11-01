@@ -167,22 +167,68 @@ reward-hack a compiler or an exact math checker.** A neural reward model trained
 on human preferences can be fooled by confident-looking algebra; a verifier only
 pays when the final answer is actually right.
 
-**One subtle trap in vanilla GRPO (Dr. GRPO / DAPO length bias):**
-Look closely at the $\frac{1}{|o_i|}$ factor in front of $\sum_{t=1}^{|o_i|}$ in
-the GRPO objective above:
-- When $\hat{A}_i > 0$ (correct answer), dividing by $|o_i|$ gives a **larger**
-  per-token gradient to **shorter** correct answers.
-- When $\hat{A}_i < 0$ (wrong answer), dividing by $|o_i|$ gives a **smaller**
-  per-token penalty to **longer** wrong answers — silently encouraging the model
-  to ramble when it is wrong!
-- **Fix (Dr. GRPO / DAPO):** divide by a constant `max_tokens` (or normalize over
-  the total number of tokens across the group $\sum_{i=1}^G |o_i|$) instead of
-  each completion's own length $|o_i|$, and mask out the $\sigma_r$ division when
-  question-difficulty weighting is undesired.
+### 4. Modern GRPO in practice: dropping $\pi_{\text{ref}}$ ("no-ref GRPO", $\beta = 0$), DAPO, and GSPO
+
+Vanilla GRPO (DeepSeekMath, 2024) kept the frozen reference model $\pi_{\text{ref}}$
+in VRAM ($2\Psi$ bytes) and ran a full reference forward pass on every group of
+$G$ rollouts to compute the $k_3$ KL penalty. When researchers scaled GRPO to
+8,000-token reasoning chains under verifiable rewards (DAPO, Dr. GRPO, Open-R1),
+four refinements became standard:
+
+1. **No reference model ($\beta = 0$, "no-ref GRPO"):**
+   On verifiable math and code tasks, the initial base or SFT checkpoint
+   $\pi_{\text{ref}}$ never produced 8,000-token backtracking chains (`"Wait, let me re-evaluate..."`).
+   Penalizing $\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})$ therefore
+   actively pulls the policy back toward short, non-reasoning completions while
+   PPO-style ratio clipping $\text{clip}(\rho_{i,t}, 1-\varepsilon_{\text{low}}, 1+\varepsilon_{\text{high}})$
+   already bounds per-step drift against $\pi_{\theta_{\text{old}}}$ and verifiable
+   rewards prevent reward hacking. Setting $\beta = 0$ deletes $\pi_{\text{ref}}$
+   completely:
+   - **VRAM drops from $18\Psi \to 16\Psi$** (only the Actor remains in memory —
+     identical to SFT! On a 7B model: $129.08\text{ GiB} \to 114.74\text{ GiB}$,
+     saving $14.34\text{ GiB}$; on `Qwen3-0.6B`: $10.00\text{ GiB} \to 8.88\text{ GiB}$).
+   - **Step compute drops by $2ND_{\text{rollout}}$ FLOPs** by eliminating the
+     reference forward pass across all $B \times G$ trajectories.
+2. **Removing the $1/|o_i|$ length bias (Dr. GRPO / DAPO token-level loss):**
+   In vanilla GRPO's $\frac{1}{G}\sum_{i=1}^G \frac{1}{|o_i|}\sum_{t=1}^{|o_i|}$,
+   dividing each trajectory by its own length $|o_i|$ gives a **larger** per-token
+   gradient to **shorter** correct answers ($\hat{A}_i > 0$) and a **smaller**
+   per-token penalty to **longer** wrong answers ($\hat{A}_i < 0$) — silently
+   rewarding the model for rambling when wrong. **Dr. GRPO** replaces $|o_i|$
+   with a constant $L_{\max}$ (and drops $\sigma_r$ normalization); **DAPO**
+   normalizes by the total tokens in the group $\sum_{i=1}^G |o_i|$.
+3. **Clip-Higher ($\varepsilon_{\text{low}} = 0.2,\; \varepsilon_{\text{high}} = 0.28$ in DAPO):**
+   Symmetric clipping at $1 + 0.2 = 1.2$ caps a low-probability reasoning token
+   ($\pi_{\theta_{\text{old}}} = 0.01$) at $0.012$, starving exploration and
+   causing entropy collapse. Raising only the upper clip bound to
+   $\varepsilon_{\text{high}} = 0.28$ lets rare reasoning tokens grow while
+   keeping the $1 - \varepsilon_{\text{low}} = 0.8$ floor against catastrophic
+   probability drops.
+4. **Sequence-level importance ratios (GSPO — Qwen3):**
+   Token-level ratios $\rho_{i,t}$ accumulate high variance over thousands of
+   tokens and destabilize MoE training when expert routing changes between
+   $\pi_{\theta_{\text{old}}}$ and $\pi_\theta$. **Group Sequence Policy
+   Optimization (GSPO)** replaces $\rho_{i,t}$ with the length-normalized
+   sequence geometric-mean ratio:
+   $$s_i(\theta) = \left(\frac{\pi_\theta(o_i \mid q)}{\pi_{\theta_{\text{old}}}(o_i \mid q)}\right)^{\frac{1}{|o_i|}} = \exp\left(\frac{1}{|o_i|} \sum_{t=1}^{|o_i|} \log \frac{\pi_\theta(o_{i,t} \mid q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,<t})}\right)$$
+   matching sequence-level clipping directly to the sequence-level reward $r_i$.
+
+??? question "Why do modern GRPO reasoning runs drop the reference model ($\beta = 0$, 'no-ref GRPO')?"
+    In PPO RLHF with a neural reward model $r_\phi$, the reference KL penalty
+    $\beta\,\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})$ is essential
+    to stop the policy from exploiting adversarial blind spots in $r_\phi$. Under
+    verifiable rewards (exact math/code checkers), you cannot reward-hack the
+    verifier, and the initial SFT/base checkpoint $\pi_{\text{ref}}$ assigns very
+    low probability to long chain-of-thought self-correction traces — so the KL
+    penalty actively fights reasoning emergence while costing $2\Psi$ of VRAM and
+    an extra forward pass over every rollout. Setting $\beta = 0$ removes
+    $\pi_{\text{ref}}$ altogether and drops GRPO's memory footprint from
+    $18\Psi$ down to $16\Psi$.
+    [Full answer](qa.md#why-do-modern-grpo-reasoning-runs-drop-the-reference-model-beta-0)
 
 ---
 
-### 4. The Unified Paradigm: SFT, RFT, DPO, PPO, and GRPO are one equation
+### 5. The Unified Paradigm: SFT, RFT, DPO, PPO, and GRPO are one equation
 
 DeepSeekMath (§4.2) shows that every post-training method in Part VII has the
 **exact same gradient form**:
@@ -198,7 +244,7 @@ They differ in only two choices: **where the data $\mathcal{D}$ comes from** and
 | **RFT** (L40) | sampled from $\pi_\theta$, filtered by verifier | $\mathbb{I}[\text{correct}(q, o)]$ ($1$ if right, $0$ if wrong) | $1$ ($16\Psi$) |
 | **DPO** (L38) | fixed preference pairs $(y_w, y_l)$ | $\pm \beta\,\sigma(\hat{r}_l - \hat{r}_w)$ | $2$ ($18\Psi$) |
 | **PPO** (L37) | online rollout from $\pi_{\theta_{\text{old}}}$ | clipped GAE advantage from Critic $V_\psi$ | $4$ ($36\Psi$) |
-| **GRPO** (L39) | online group rollout $\{o_1,\dots,o_G\} \sim \pi_{\theta_{\text{old}}}$ | clipped group z-score $\frac{r_i - \mu_r}{\sigma_r} - \beta\,\nabla k_3$ | $2$ ($18\Psi$) |
+| **GRPO** (L39) | online group rollout $\{o_1,\dots,o_G\} \sim \pi_{\theta_{\text{old}}}$ | clipped group z-score $\frac{r_i - \mu_r}{\sigma_r} - \beta\,\nabla k_3$ | $2$ ($18\Psi$), or $1$ ($16\Psi$) when $\beta = 0$ |
 
 Notice the crucial difference between **RFT / SFT** and **GRPO**: RFT has
 $GC \in \{0, 1\}$, so it only ever pushes **up** on winners ($GC = 1$) and
@@ -272,7 +318,9 @@ uv run pytest tests/test_39_grpo.py -v
 
 - **[DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models](https://arxiv.org/abs/2402.03300)** (Shao et al., 2024) — Section 4.1 (GRPO) and Section 4.2 (Unified Paradigm).
 - **[Approximating KL Divergence](http://joschu.net/blog/kl-approx.html)** (John Schulman, 2020) — why $k_3 = (q/p) - \log(q/p) - 1$ is the minimum-variance unbiased non-negative estimator.
-- **[Understanding R1-Zero-Like Training: A Critical Perspective (Dr. GRPO)](https://arxiv.org/abs/2503.20783)** (Liu et al., 2025) — the $\frac{1}{|o_i|}$ length-bias analysis.
+- **[Understanding R1-Zero-Like Training: A Critical Perspective (Dr. GRPO)](https://arxiv.org/abs/2503.20783)** (Liu et al., 2025) — the $\frac{1}{|o_i|}$ length-bias analysis and $\beta = 0$ reference-free GRPO.
+- **[DAPO: An Open-Source LLM Reinforcement Learning System at Scale](https://arxiv.org/abs/2503.14476)** (Yu et al., 2025) — Clip-Higher ($\varepsilon_{\text{high}}$), dynamic sampling, token-level loss, and dropping $\pi_{\text{ref}}$.
+- **[Group Sequence Policy Optimization (GSPO)](https://arxiv.org/abs/2507.18071)** (Zheng et al. / Qwen3, 2025) — sequence-level geometric-mean importance ratios for stable MoE RL.
 
 ---
 
